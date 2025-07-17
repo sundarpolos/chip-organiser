@@ -39,8 +39,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     const apiUrl = process.env.WHATSAPP_API_URL;
 
     if (!apiToken || !apiUrl) {
-      console.error('WhatsApp credentials or API URL are not set in .env file.');
-      return { success: false, error: 'Server configuration error: WhatsApp credentials missing.' };
+      const errorMsg = 'WhatsApp credentials or API URL are not set in .env file.';
+      console.error(errorMsg);
+      return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
     try {
@@ -48,24 +49,31 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       formData.append('receiver', to);
       formData.append('msgtext', message);
       formData.append('token', apiToken);
-
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
       });
 
-      // The API seems to return JSON, so we'll try to parse it.
-      const responseData = await response.json();
+      const responseText = await response.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse API response as JSON:', responseText);
+        return { success: false, error: `Invalid API response: ${responseText}` };
+      }
       
-      // Check both the HTTP status code and the 'success' field in the JSON payload
       if (!response.ok || String(responseData.success).toLowerCase() !== 'true') {
         console.error('Failed to send WhatsApp message. API Response:', responseData);
-        // Provide a more specific error message from the API if available
         const apiError = responseData.error || responseData.message || `API returned status ${response.status}`;
         return { success: false, error: apiError };
       }
       
-      return { success: true, messageId: responseData.messageId || 'N/A' };
+      return { success: true, messageId: responseData.message_id || responseData.messageId || 'N/A' };
 
     } catch (error) {
       console.error('Error in sendWhatsappMessageFlow:', error);
