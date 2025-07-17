@@ -37,16 +37,15 @@ const sendWhatsappMessageFlow = ai.defineFlow(
   async ({ to, message }) => {
     const fromPhoneNumberId = process.env.WHATSAPP_MOBILE_NUMBER;
     const apiToken = process.env.WHATSAPP_API_TOKEN;
+    const apiUrl = process.env.WHATSAPP_API_URL;
 
-    if (!fromPhoneNumberId || !apiToken) {
-      console.error('WhatsApp credentials are not set in .env file.');
+    if (!fromPhoneNumberId || !apiToken || !apiUrl) {
+      console.error('WhatsApp credentials or API URL are not set in .env file.');
       return { success: false, error: 'Server configuration error: WhatsApp credentials missing.' };
     }
 
-    const url = `https://graph.facebook.com/v19.0/${fromPhoneNumberId}/messages`;
-
     try {
-      const response = await fetch(url, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiToken}`,
@@ -67,7 +66,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         return { success: false, error: responseData.error?.message || 'Unknown error from WhatsApp API.' };
       }
 
-      return { success: true, messageId: responseData.messages[0]?.id };
+      return { success: true, messageId: responseData.messages?.[0]?.id };
 
     } catch (error) {
       console.error('Error in sendWhatsappMessageFlow:', error);
