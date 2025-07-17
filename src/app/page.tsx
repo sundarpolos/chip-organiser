@@ -740,13 +740,12 @@ const ManagePlayersDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="h-[90vh] max-h-[500px] flex flex-col">
+            <DialogContent className="flex flex-col h-[90vh] max-h-[500px]">
                 <DialogHeader>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center gap-2">
                         <DialogTitle>Manage Players</DialogTitle>
                         <Badge variant="secondary">{masterPlayers.length}</Badge>
                     </div>
-                    <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 border-b pb-4">
                     <div className="flex gap-2">
