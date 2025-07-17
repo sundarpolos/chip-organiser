@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, type FC } from "react"
@@ -131,38 +132,31 @@ export default function ChipMaestroPage() {
       if (savedGameHistory) {
         const history = JSON.parse(savedGameHistory)
         setGameHistory(history)
-        if (history.length > 0) {
-          setActiveGame(history[0])
-        }
       }
       
-      if (!savedGameHistory || JSON.parse(savedGameHistory).length === 0) {
-        setVenueModalOpen(true)
-        addNewPlayer();
+      const lastActiveGame = localStorage.getItem("activeGame");
+      if (lastActiveGame) {
+          const game = JSON.parse(lastActiveGame);
+          setActiveGame(game);
+          setCurrentVenue(game.venue);
+          setGameDate(new Date(game.timestamp));
+          setPlayers(game.players.map((p: CalculatedPlayer) => ({
+              id: p.id,
+              name: p.name,
+              whatsappNumber: p.whatsappNumber,
+              buyIns: p.buyIns,
+              finalChips: p.finalChips,
+          })));
+          if (game.players.length > 0) {
+              setActiveTab(game.players[0].id)
+          }
       } else {
-        const history = JSON.parse(savedGameHistory);
-        if (history.length > 0) {
-            const lastGame = history[0];
-            setCurrentVenue(lastGame.venue);
-            setGameDate(new Date(lastGame.timestamp));
-            const playersFromHistory = lastGame.players.map(p => ({
-                id: p.id,
-                name: p.name,
-                whatsappNumber: p.whatsappNumber,
-                buyIns: p.buyIns,
-                finalChips: p.finalChips,
-            }));
-            setPlayers(playersFromHistory);
-            if (playersFromHistory.length > 0) {
-                setActiveTab(playersFromHistory[0].id)
-            }
-        }
+        setVenueModalOpen(true);
       }
     } catch (error) {
       console.error("Failed to load data from localStorage", error)
       toast({ variant: "destructive", title: "Error", description: "Could not load saved data." })
-      setVenueModalOpen(true)
-      addNewPlayer();
+      setVenueModalOpen(true);
     }
     setIsDataReady(true)
   }, [])
@@ -173,7 +167,12 @@ export default function ChipMaestroPage() {
     localStorage.setItem("masterPlayers", JSON.stringify(masterPlayers))
     localStorage.setItem("masterVenues", JSON.stringify(masterVenues))
     localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
-  }, [masterPlayers, masterVenues, gameHistory, isDataReady])
+    if (activeGame) {
+        localStorage.setItem("activeGame", JSON.stringify(activeGame));
+    } else {
+        localStorage.removeItem("activeGame");
+    }
+  }, [masterPlayers, masterVenues, gameHistory, activeGame, isDataReady])
 
   const addNewPlayer = () => {
     if (players.some(p => p.name === "")) {
@@ -251,10 +250,25 @@ export default function ChipMaestroPage() {
         players: calculatedPlayers,
     }
 
-    const updatedHistory = [newGame, ...gameHistory];
+    // Check if a game from the same day and venue already exists
+    const existingGameIndex = gameHistory.findIndex(
+      g => g.venue === newGame.venue && isSameDay(new Date(g.timestamp), new Date(newGame.timestamp))
+    );
+
+    let updatedHistory;
+    if (existingGameIndex !== -1) {
+      // Update the existing game
+      updatedHistory = [...gameHistory];
+      updatedHistory[existingGameIndex] = newGame;
+      toast({ title: "Game Updated!", description: `${currentVenue} has been updated in your history.` });
+    } else {
+      // Add a new game
+      updatedHistory = [newGame, ...gameHistory];
+      toast({ title: "Game Saved!", description: `${currentVenue} has been saved to your history.` });
+    }
+    
     setGameHistory(updatedHistory);
     setActiveGame(newGame);
-    toast({ title: "Game Saved!", description: `${currentVenue} has been saved to your history.` });
   };
   
   const handleLoadGame = (gameId: string) => {
@@ -282,7 +296,7 @@ export default function ChipMaestroPage() {
     setPlayers([]);
     setActiveGame(null);
     setGameDate(new Date());
-    addNewPlayer();
+    setActiveTab("");
     setVenueModalOpen(true);
   }
   
@@ -290,6 +304,9 @@ export default function ChipMaestroPage() {
     setCurrentVenue(venue);
     setGameDate(date);
     setVenueModalOpen(false);
+    if (players.length === 0) {
+      addNewPlayer();
+    }
   }
 
   const handleRunAnomalyDetection = async (player: Player) => {
