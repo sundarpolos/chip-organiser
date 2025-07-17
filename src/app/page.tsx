@@ -11,6 +11,17 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -505,6 +516,13 @@ const BuyInRow: FC<{
         }
         setIsVerifying(false);
     };
+
+    const handleAmountChange = (newAmount: number) => {
+        if(buyIn.verified) {
+            onVerify(index, false);
+        }
+        onBuyInChange(index, newAmount);
+    }
     
     return (
         <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
@@ -512,20 +530,36 @@ const BuyInRow: FC<{
                 <Input
                     type="number"
                     value={buyIn.amount}
-                    onChange={e => onBuyInChange(index, parseInt(e.target.value) || 0)}
+                    onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={showOtpInput || buyIn.verified}
+                    disabled={showOtpInput}
                 />
                 {buyIn.verified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                 ) : (
-                    showOtpInput ? <div className="w-10" /> : null
+                    showOtpInput ? <div className="w-5" /> : null
                 )}
                  {canBeRemoved && (
-                    <Button size="icon" variant="destructive" onClick={() => onRemoveBuyIn(index)} className="h-9 w-9">
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="destructive" className="h-9 w-9">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this buy-in. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => onRemoveBuyIn(index)}>Continue</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                 )}
             </div>
             {showOtpInput && !buyIn.verified && (
