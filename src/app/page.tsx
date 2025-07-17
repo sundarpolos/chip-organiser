@@ -470,11 +470,17 @@ const BuyInRow: FC<{
 
         setIsSending(true);
         try {
+            const verifiedBuyIns = player.buyIns.filter(b => b.verified);
+            const totalVerifiedAmount = verifiedBuyIns.reduce((sum, b) => sum + b.amount, 0);
+            
             const result = await sendBuyInOtp({
                 playerName: player.name,
                 whatsappNumber: player.whatsappNumber,
-                buyInAmount: buyIn.amount
+                buyInAmount: buyIn.amount,
+                buyInCount: verifiedBuyIns.length + 1,
+                totalBuyInAmount: totalVerifiedAmount,
             });
+
             if (result.success && result.otp) {
                 toast({ title: "OTP Sent", description: "Verification code sent to player's WhatsApp." });
                 setSentOtp(result.otp);

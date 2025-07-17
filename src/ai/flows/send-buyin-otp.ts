@@ -16,6 +16,8 @@ const SendBuyInOtpInputSchema = z.object({
   playerName: z.string().describe('The name of the player.'),
   whatsappNumber: z.string().describe("The player's WhatsApp number."),
   buyInAmount: z.number().describe('The buy-in amount to be verified.'),
+  buyInCount: z.number().describe('The number of this buy-in for the player (e.g., 1 for 1st).'),
+  totalBuyInAmount: z.number().describe("The player's total verified buy-in amount so far."),
 });
 export type SendBuyInOtpInput = z.infer<typeof SendBuyInOtpInputSchema>;
 
@@ -31,6 +33,13 @@ function generateOtp(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
+// Helper to get ordinal suffix (1st, 2nd, 3rd, etc.)
+function getOrdinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 export async function sendBuyInOtp(input: SendBuyInOtpInput): Promise<SendBuyInOtpOutput> {
   return sendBuyInOtpFlow(input);
 }
@@ -41,13 +50,14 @@ const sendBuyInOtpFlow = ai.defineFlow(
     inputSchema: SendBuyInOtpInputSchema,
     outputSchema: SendBuyInOtpOutputSchema,
   },
-  async ({ playerName, whatsappNumber, buyInAmount }) => {
+  async ({ playerName, whatsappNumber, buyInAmount, buyInCount, totalBuyInAmount }) => {
     if (!whatsappNumber) {
         return { success: false, error: 'WhatsApp number is not provided.' };
     }
 
     const otp = generateOtp();
-    const message = `Hi ${playerName}, your verification code for a buy-in of ${buyInAmount} is ${otp}.`;
+    const newTotal = totalBuyInAmount + buyInAmount;
+    const message = `Hi ${playerName}, your OTP for your ${getOrdinalSuffix(buyInCount)} buy-in of ₹${buyInAmount} is ${otp}. Your new grand total will be ₹${newTotal}.`;
 
     try {
       const whatsappResult = await sendWhatsappMessage({ to: whatsappNumber, message });
