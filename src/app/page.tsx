@@ -508,10 +508,9 @@ const BuyInRow: FC<{
 
     if (buyIn.verified) {
         return (
-            <div className="flex items-center gap-2 p-2 rounded-md border bg-green-50 dark:bg-green-900/50">
+            <div className="flex items-center gap-2 p-2 rounded-md border bg-slate-50 dark:bg-slate-900/50">
                 <p className="flex-1 text-sm">Buy-in: {buyIn.amount}</p>
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <span className="text-sm font-medium text-green-700">Verified</span>
             </div>
         )
     }
