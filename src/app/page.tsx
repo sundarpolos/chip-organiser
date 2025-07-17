@@ -879,10 +879,10 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        // WhatsApp number validation (basic)
-        const whatsappRegex = /^\d{10,14}$/; // Allows 10 to 14 digits
+        // WhatsApp number validation (Regex for optional '+' and 10-14 digits)
+        const whatsappRegex = /^\+?\d{10,14}$/;
         if (whatsapp && !whatsappRegex.test(whatsapp)) {
-            toast({ variant: "destructive", title: "Invalid WhatsApp Number", description: "Please enter a valid number with country code (e.g., 919876543210)." });
+            toast({ variant: "destructive", title: "Invalid WhatsApp Number", description: "Please enter a valid number, e.g., +919876543210 or 919876543210." });
             return;
         }
 
