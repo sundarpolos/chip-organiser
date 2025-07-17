@@ -180,7 +180,7 @@ export default function ChipMaestroPage() {
     }
 
     const calculatedPlayers: CalculatedPlayer[] = players.map(p => {
-        const totalBuyIns = p.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
         return {
             ...p,
             totalBuyIns,
@@ -688,7 +688,7 @@ const PlayerCard: FC<{
     }
   }
 
-  const totalBuyIns = player.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
   const availableMasterPlayers = useMemo(() => {
     const currentInGamePlayerNames = allPlayers
@@ -1421,4 +1421,5 @@ const WhatsappDialog: FC<{
     
 
     
+
 
