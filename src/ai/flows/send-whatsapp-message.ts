@@ -35,38 +35,39 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     outputSchema: SendWhatsappMessageOutputSchema,
   },
   async ({ to, message }) => {
-    const fromPhoneNumberId = process.env.WHATSAPP_MOBILE_NUMBER;
     const apiToken = process.env.WHATSAPP_API_TOKEN;
     const apiUrl = process.env.WHATSAPP_API_URL;
 
-    if (!fromPhoneNumberId || !apiToken || !apiUrl) {
+    if (!apiToken || !apiUrl) {
       console.error('WhatsApp credentials or API URL are not set in .env file.');
       return { success: false, error: 'Server configuration error: WhatsApp credentials missing.' };
     }
 
     try {
+      const formData = new URLSearchParams();
+      formData.append('receiver', to);
+      formData.append('msgtext', message);
+      formData.append('token', apiToken);
+      // To add media, you would add:
+      // formData.append('mediaurl', 'https://your-media-url.com/image.png');
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: to,
-          type: 'text',
-          text: { body: message },
-        }),
+        body: formData.toString(),
       });
 
       const responseData = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !responseData.success) {
         console.error('Failed to send WhatsApp message:', responseData);
-        return { success: false, error: responseData.error?.message || 'Unknown error from WhatsApp API.' };
+        return { success: false, error: responseData.error || responseData.message || 'Unknown error from WhatsApp API.' };
       }
-
-      return { success: true, messageId: responseData.messages?.[0]?.id };
+      
+      // The API seems to return {success: true} or {success: false}
+      return { success: true, messageId: responseData.messageId || 'N/A' };
 
     } catch (error) {
       console.error('Error in sendWhatsappMessageFlow:', error);
