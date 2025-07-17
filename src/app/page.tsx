@@ -556,7 +556,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                                     <TableCell className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {p.profitLoss >= 0 ? '+' : ''}{p.profitLoss.toFixed(2)}
                                     </TableCell>
-                                </TableRow>
+                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
@@ -731,9 +731,9 @@ const ManagePlayersDialog: FC<{
                         <div className="space-y-2 py-4 pr-6">
                             {masterPlayers.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                                    <div className="flex items-center space-x-2">
-                                        <p className="text-sm font-medium">{p.name}</p>
-                                        {p.whatsappNumber && <p className="text-xs text-muted-foreground">({p.whatsappNumber})</p>}
+                                    <div className="grid grid-cols-2 gap-4 flex-1 mr-4">
+                                        <p className="text-sm font-medium truncate">{p.name}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{p.whatsappNumber || '-'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
