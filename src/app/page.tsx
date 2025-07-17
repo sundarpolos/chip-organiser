@@ -40,7 +40,6 @@ import {
   ShieldAlert,
   Crown,
   Share2,
-  MessageSquare,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -52,6 +51,23 @@ config();
 
 
 const MAX_PLAYERS = 7;
+
+const WhatsappIcon = () => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+    </svg>
+  );
 
 export default function ChipMaestroPage() {
   const { toast } = useToast()
@@ -300,7 +316,7 @@ export default function ChipMaestroPage() {
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
           <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="icon" className="h-8 w-8">
-            <MessageSquare className="h-4 w-4" />
+            <WhatsappIcon />
             <span className="sr-only">Send WhatsApp Message</span>
           </Button>
         </div>
