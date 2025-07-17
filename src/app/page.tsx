@@ -369,7 +369,7 @@ export default function ChipMaestroPage() {
   }, [activeGame]);
 
   const totalBuyInLog = useMemo(() => {
-    const log = players.flatMap(p => p.buyIns.map(b => ({
+    const log = players.flatMap(p => (p.buyIns || []).map(b => ({
       playerName: p.name || "Unnamed",
       amount: b.amount,
       timestamp: b.timestamp,
@@ -1421,3 +1421,4 @@ const WhatsappDialog: FC<{
     
 
     
+
