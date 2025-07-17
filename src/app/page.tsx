@@ -297,7 +297,13 @@ export default function ChipMaestroPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-6 gap-4">
-        <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+          <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="icon" className="h-8 w-8">
+            <MessageSquare className="h-4 w-4" />
+            <span className="sr-only">Send WhatsApp Message</span>
+          </Button>
+        </div>
         <ThemeToggle />
       </header>
       
@@ -309,9 +315,6 @@ export default function ChipMaestroPage() {
                 <div className="flex items-center gap-2">
                   <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm" className="sm:size-auto"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
                   <Button onClick={handleNewGame} variant="destructive" size="sm" className="sm:size-auto"><Plus className="mr-2 h-4 w-4" />New Game</Button>
-                </div>
-                <div>
-                  <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="sm"><MessageSquare className="mr-2 h-4 w-4" />WhatsApp</Button>
                 </div>
               </div>
             </CardHeader>
@@ -498,7 +501,7 @@ const PlayerCard: FC<{
           <Label className="text-lg">Final Chips</Label>
           <Input 
             type="number" 
-            className="mt-2 text-lg h-10" 
+            className="mt-2 text-sm h-9" 
             value={player.finalChips} 
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
           />
