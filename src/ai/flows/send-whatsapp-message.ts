@@ -35,12 +35,12 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     outputSchema: SendWhatsappMessageOutputSchema,
   },
   async ({ to, message }) => {
-    const apiToken = process.env.WHATSAPP_API_TOKEN;
-    const apiUrl = process.env.WHATSAPP_API_URL;
-    const senderMobile = process.env.WHATSAPP_SENDER_MOBILE;
+    const apiToken = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
+    const apiUrl = process.env.NEXT_PUBLIC_WHATSAPP_API_URL;
+    const senderMobile = process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE;
 
     if (!apiToken || !apiUrl || !senderMobile) {
-      const errorMsg = 'WhatsApp credentials, sender number, or API URL are not set in .env file.';
+      const errorMsg = 'WhatsApp credentials, sender number, or API URL are not set in env file.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
