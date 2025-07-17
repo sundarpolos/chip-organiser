@@ -48,8 +48,6 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       formData.append('receiver', to);
       formData.append('msgtext', message);
       formData.append('token', apiToken);
-      // To add media, you would add:
-      // formData.append('mediaurl', 'https://your-media-url.com/image.png');
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -61,12 +59,11 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       const responseData = await response.json();
 
-      if (!response.ok || !responseData.success) {
+      if (!response.ok || responseData.success === 'false' || responseData.success === false) {
         console.error('Failed to send WhatsApp message:', responseData);
         return { success: false, error: responseData.error || responseData.message || 'Unknown error from WhatsApp API.' };
       }
       
-      // The API seems to return {success: true} or {success: false}
       return { success: true, messageId: responseData.messageId || 'N/A' };
 
     } catch (error) {
