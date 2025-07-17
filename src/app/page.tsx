@@ -727,7 +727,7 @@ const PlayerCard: FC<{
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="text-lg mb-2 inline-block">Buy-ins</Label>
+          <Label className="hidden md:inline-block text-lg mb-2">Buy-ins</Label>
           <div className="space-y-2">
              {player.buyIns.map((buyIn, index) => (
               <BuyInRow 
