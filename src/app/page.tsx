@@ -293,15 +293,12 @@ export default function ChipMaestroPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div className="flex items-baseline gap-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
-            <Crown className="text-primary h-8 w-8" />
-            Chip Maestro
-          </h1>
+        <div className="flex items-center gap-4">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">{currentVenue}</h1>
         </div>
-        <div className="flex items-center gap-2 mt-2 sm:mt-0 p-1 px-2 bg-slate-100 text-slate-600 rounded-md">
+        <div className="flex items-center gap-2 mt-4 sm:mt-0 p-1 px-3 bg-slate-100 text-slate-600 rounded-md">
           <Timer className="h-4 w-4" />
-          <span className="font-mono text-lg font-semibold">{formattedTime}</span>
+          <span className="font-mono text-xl font-semibold">{formattedTime}</span>
         </div>
       </header>
       
