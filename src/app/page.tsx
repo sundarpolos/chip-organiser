@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn } from "@/lib/types"
-import { calculateInterPlayerTransfers, generateVerificationCode } from "@/lib/game-logic"
+import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { useGameTimer } from "@/hooks/use-game-timer"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -141,7 +141,7 @@ export default function ChipMaestroPage() {
       id: `player-${Date.now()}`,
       name: "",
       whatsappNumber: "",
-      buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: false, verificationCode: null, codeSent: false }],
+      buyIns: [{ amount: 0, timestamp: new Date().toISOString() }],
       finalChips: 0,
     }
     setPlayers([...players, newPlayer])
@@ -407,8 +407,6 @@ const PlayerCard: FC<{
   isOnlyPlayer: boolean
 }> = ({ player, masterPlayers, allPlayers, onUpdate, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
   
-  const { toast } = useToast();
-
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...player.buyIns]
     newBuyIns[index].amount = newAmount
@@ -416,7 +414,7 @@ const PlayerCard: FC<{
   }
 
   const addBuyIn = () => {
-    const newBuyIns = [...player.buyIns, { amount: 0, timestamp: new Date().toISOString(), verified: false, verificationCode: null, codeSent: false }]
+    const newBuyIns = [...player.buyIns, { amount: 0, timestamp: new Date().toISOString() }]
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
@@ -424,30 +422,6 @@ const PlayerCard: FC<{
     if (player.buyIns.length > 1) {
       const newBuyIns = player.buyIns.filter((_, i) => i !== index)
       onUpdate(player.id, { buyIns: newBuyIns })
-    }
-  }
-
-  const sendVerificationCode = (index: number) => {
-    if(!player.whatsappNumber) {
-        toast({variant: 'destructive', title: 'WhatsApp number missing', description: 'Please add a WhatsApp number for this player in Manage Players.'})
-        return
-    }
-    const newBuyIns = [...player.buyIns];
-    const code = generateVerificationCode();
-    newBuyIns[index].verificationCode = code;
-    newBuyIns[index].codeSent = true;
-    onUpdate(player.id, { buyIns: newBuyIns });
-    toast({ title: 'Code Sent (Simulated)', description: `Verification code for ${player.name} is ${code}`});
-  }
-
-  const confirmVerificationCode = (index: number, enteredCode: string) => {
-    const newBuyIns = [...player.buyIns];
-    if (newBuyIns[index].verificationCode === enteredCode) {
-        newBuyIns[index].verified = true;
-        onUpdate(player.id, { buyIns: newBuyIns });
-        toast({title: 'Success!', description: `Buy-in of ${newBuyIns[index].amount} verified for ${player.name}.`});
-    } else {
-        toast({variant: 'destructive', title: 'Invalid Code', description: 'The verification code is incorrect.'});
     }
   }
 
@@ -492,27 +466,19 @@ const PlayerCard: FC<{
           <Label className="text-lg">Buy-ins</Label>
           <div className="space-y-2 mt-2">
             {player.buyIns.map((buyIn, index) => (
-              <div key={index} className={`p-2 rounded-md border ${buyIn.verified ? 'bg-green-100 border-green-200' : 'bg-white'}`}>
+              <div key={index} className="p-2 rounded-md border bg-white">
                 <div className="flex items-center gap-2">
-                  <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} disabled={buyIn.verified} placeholder="Amount" />
+                  <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" />
                   {index === player.buyIns.length - 1 ? (
                     <Button size="icon" variant="outline" onClick={addBuyIn}><Plus className="h-4 w-4" /></Button>
                   ) : (
                     <Button size="icon" variant="destructive" onClick={() => removeBuyIn(index)}><Trash2 className="h-4 w-4" /></Button>
                   )}
                 </div>
-                {!buyIn.verified && (
-                    <div className="flex items-center gap-2 mt-2">
-                        <Input placeholder="Code" id={`code-input-${player.id}-${index}`} />
-                        <Button variant="secondary" size="sm" onClick={() => confirmVerificationCode(index, (document.getElementById(`code-input-${player.id}-${index}`) as HTMLInputElement).value)}>Confirm</Button>
-                        <Button variant="outline" size="sm" onClick={() => sendVerificationCode(index)} disabled={buyIn.codeSent}>Send</Button>
-                    </div>
-                )}
-                 {buyIn.verified && <p className="text-sm text-green-600 font-medium mt-2">✓ Verified</p>}
               </div>
             ))}
           </div>
-          <p className="text-xl font-bold mt-4 text-right">Total: ${totalBuyIns}</p>
+          <p className="text-xl font-bold mt-4 text-right">Total: {totalBuyIns}</p>
         </div>
         <div>
           <Label className="text-lg">Final Chips</Label>
@@ -555,7 +521,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                                 <TableRow key={p.id}>
                                     <TableCell>{p.name}</TableCell>
                                     <TableCell className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {p.profitLoss >= 0 ? '+' : ''}${p.profitLoss.toFixed(2)}
+                                        {p.profitLoss >= 0 ? '+' : ''}{p.profitLoss.toFixed(2)}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -578,7 +544,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                            {buyInLog.map((log, i) => (
                             <TableRow key={i}>
                                 <TableCell>{log.playerName}</TableCell>
-                                <TableCell>${log.amount}</TableCell>
+                                <TableCell>{log.amount}</TableCell>
                                 <TableCell className="text-right text-muted-foreground">{format(new Date(log.timestamp), "p")}</TableCell>
                             </TableRow>
                            ))}
@@ -589,7 +555,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                         <TableFoot>
                             <TableRow>
                                 <TableCell colSpan={2} className="font-bold">Grand Total</TableCell>
-                                <TableCell className="text-right font-bold">${grandTotal}</TableCell>
+                                <TableCell className="text-right font-bold">{grandTotal}</TableCell>
                             </TableRow>
                         </TableFoot>
                     </Table>
@@ -826,7 +792,7 @@ const ReportsDialog: FC<{
                              {activeGame.players.flatMap(p => p.buyIns.map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
                                  <TableRow key={i}>
                                      <TableCell>{b.playerName}</TableCell>
-                                     <TableCell>${b.amount}</TableCell>
+                                     <TableCell>{b.amount}</TableCell>
                                      <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
                                  </TableRow>
                              ))}

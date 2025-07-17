@@ -18,7 +18,7 @@ export function calculateInterPlayerTransfers(players: CalculatedPlayer[]): stri
         const receiver = receivers[0];
         const amount = Math.min(payer.amount, receiver.amount);
 
-        transfers.push(`<strong>${payer.name}</strong> pays <strong>${receiver.name}</strong>: $${amount.toFixed(2)}`);
+        transfers.push(`<strong>${payer.name}</strong> pays <strong>${receiver.name}</strong>: ${amount.toFixed(2)}`);
 
         payer.amount -= amount;
         receiver.amount -= amount;
@@ -32,8 +32,4 @@ export function calculateInterPlayerTransfers(players: CalculatedPlayer[]): stri
     }
 
     return transfers;
-}
-
-export function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 }
