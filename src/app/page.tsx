@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
-import { useGameTimer } from "@/hooks/use-game-timer"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -39,7 +38,6 @@ import {
   ShieldAlert,
   Crown,
   Share2,
-  Timer,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -49,7 +47,6 @@ const MAX_PLAYERS = 7;
 
 export default function ChipMaestroPage() {
   const { toast } = useToast()
-  const { formattedTime, start: startTimer, reset: resetTimer } = useGameTimer()
 
   // Core State
   const [players, setPlayers] = useState<Player[]>([])
@@ -227,13 +224,11 @@ export default function ChipMaestroPage() {
     setActiveGame(null);
     addNewPlayer();
     setVenueModalOpen(true);
-    resetTimer();
   }
   
   const handleStartGameFromVenue = (venue: string) => {
     setCurrentVenue(venue);
     setVenueModalOpen(false);
-    startTimer();
   }
 
   const handleRunAnomalyDetection = async (player: Player) => {
@@ -294,10 +289,6 @@ export default function ChipMaestroPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-center items-center mb-6 gap-4">
         <h1 className="text-xl font-bold text-gray-800 truncate">{currentVenue}</h1>
-        <div className="flex items-center gap-2 p-1 px-2 bg-slate-100 text-slate-600 rounded-md">
-          <Timer className="h-4 w-4" />
-          <span className="font-mono text-base font-semibold">{formattedTime}</span>
-        </div>
       </header>
       
       <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
