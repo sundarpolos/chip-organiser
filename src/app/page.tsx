@@ -879,6 +879,13 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
+        // WhatsApp number validation (basic)
+        const whatsappRegex = /^\d{10,14}$/; // Allows 10 to 14 digits
+        if (whatsapp && !whatsappRegex.test(whatsapp)) {
+            toast({ variant: "destructive", title: "Invalid WhatsApp Number", description: "Please enter a valid number with country code (e.g., 919876543210)." });
+            return;
+        }
+
         if (editingPlayer) {
             setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: whatsapp} : p));
         } else {
