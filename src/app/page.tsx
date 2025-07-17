@@ -298,7 +298,6 @@ export default function ChipMaestroPage() {
             <Crown className="text-primary h-8 w-8" />
             Chip Maestro
           </h1>
-          <span className="text-xl text-muted-foreground font-medium">{currentVenue}</span>
         </div>
         <div className="flex items-center gap-2 mt-2 sm:mt-0 p-1 px-2 bg-slate-100 text-slate-600 rounded-md">
           <Timer className="h-4 w-4" />
@@ -311,7 +310,6 @@ export default function ChipMaestroPage() {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Player Dashboard</CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
                   <Button onClick={handleNewGame} variant="destructive" size="sm"><Plus className="mr-2 h-4 w-4" />New Game</Button>
@@ -348,14 +346,14 @@ export default function ChipMaestroPage() {
                  </div>
               )}
             </CardContent>
-            <CardFooter className="flex justify-between items-center">
+            <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
-                  <Button onClick={addNewPlayer} disabled={players.length >= MAX_PLAYERS}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
-                  <Button onClick={handleSaveGame} variant="secondary"><Save className="mr-2 h-4 w-4" />Save Game</Button>
+                  <Button onClick={addNewPlayer} disabled={players.length >= MAX_PLAYERS} size="sm" className="sm:size-auto"><Plus className="mr-2 h-4 w-4" />Add Player</Button>
+                  <Button onClick={handleSaveGame} variant="secondary" size="sm" className="sm:size-auto"><Save className="mr-2 h-4 w-4" />Save Game</Button>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
-                    <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                    <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" size="sm" className="sm:size-auto"><History className="mr-2 h-4 w-4" />Load Game</Button>
+                    <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame} size="sm" className="sm:size-auto"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                 </div>
             </CardFooter>
           </Card>
