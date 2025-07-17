@@ -720,11 +720,11 @@ const PlayerCard: FC<{
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Label className="text-lg">Buy-ins</Label>
             <Button onClick={addBuyIn} variant="outline" size="icon" className="h-7 w-7">
               <Plus className="h-4 w-4" />
               <span className="sr-only">Re-buy</span>
             </Button>
+            <Label className="text-lg">Buy-ins</Label>
           </div>
           <div className="space-y-2">
              {player.buyIns.map((buyIn, index) => (
@@ -996,13 +996,13 @@ const ManagePlayersDialog: FC<{
         }
 
         if (mobileNumber) {
-            // Regex for 10-14 digits, allowing for different country number lengths
-            const mobileRegex = /^\d{10,14}$/; 
-            if (!mobileRegex.test(mobileNumber)) {
+            const mobileRegex = /^\+?\d{10,14}$/;
+            const fullNumberForValidation = `${countryCode}${mobileNumber}`;
+            if (!mobileRegex.test(fullNumberForValidation.replace(/\s/g, ''))) {
                  toast({
                      variant: "destructive",
                      title: "Invalid Mobile Number",
-                     description: "Please enter a valid mobile number (10-14 digits, no spaces or symbols).",
+                     description: "Please enter a valid mobile number (e.g., +919876543210). It should be 10-14 digits plus an optional country code.",
                  });
                  return;
             }
