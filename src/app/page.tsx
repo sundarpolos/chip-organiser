@@ -133,6 +133,10 @@ export default function ChipMaestroPage() {
   }, [masterPlayers, masterVenues, gameHistory, isDataReady])
 
   const addNewPlayer = () => {
+    if (players.some(p => p.name === "")) {
+      toast({ variant: "destructive", title: "Unnamed Player Exists", description: "Please name the existing new player before adding another." });
+      return;
+    }
     if (players.length >= MAX_PLAYERS) {
       toast({ variant: "destructive", title: "Max players reached", description: `You can only have up to ${MAX_PLAYERS} players.` })
       return
