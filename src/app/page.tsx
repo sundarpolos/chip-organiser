@@ -137,7 +137,7 @@ export default function ChipMaestroPage() {
       const lastActiveGame = localStorage.getItem("activeGame");
       if (lastActiveGame) {
           const game = JSON.parse(lastActiveGame);
-          setActiveGame(game);
+          // Don't set activeGame here, let the state update from players/venue/date trigger it
           setCurrentVenue(game.venue);
           setGameDate(new Date(game.timestamp));
           setPlayers(game.players.map((p: CalculatedPlayer) => ({
@@ -161,18 +161,58 @@ export default function ChipMaestroPage() {
     setIsDataReady(true)
   }, [])
 
-  // Persist data to localStorage whenever it changes
+
+  // Persist master data and game history to localStorage whenever they change
   useEffect(() => {
     if(!isDataReady) return;
     localStorage.setItem("masterPlayers", JSON.stringify(masterPlayers))
     localStorage.setItem("masterVenues", JSON.stringify(masterVenues))
     localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
-    if (activeGame) {
-        localStorage.setItem("activeGame", JSON.stringify(activeGame));
-    } else {
-        localStorage.removeItem("activeGame");
+  }, [masterPlayers, masterVenues, gameHistory, isDataReady])
+
+  // This effect rebuilds the activeGame object whenever the core game state changes.
+  useEffect(() => {
+    if (!isDataReady) return;
+
+    if (players.length === 0 && currentVenue === "Untitled Game") {
+        setActiveGame(null);
+        return;
     }
-  }, [masterPlayers, masterVenues, gameHistory, activeGame, isDataReady])
+
+    const calculatedPlayers: CalculatedPlayer[] = players.map(p => {
+        const totalBuyIns = p.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+        return {
+            ...p,
+            totalBuyIns,
+            profitLoss: p.finalChips - totalBuyIns,
+        }
+    });
+
+    const now = new Date();
+    const finalTimestamp = set(gameDate, { 
+      hours: now.getHours(), 
+      minutes: now.getMinutes(), 
+      seconds: now.getSeconds() 
+    }).toISOString();
+
+    const currentGame: GameHistory = {
+        id: activeGame?.id || `game-${Date.now()}`,
+        venue: currentVenue,
+        timestamp: finalTimestamp,
+        players: calculatedPlayers,
+    }
+    setActiveGame(currentGame);
+  }, [players, currentVenue, gameDate, isDataReady]);
+
+  // This effect saves the activeGame to localStorage whenever it's updated.
+  useEffect(() => {
+      if (!isDataReady) return;
+      if (activeGame) {
+          localStorage.setItem("activeGame", JSON.stringify(activeGame));
+      } else {
+          localStorage.removeItem("activeGame");
+      }
+  }, [activeGame, isDataReady]);
 
   const addNewPlayer = () => {
     if (players.some(p => p.name === "")) {
@@ -216,6 +256,11 @@ export default function ChipMaestroPage() {
   };
   
   const handleSaveGame = () => {
+    if (!activeGame || players.length === 0) {
+        toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
+        return;
+    }
+
     if (players.some(p => !p.name)) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
         return;
@@ -226,55 +271,30 @@ export default function ChipMaestroPage() {
       return;
     }
 
-    const calculatedPlayers: CalculatedPlayer[] = players.map(p => {
-        const totalBuyIns = p.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
-        return {
-            ...p,
-            totalBuyIns,
-            profitLoss: p.finalChips - totalBuyIns,
-        }
-    });
-
-    const now = new Date();
-    const finalTimestamp = set(gameDate, { 
-      hours: now.getHours(), 
-      minutes: now.getMinutes(), 
-      seconds: now.getSeconds() 
-    }).toISOString();
-
-
-    const newGame: GameHistory = {
-        id: `game-${Date.now()}`,
-        venue: currentVenue,
-        timestamp: finalTimestamp,
-        players: calculatedPlayers,
-    }
-
     // Check if a game from the same day and venue already exists
     const existingGameIndex = gameHistory.findIndex(
-      g => g.venue === newGame.venue && isSameDay(new Date(g.timestamp), new Date(newGame.timestamp))
+      g => g.venue === activeGame.venue && isSameDay(new Date(g.timestamp), new Date(activeGame.timestamp))
     );
 
     let updatedHistory;
     if (existingGameIndex !== -1) {
       // Update the existing game
       updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = newGame;
+      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id }; // Retain original ID
       toast({ title: "Game Updated!", description: `${currentVenue} has been updated in your history.` });
     } else {
       // Add a new game
-      updatedHistory = [newGame, ...gameHistory];
+      const newGameToSave = {...activeGame, id: `game-hist-${Date.now()}`}; // Create new ID for history
+      updatedHistory = [newGameToSave, ...gameHistory];
       toast({ title: "Game Saved!", description: `${currentVenue} has been saved to your history.` });
     }
     
     setGameHistory(updatedHistory);
-    setActiveGame(newGame);
   };
   
   const handleLoadGame = (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad) {
-      setActiveGame(gameToLoad);
       setCurrentVenue(gameToLoad.venue);
       setGameDate(new Date(gameToLoad.timestamp));
       setPlayers(gameToLoad.players.map(p => ({
