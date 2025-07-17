@@ -288,7 +288,7 @@ export default function ChipMaestroPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-center items-center mb-6 gap-4">
-        <h1 className="text-xl font-bold text-gray-800 truncate">{currentVenue}</h1>
+        <h1 className="text-lg font-semibold text-gray-800 truncate">{currentVenue}</h1>
       </header>
       
       <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
@@ -694,8 +694,8 @@ const ManagePlayersDialog: FC<{
                     <ScrollArea className="h-full">
                         <div className="space-y-2 py-4 pr-6">
                             {masterPlayers.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-2 bg-slate-100 rounded-md">
-                                    <div><p>{p.name}</p><p className="text-xs text-muted-foreground">{p.whatsappNumber}</p></div>
+                                <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 rounded-md">
+                                    <div><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-muted-foreground">{p.whatsappNumber}</p></div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
                                         <Button size="sm" variant="destructive" onClick={() => handleRemove(p.id)}>Remove</Button>
