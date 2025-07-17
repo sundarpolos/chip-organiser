@@ -512,11 +512,13 @@ const BuyInRow: FC<{
     index: number;
     player: Player;
     canBeRemoved: boolean;
+    isLastRow: boolean;
     onBuyInChange: (index: number, newAmount: number) => void;
     onRemoveBuyIn: (index: number) => void;
     onVerify: (index: number, verified: boolean) => void;
+    onAddBuyIn: () => void;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, onBuyInChange, onRemoveBuyIn, onVerify, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -593,6 +595,12 @@ const BuyInRow: FC<{
                     className="h-9 text-sm"
                     disabled={buyIn.verified}
                 />
+                {isLastRow && (
+                    <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
+                        <Plus className="h-4 w-4" />
+                        <span className="sr-only">Re-buy</span>
+                    </Button>
+                )}
                 {buyIn.verified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                 ) : (
@@ -719,13 +727,7 @@ const PlayerCard: FC<{
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Label className="text-lg">Buy-ins</Label>
-            <Button onClick={addBuyIn} variant="outline" size="icon" className="h-7 w-7">
-              <Plus className="h-4 w-4" />
-              <span className="sr-only">Re-buy</span>
-            </Button>
-          </div>
+          <Label className="text-lg mb-2 inline-block">Buy-ins</Label>
           <div className="space-y-2">
              {player.buyIns.map((buyIn, index) => (
               <BuyInRow 
@@ -734,9 +736,11 @@ const PlayerCard: FC<{
                 index={index}
                 player={player}
                 canBeRemoved={player.buyIns.length > 1}
+                isLastRow={index === player.buyIns.length - 1}
                 onBuyInChange={handleBuyInChange}
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
+                onAddBuyIn={addBuyIn}
                 toast={toast}
               />
             ))}
@@ -1413,5 +1417,7 @@ const WhatsappDialog: FC<{
     </Dialog>
   );
 };
+
+    
 
     
