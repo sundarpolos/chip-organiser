@@ -445,13 +445,12 @@ const BuyInRow: FC<{
     buyIn: BuyIn;
     index: number;
     player: Player;
-    isLast: boolean;
+    canBeRemoved: boolean;
     onBuyInChange: (index: number, newAmount: number) => void;
-    onAddBuyIn: () => void;
     onRemoveBuyIn: (index: number) => void;
     onVerify: (index: number, verified: boolean) => void;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, isLast, onBuyInChange, onAddBuyIn, onRemoveBuyIn, onVerify, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, onBuyInChange, onRemoveBuyIn, onVerify, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -521,11 +520,9 @@ const BuyInRow: FC<{
       <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
             <div className="flex items-center gap-2">
                 <Input type="number" value={buyIn.amount} onChange={e => onBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" className="h-9 text-sm" disabled={showOtpInput} />
-                {isLast ? (
-                    <Button size="icon" variant="outline" onClick={onAddBuyIn}><Plus className="h-4 w-4" /></Button>
-                ) : (
+                {canBeRemoved ? (
                     <Button size="icon" variant="destructive" onClick={() => onRemoveBuyIn(index)}><Trash2 className="h-4 w-4" /></Button>
-                )}
+                ) : <div className="w-10" /> }
             </div>
             {showOtpInput ? (
                 <div className="flex items-center gap-2">
@@ -631,15 +628,15 @@ const PlayerCard: FC<{
                 buyIn={buyIn}
                 index={index}
                 player={player}
-                isLast={index === player.buyIns.length - 1}
+                canBeRemoved={player.buyIns.length > 1}
                 onBuyInChange={handleBuyInChange}
-                onAddBuyIn={addBuyIn}
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
                 toast={toast}
               />
             ))}
           </div>
+          <Button onClick={addBuyIn} className="w-full mt-2" variant="outline"><Plus className="h-4 w-4 mr-2"/>Re-buy</Button>
           <p className="text-xl font-bold mt-4 text-right">Total Verified: {totalBuyIns}</p>
         </div>
         <div>
