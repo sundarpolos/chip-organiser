@@ -57,7 +57,7 @@ import {
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { format, isSameDay } from "date-fns"
+import { format, isSameDay, set } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
@@ -95,6 +95,7 @@ export default function ChipMaestroPage() {
   const [activeTab, setActiveTab] = useState<string>("")
   const [currentVenue, setCurrentVenue] = useState<string>("Untitled Game")
   const [isDataReady, setIsDataReady] = useState(false)
+  const [gameDate, setGameDate] = useState<Date>(new Date())
 
   // Master Data State
   const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([])
@@ -143,6 +144,7 @@ export default function ChipMaestroPage() {
         if (history.length > 0) {
             const lastGame = history[0];
             setCurrentVenue(lastGame.venue);
+            setGameDate(new Date(lastGame.timestamp));
             const playersFromHistory = lastGame.players.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -234,10 +236,18 @@ export default function ChipMaestroPage() {
         }
     });
 
+    const now = new Date();
+    const finalTimestamp = set(gameDate, { 
+      hours: now.getHours(), 
+      minutes: now.getMinutes(), 
+      seconds: now.getSeconds() 
+    }).toISOString();
+
+
     const newGame: GameHistory = {
         id: `game-${Date.now()}`,
         venue: currentVenue,
-        timestamp: new Date().toISOString(),
+        timestamp: finalTimestamp,
         players: calculatedPlayers,
     }
 
@@ -252,6 +262,7 @@ export default function ChipMaestroPage() {
     if (gameToLoad) {
       setActiveGame(gameToLoad);
       setCurrentVenue(gameToLoad.venue);
+      setGameDate(new Date(gameToLoad.timestamp));
       setPlayers(gameToLoad.players.map(p => ({
         id: p.id,
         name: p.name,
@@ -270,12 +281,14 @@ export default function ChipMaestroPage() {
   const handleNewGame = () => {
     setPlayers([]);
     setActiveGame(null);
+    setGameDate(new Date());
     addNewPlayer();
     setVenueModalOpen(true);
   }
   
-  const handleStartGameFromVenue = (venue: string) => {
+  const handleStartGameFromVenue = (venue: string, date: Date) => {
     setCurrentVenue(venue);
+    setGameDate(date);
     setVenueModalOpen(false);
   }
 
@@ -338,7 +351,10 @@ export default function ChipMaestroPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-6 gap-4">
         <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+          <div>
+            <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+            <p className="text-sm text-muted-foreground">{format(gameDate, "PPP")}</p>
+          </div>
           <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="icon" className="h-8 w-8">
             <WhatsappIcon />
             <span className="sr-only">Send WhatsApp Message</span>
@@ -418,6 +434,7 @@ export default function ChipMaestroPage() {
         masterVenues={masterVenues}
         onStartGame={handleStartGameFromVenue}
         setMasterVenues={setMasterVenues}
+        initialDate={gameDate}
       />
       <ManagePlayersDialog 
         isOpen={isManagePlayersModalOpen}
@@ -774,11 +791,19 @@ const VenueDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
     masterVenues: MasterVenue[],
-    onStartGame: (venue: string) => void,
+    onStartGame: (venue: string, date: Date) => void,
     setMasterVenues: (venues: MasterVenue[]) => void,
-}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues }) => {
+    initialDate: Date
+}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, initialDate }) => {
     const [newVenue, setNewVenue] = useState("");
     const [selectedVenue, setSelectedVenue] = useState("");
+    const [date, setDate] = useState<Date | undefined>(initialDate);
+
+    useEffect(() => {
+      if(isOpen) {
+        setDate(initialDate)
+      }
+    }, [isOpen, initialDate])
 
     const handleSaveNewVenue = () => {
         if (!newVenue.trim()) return;
@@ -797,41 +822,51 @@ const VenueDialog: FC<{
 
     const handleConfirm = () => {
         const venueToStart = selectedVenue || newVenue.trim();
-        if (!venueToStart) return;
+        if (!venueToStart || !date) return;
         if (!masterVenues.some(v => v.name === venueToStart)) {
             const newMasterVenues = [...masterVenues, { id: `venue-${Date.now()}`, name: venueToStart }];
             setMasterVenues(newMasterVenues);
         }
-        onStartGame(venueToStart);
+        onStartGame(venueToStart, date);
     }
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
-                <DialogHeader><DialogTitle>Set Game Venue</DialogTitle><DialogDescription>Select or create a venue to start a new game.</DialogDescription></DialogHeader>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Existing Venues</Label>
-                        <div className="flex gap-2">
-                        <Select onValueChange={setSelectedVenue} value={selectedVenue}>
-                            <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
-                            <SelectContent>
-                                {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
+                <DialogHeader><DialogTitle>Set Game Venue & Date</DialogTitle><DialogDescription>Select or create a venue and date to start a new game.</DialogDescription></DialogHeader>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Existing Venues</Label>
+                            <div className="flex gap-2">
+                            <Select onValueChange={setSelectedVenue} value={selectedVenue}>
+                                <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
+                                <SelectContent>
+                                    {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                             <Label>Or Enter New Venue</Label>
+                            <div className="flex gap-2">
+                                <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
+                                <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
+                            </div>
                         </div>
                     </div>
-                    <div className="space-y-2">
-                         <Label>Or Enter New Venue</Label>
-                        <div className="flex gap-2">
-                            <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
-                            <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
-                        </div>
+                     <div className="flex justify-center">
+                        <Calendar
+                          mode="single"
+                          selected={date}
+                          onSelect={setDate}
+                          className="rounded-md border"
+                        />
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleConfirm} disabled={!selectedVenue && !newVenue.trim()}>Start New Game</Button>
+                    <Button onClick={handleConfirm} disabled={(!selectedVenue && !newVenue.trim()) || !date}>Start New Game</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
