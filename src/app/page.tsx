@@ -749,8 +749,10 @@ const ManagePlayersDialog: FC<{
                     <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 border-b pb-4">
-                    <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} />
-                    <Input placeholder="WhatsApp Number" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
+                    <div className="flex gap-2">
+                        <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} />
+                        <Input placeholder="WhatsApp Number" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
+                    </div>
                     <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
                     {editingPlayer && <Button variant="ghost" className="w-full" onClick={() => setEditingPlayer(null)}>Cancel Edit</Button>}
                 </div>
