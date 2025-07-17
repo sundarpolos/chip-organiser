@@ -228,12 +228,12 @@ export default function ChipMaestroPage() {
     addNewPlayer();
     setVenueModalOpen(true);
     resetTimer();
-    startTimer();
   }
   
   const handleStartGameFromVenue = (venue: string) => {
     setCurrentVenue(venue);
     setVenueModalOpen(false);
+    startTimer();
   }
 
   const handleRunAnomalyDetection = async (player: Player) => {
