@@ -46,6 +46,7 @@ import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { config } from 'dotenv';
+import { Badge } from "@/components/ui/badge"
 
 config();
 
@@ -717,7 +718,10 @@ const ManagePlayersDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="h-[90vh] max-h-[500px] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle>Manage Players</DialogTitle>
+                    <div className="flex items-center gap-2">
+                        <DialogTitle>Manage Players</DialogTitle>
+                        <Badge variant="secondary">{masterPlayers.length}</Badge>
+                    </div>
                     <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 border-b pb-4">
@@ -732,8 +736,8 @@ const ManagePlayersDialog: FC<{
                             {masterPlayers.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
                                     <div className="grid grid-cols-2 gap-4 flex-1 mr-4">
-                                        <p className="text-sm font-medium truncate">{p.name}</p>
-                                        <p className="text-xs text-muted-foreground truncate">{p.whatsappNumber || '-'}</p>
+                                        <p className="text-sm font-medium truncate col-span-1">{p.name}</p>
+                                        <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
