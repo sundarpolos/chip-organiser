@@ -57,7 +57,10 @@ const sendBuyInOtpFlow = ai.defineFlow(
 
     const otp = generateOtp();
     const newTotal = totalBuyInAmount + buyInAmount;
-    const message = `Hi ${playerName}, your OTP for your ${getOrdinalSuffix(buyInCount)} buy-in of ₹${buyInAmount} is ${otp}. Your new grand total will be ₹${newTotal}.`;
+    const message = `Hi ${playerName}, your OTP is ${otp} for your ${getOrdinalSuffix(buyInCount)} buy-in.
+Amount: ₹${buyInAmount}
+Previous Total: ₹${totalBuyInAmount}
+After verification, your new grand total will be ₹${newTotal}.`;
 
     try {
       const whatsappResult = await sendWhatsappMessage({ to: whatsappNumber, message });
