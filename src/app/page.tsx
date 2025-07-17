@@ -748,8 +748,9 @@ const PlayerCard: FC<{
           <Input 
             type="number" 
             className="mt-2 text-sm h-9" 
-            value={player.finalChips} 
+            value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
+            placeholder="Chip Count"
           />
         </div>
       </CardContent>
@@ -764,27 +765,31 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
             {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "PPP p")}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-6">
-             {!activeGame ? (
+             {!activeGame || activeGame.players.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
-                    <p>Save a game to see the summary.</p>
+                    <p>Add players and buy-ins to see the summary.</p>
                 </div>
             ) : (
             <>
                 <div>
-                    <h3 className="font-semibold mb-2">Player Performance</h3>
+                    <h3 className="font-semibold mb-2">Player Summary</h3>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead>P/L</TableHead>
+                                <TableHead className="p-2">Player</TableHead>
+                                <TableHead className="p-2 text-right">Buy-ins</TableHead>
+                                <TableHead className="p-2 text-right">Chips</TableHead>
+                                <TableHead className="p-2 text-right">P/L</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {activeGame.players.map(p => (
                                 <TableRow key={p.id}>
-                                    <TableCell>{p.name}</TableCell>
-                                    <TableCell className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {p.profitLoss >= 0 ? '+' : ''}{p.profitLoss.toFixed(2)}
+                                    <TableCell className="p-2 font-medium">{p.name || "Unnamed"}</TableCell>
+                                    <TableCell className="p-2 text-right">{p.totalBuyIns}</TableCell>
+                                    <TableCell className="p-2 text-right">{p.finalChips}</TableCell>
+                                    <TableCell className={`p-2 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {p.profitLoss.toFixed(0)}
                                     </TableCell>
                                  </TableRow>
                             ))}
@@ -1408,3 +1413,5 @@ const WhatsappDialog: FC<{
     </Dialog>
   );
 };
+
+    
