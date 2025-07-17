@@ -57,11 +57,12 @@ import {
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { format } from "date-fns"
+import { format, isSameDay } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Calendar } from "@/components/ui/calendar"
 
 
 config();
@@ -879,7 +880,6 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        // WhatsApp number validation (Regex for optional '+' and 10-14 digits)
         const whatsappRegex = /^\+?\d{10,14}$/;
         if (whatsapp && !whatsappRegex.test(whatsapp)) {
             toast({ variant: "destructive", title: "Invalid WhatsApp Number", description: "Please enter a valid number, e.g., +919876543210 or 919876543210." });
@@ -968,26 +968,92 @@ const ManagePlayersDialog: FC<{
 }
 
 const LoadGameDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    gameHistory: GameHistory[],
-    onLoadGame: (id: string) => void,
-}> = ({isOpen, onOpenChange, gameHistory, onLoadGame}) => (
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  gameHistory: GameHistory[];
+  onLoadGame: (id: string) => void;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame }) => {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [month, setMonth] = useState<Date>(new Date());
+
+  const gameDates = useMemo(() => {
+    return gameHistory.map(g => new Date(g.timestamp));
+  }, [gameHistory]);
+
+  const gamesOnSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return gameHistory.filter(g => isSameDay(new Date(g.timestamp), selectedDate));
+  }, [gameHistory, selectedDate]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedDate(undefined);
+      setMonth(new Date());
+    }
+  }, [isOpen]);
+
+  return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[80vh] flex flex-col">
-            <DialogHeader><DialogTitle>Load Previous Game</DialogTitle></DialogHeader>
-            <ScrollArea className="flex-grow">
-                {gameHistory.length > 0 ? gameHistory.map(g => (
-                    <div key={g.id} className="flex items-center justify-between p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
-                        <div><p>{g.venue}</p><p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP p")}</p></div>
-                        <Button onClick={() => onLoadGame(g.id)}>Load</Button>
+      <DialogContent className="max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Load Previous Game</DialogTitle>
+        </DialogHeader>
+        <div className="flex justify-center">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            month={month}
+            onMonthChange={setMonth}
+            modifiers={{ played: gameDates }}
+            modifiersClassNames={{
+              played: "bg-primary/20 rounded-full",
+            }}
+            className="rounded-md border"
+          />
+        </div>
+
+        {selectedDate && (
+          <div className="flex-grow mt-4">
+            <h3 className="text-lg font-semibold mb-2 text-center">
+              Games on {format(selectedDate, "PPP")}
+            </h3>
+            <ScrollArea className="h-48">
+              {gamesOnSelectedDate.length > 0 ? (
+                gamesOnSelectedDate.map(g => (
+                  <div key={g.id} className="flex items-center justify-between p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
+                    <div>
+                      <p>{g.venue}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "p")}</p>
                     </div>
-                )) : <p className="text-center text-muted-foreground py-10">No games in history.</p>}
+                    <Button onClick={() => onLoadGame(g.id)}>Load</Button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-10">No games found for this date.</p>
+              )}
             </ScrollArea>
-             <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
-        </DialogContent>
+          </div>
+        )}
+        
+        {gameHistory.length > 0 && !selectedDate && (
+            <p className="text-center text-muted-foreground py-4">Select a highlighted date to see games.</p>
+        )}
+
+        {gameHistory.length === 0 && (
+            <p className="text-center text-muted-foreground py-10">No games in history.</p>
+        )}
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Close</Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
-)
+  );
+};
+
 
 const ReportsDialog: FC<{
     isOpen: boolean,
