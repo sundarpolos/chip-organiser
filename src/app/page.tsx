@@ -591,7 +591,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={showOtpInput}
+                    disabled={buyIn.verified}
                 />
                 {buyIn.verified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
@@ -910,6 +910,14 @@ const VenueDialog: FC<{
     )
 }
 
+const countryCodes = [
+    { value: "+91", label: "IN (+91)" },
+    { value: "+1", label: "US (+1)" },
+    { value: "+44", label: "UK (+44)" },
+    { value: "+61", label: "AU (+61)" },
+    { value: "+81", label: "JP (+81)" },
+];
+
 const ManagePlayersDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
@@ -919,16 +927,41 @@ const ManagePlayersDialog: FC<{
 }> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
-    const [whatsapp, setWhatsapp] = useState("");
+    const [countryCode, setCountryCode] = useState("+91");
+    const [mobileNumber, setMobileNumber] = useState("");
     const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+
+    const splitPhoneNumber = (fullNumber: string) => {
+        if (!fullNumber) return { cc: "+91", num: "" };
+
+        for (const code of countryCodes) {
+            if (fullNumber.startsWith(code.value)) {
+                return { cc: code.value, num: fullNumber.substring(code.value.length) };
+            }
+        }
+        
+        // Fallback for numbers without a known country code
+        if (fullNumber.startsWith('+')) {
+            const firstSpace = fullNumber.indexOf(' ');
+            if (firstSpace > -1) {
+                return { cc: fullNumber.substring(0, firstSpace), num: fullNumber.substring(firstSpace + 1) };
+            }
+        }
+        
+        // Default if no logic matches
+        return { cc: "+91", num: fullNumber.replace("+91", "") };
+    };
 
     useEffect(() => {
         if(editingPlayer) {
             setName(editingPlayer.name);
-            setWhatsapp(editingPlayer.whatsappNumber);
+            const { cc, num } = splitPhoneNumber(editingPlayer.whatsappNumber);
+            setCountryCode(cc);
+            setMobileNumber(num);
         } else {
             setName("");
-            setWhatsapp("");
+            setCountryCode("+91");
+            setMobileNumber("");
         }
     }, [editingPlayer]);
     
@@ -952,16 +985,18 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        const whatsappRegex = /^\+?\d{10,14}$/;
-        if (whatsapp && !whatsappRegex.test(whatsapp)) {
-            toast({ variant: "destructive", title: "Invalid WhatsApp Number", description: "Please enter a valid number, e.g., +919876543210 or 919876543210." });
+        const tenDigitRegex = /^\d{10}$/;
+        if (mobileNumber && !tenDigitRegex.test(mobileNumber)) {
+            toast({ variant: "destructive", title: "Invalid Mobile Number", description: "Please enter a valid 10-digit mobile number." });
             return;
         }
+        
+        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
 
         if (editingPlayer) {
-            setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: whatsapp} : p));
+            setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: fullWhatsappNumber} : p));
         } else {
-            setMasterPlayers([...masterPlayers, {id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: whatsapp}]);
+            setMasterPlayers([...masterPlayers, {id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: fullWhatsappNumber}]);
         }
         setEditingPlayer(null);
     }
@@ -993,9 +1028,15 @@ const ManagePlayersDialog: FC<{
                     </div>
                 </DialogHeader>
                 <div className="space-y-2 border-b pb-4">
-                    <div className="flex gap-2">
-                        <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} />
-                        <Input placeholder="WhatsApp Number" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
+                    <div className="grid grid-cols-2 gap-2">
+                        <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} className="col-span-2" />
+                         <Select value={countryCode} onValueChange={setCountryCode}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {countryCodes.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Input placeholder="10-digit mobile" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} />
                     </div>
                     <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
                     {editingPlayer && <Button variant="ghost" className="w-full" onClick={() => setEditingPlayer(null)}>Cancel Edit</Button>}
