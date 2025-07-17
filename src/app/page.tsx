@@ -431,8 +431,9 @@ const PlayerCard: FC<{
 
   const availableMasterPlayers = useMemo(() => {
     const currentInGamePlayerNames = allPlayers
-      .filter(p => p.id !== player.id && p.name)
-      .map(p => p.name);
+      .filter(p => p.id !== player.id)
+      .map(p => p.name)
+      .filter(Boolean);
     return masterPlayers.filter(mp => !currentInGamePlayerNames.includes(mp.name));
   }, [masterPlayers, allPlayers, player.id]);
 
