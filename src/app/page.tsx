@@ -729,7 +729,7 @@ const PlayerCard: FC<{
         <div>
           <Label className="hidden md:inline-block text-lg mb-2">Buy-ins</Label>
           <div className="space-y-2">
-             {player.buyIns.map((buyIn, index) => (
+             {(player.buyIns || []).map((buyIn, index) => (
               <BuyInRow 
                 key={index}
                 buyIn={buyIn}
@@ -1421,5 +1421,6 @@ const WhatsappDialog: FC<{
     
 
     
+
 
 
