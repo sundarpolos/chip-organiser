@@ -367,6 +367,7 @@ export default function ChipMaestroPage() {
         onOpenChange={setManagePlayersModalOpen}
         masterPlayers={masterPlayers}
         setMasterPlayers={setMasterPlayers}
+        toast={toast}
       />
       <LoadGameDialog 
         isOpen={isLoadGameModalOpen}
@@ -635,7 +636,8 @@ const ManagePlayersDialog: FC<{
     onOpenChange: (open: boolean) => void,
     masterPlayers: MasterPlayer[],
     setMasterPlayers: (players: MasterPlayer[]) => void,
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers }) => {
+    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
     const [whatsapp, setWhatsapp] = useState("");
@@ -651,11 +653,22 @@ const ManagePlayersDialog: FC<{
     }, [editingPlayer]);
     
     const handleSave = () => {
-        if (!name.trim()) return;
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            toast({ variant: "destructive", title: "Invalid Name", description: "Player name cannot be empty." });
+            return;
+        }
+
+        const isDuplicate = masterPlayers.some(p => p.name.toLowerCase() === trimmedName.toLowerCase() && p.id !== editingPlayer?.id);
+        if (isDuplicate) {
+            toast({ variant: "destructive", title: "Duplicate Player", description: "A player with this name already exists." });
+            return;
+        }
+
         if (editingPlayer) {
-            setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name, whatsappNumber: whatsapp} : p));
+            setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: whatsapp} : p));
         } else {
-            setMasterPlayers([...masterPlayers, {id: `mp-${Date.now()}`, name, whatsappNumber: whatsapp}]);
+            setMasterPlayers([...masterPlayers, {id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: whatsapp}]);
         }
         setEditingPlayer(null);
     }
