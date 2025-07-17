@@ -1,6 +1,7 @@
 export interface BuyIn {
   amount: number;
   timestamp: string;
+  verified: boolean;
 }
 
 export interface Player {

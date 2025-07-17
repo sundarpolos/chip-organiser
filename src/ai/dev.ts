@@ -3,3 +3,4 @@ config();
 
 import '@/ai/flows/detect-anomalies.ts';
 import '@/ai/flows/send-whatsapp-message.ts';
+import '@/ai/flows/send-buyin-otp.ts';

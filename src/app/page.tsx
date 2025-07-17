@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
+import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
@@ -41,6 +42,7 @@ import {
   Crown,
   Share2,
   Pencil,
+  CheckCircle2
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -172,7 +174,7 @@ export default function ChipMaestroPage() {
       id: `player-${Date.now()}`,
       name: "",
       whatsappNumber: "",
-      buyIns: [{ amount: 0, timestamp: new Date().toISOString() }],
+      buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: false }],
       finalChips: 0,
     }
     setPlayers([...players, newPlayer])
@@ -206,8 +208,13 @@ export default function ChipMaestroPage() {
         return;
     }
 
+    if (players.some(p => p.buyIns.some(b => !b.verified && b.amount > 0))) {
+      toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
+      return;
+    }
+
     const calculatedPlayers: CalculatedPlayer[] = players.map(p => {
-        const totalBuyIns = p.buyIns.reduce((sum, bi) => sum + bi.amount, 0);
+        const totalBuyIns = p.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
         return {
             ...p,
             totalBuyIns,
@@ -304,11 +311,12 @@ export default function ChipMaestroPage() {
       playerName: p.name || "Unnamed",
       amount: b.amount,
       timestamp: b.timestamp,
+      verified: b.verified,
     }))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return log;
   }, [players]);
 
-  const grandTotalBuyIn = useMemo(() => totalBuyInLog.reduce((sum, item) => sum + item.amount, 0), [totalBuyInLog]);
+  const grandTotalBuyIn = useMemo(() => totalBuyInLog.reduce((sum, item) => sum + (item.verified ? item.amount : 0), 0), [totalBuyInLog]);
 
   if (!isDataReady) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -357,6 +365,7 @@ export default function ChipMaestroPage() {
                         onRunAnomalyCheck={handleRunAnomalyDetection}
                         isOnlyPlayer={players.length === 1}
                         allPlayers={players}
+                        toast={toast}
                       />
                     </TabsContent>
                   ))}
@@ -432,6 +441,102 @@ export default function ChipMaestroPage() {
   )
 }
 
+const BuyInRow: FC<{
+    buyIn: BuyIn;
+    index: number;
+    player: Player;
+    isLast: boolean;
+    onBuyInChange: (index: number, newAmount: number) => void;
+    onAddBuyIn: () => void;
+    onRemoveBuyIn: (index: number) => void;
+    onVerify: (index: number, verified: boolean) => void;
+    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
+}> = ({ buyIn, index, player, isLast, onBuyInChange, onAddBuyIn, onRemoveBuyIn, onVerify, toast }) => {
+    const [otp, setOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
+    const [isSending, setIsSending] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [showOtpInput, setShowOtpInput] = useState(false);
+
+    const handleSendOtp = async () => {
+        if (!player.whatsappNumber) {
+            toast({ variant: "destructive", title: "Missing Number", description: "Player's WhatsApp number is required to send OTP." });
+            return;
+        }
+        if (buyIn.amount <= 0) {
+            toast({ variant: "destructive", title: "Invalid Amount", description: "Buy-in amount must be greater than zero." });
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            const result = await sendBuyInOtp({
+                playerName: player.name,
+                whatsappNumber: player.whatsappNumber,
+                buyInAmount: buyIn.amount
+            });
+            if (result.success && result.otp) {
+                toast({ title: "OTP Sent", description: "Verification code sent to player's WhatsApp." });
+                setSentOtp(result.otp);
+                setShowOtpInput(true);
+            } else {
+                throw new Error(result.error || "Failed to send OTP.");
+            }
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "OTP Error", description: e.message });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleConfirmOtp = () => {
+        setIsVerifying(true);
+        if (otp === sentOtp) {
+            toast({ title: "Success", description: "Buy-in verified successfully." });
+            onVerify(index, true);
+            setShowOtpInput(false);
+        } else {
+            toast({ variant: "destructive", title: "Invalid OTP", description: "The entered code is incorrect." });
+        }
+        setIsVerifying(false);
+    };
+
+    if (buyIn.verified) {
+        return (
+            <div className="flex items-center gap-2 p-2 rounded-md border bg-green-50 dark:bg-green-900/50">
+                <p className="flex-1 text-sm">Buy-in: {buyIn.amount}</p>
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <span className="text-sm font-medium text-green-700">Verified</span>
+            </div>
+        )
+    }
+
+    return (
+      <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
+            <div className="flex items-center gap-2">
+                <Input type="number" value={buyIn.amount} onChange={e => onBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" className="h-9 text-sm" disabled={showOtpInput} />
+                {isLast ? (
+                    <Button size="icon" variant="outline" onClick={onAddBuyIn}><Plus className="h-4 w-4" /></Button>
+                ) : (
+                    <Button size="icon" variant="destructive" onClick={() => onRemoveBuyIn(index)}><Trash2 className="h-4 w-4" /></Button>
+                )}
+            </div>
+            {showOtpInput ? (
+                <div className="flex items-center gap-2">
+                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
+                    <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
+                        {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm"}
+                    </Button>
+                </div>
+            ) : (
+                 <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
+                     {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
+                 </Button>
+            )}
+        </div>
+    )
+}
+
 const PlayerCard: FC<{
   player: Player,
   masterPlayers: MasterPlayer[],
@@ -440,17 +545,29 @@ const PlayerCard: FC<{
   onNameChange: (id: string, newName: string) => void,
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
-  isOnlyPlayer: boolean
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
+  isOnlyPlayer: boolean,
+  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...player.buyIns]
-    newBuyIns[index].amount = newAmount
+    newBuyIns[index] = {...newBuyIns[index], amount: newAmount}
     onUpdate(player.id, { buyIns: newBuyIns })
   }
+  
+  const handleVerifyBuyIn = (index: number, verified: boolean) => {
+    const newBuyIns = [...player.buyIns];
+    newBuyIns[index] = {...newBuyIns[index], verified };
+    onUpdate(player.id, { buyIns: newBuyIns });
+  };
+
 
   const addBuyIn = () => {
-    const newBuyIns = [...player.buyIns, { amount: 0, timestamp: new Date().toISOString() }]
+    if (player.buyIns.some(b => !b.verified && b.amount > 0)) {
+        toast({ variant: "destructive", title: "Unverified Buy-in", description: "Please verify the current buy-in before adding a new one." });
+        return;
+    }
+    const newBuyIns = [...player.buyIns, { amount: 0, timestamp: new Date().toISOString(), verified: false }]
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
@@ -461,7 +578,7 @@ const PlayerCard: FC<{
     }
   }
 
-  const totalBuyIns = player.buyIns.reduce((sum, bi) => sum + bi.amount, 0);
+  const totalBuyIns = player.buyIns.reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
   const availableMasterPlayers = useMemo(() => {
     const currentInGamePlayerNames = allPlayers
@@ -502,20 +619,22 @@ const PlayerCard: FC<{
         <div>
           <Label className="text-lg">Buy-ins</Label>
           <div className="space-y-2 mt-2">
-            {player.buyIns.map((buyIn, index) => (
-              <div key={index} className="p-2 rounded-md border bg-white dark:bg-slate-800">
-                <div className="flex items-center gap-2">
-                  <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" className="h-9 text-sm" />
-                  {index === player.buyIns.length - 1 ? (
-                    <Button size="icon" variant="outline" onClick={addBuyIn}><Plus className="h-4 w-4" /></Button>
-                  ) : (
-                    <Button size="icon" variant="destructive" onClick={() => removeBuyIn(index)}><Trash2 className="h-4 w-4" /></Button>
-                  )}
-                </div>
-              </div>
+             {player.buyIns.map((buyIn, index) => (
+              <BuyInRow 
+                key={index}
+                buyIn={buyIn}
+                index={index}
+                player={player}
+                isLast={index === player.buyIns.length - 1}
+                onBuyInChange={handleBuyInChange}
+                onAddBuyIn={addBuyIn}
+                onRemoveBuyIn={removeBuyIn}
+                onVerify={handleVerifyBuyIn}
+                toast={toast}
+              />
             ))}
           </div>
-          <p className="text-xl font-bold mt-4 text-right">Total: {totalBuyIns}</p>
+          <p className="text-xl font-bold mt-4 text-right">Total Verified: {totalBuyIns}</p>
         </div>
         <div>
           <Label className="text-lg">Final Chips</Label>
