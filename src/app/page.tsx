@@ -335,7 +335,7 @@ export default function ChipMaestroPage() {
     setAnomalyLoading(true);
     setAnomalyResult(null);
 
-    const playerBuyIns = player.buyIns.map(b => ({
+    const playerBuyIns = (player.buyIns || []).map(b => ({
       playerName: player.name,
       amount: b.amount,
       timestamp: b.timestamp,
@@ -344,7 +344,7 @@ export default function ChipMaestroPage() {
     const historicalBuyIns = gameHistory
       .flatMap(g => g.players)
       .filter(p => p.name === player.name)
-      .flatMap(p => p.buyIns)
+      .flatMap(p => (p.buyIns || []))
       .map(b => ({
         playerName: player.name,
         amount: b.amount,
@@ -537,7 +537,7 @@ const BuyInRow: FC<{
 
         setIsSending(true);
         try {
-            const verifiedBuyIns = player.buyIns.filter(b => b.verified);
+            const verifiedBuyIns = (player.buyIns || []).filter(b => b.verified);
             const totalVerifiedAmount = verifiedBuyIns.reduce((sum, b) => sum + b.amount, 0);
             
             const result = await sendBuyInOtp({
@@ -658,30 +658,30 @@ const PlayerCard: FC<{
 }> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
-    const newBuyIns = [...player.buyIns]
+    const newBuyIns = [...(player.buyIns || [])]
     newBuyIns[index] = {...newBuyIns[index], amount: newAmount}
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
   const handleVerifyBuyIn = (index: number, verified: boolean) => {
-    const newBuyIns = [...player.buyIns];
+    const newBuyIns = [...(player.buyIns || [])];
     newBuyIns[index] = {...newBuyIns[index], verified };
     onUpdate(player.id, { buyIns: newBuyIns });
   };
 
 
   const addBuyIn = () => {
-    if (player.buyIns.some(b => !b.verified && b.amount > 0)) {
+    if ((player.buyIns || []).some(b => !b.verified && b.amount > 0)) {
         toast({ variant: "destructive", title: "Unverified Buy-in", description: "Please verify the current buy-in before adding a new one." });
         return;
     }
-    const newBuyIns = [...player.buyIns, { amount: 0, timestamp: new Date().toISOString(), verified: false }]
+    const newBuyIns = [...(player.buyIns || []), { amount: 0, timestamp: new Date().toISOString(), verified: false }]
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
   const removeBuyIn = (index: number) => {
-    if (player.buyIns.length > 1) {
-      const newBuyIns = player.buyIns.filter((_, i) => i !== index)
+    if ((player.buyIns || []).length > 1) {
+      const newBuyIns = (player.buyIns || []).filter((_, i) => i !== index)
       onUpdate(player.id, { buyIns: newBuyIns })
     } else {
         toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
@@ -735,8 +735,8 @@ const PlayerCard: FC<{
                 buyIn={buyIn}
                 index={index}
                 player={player}
-                canBeRemoved={player.buyIns.length > 1}
-                isLastRow={index === player.buyIns.length - 1}
+                canBeRemoved={(player.buyIns || []).length > 1}
+                isLastRow={index === (player.buyIns || []).length - 1}
                 onBuyInChange={handleBuyInChange}
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
@@ -1262,7 +1262,7 @@ const ReportsDialog: FC<{
                      <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
                          <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
                          <TableBody>
-                             {activeGame.players.flatMap(p => p.buyIns.map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
+                             {activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
                                  <TableRow key={i}>
                                      <TableCell>{b.playerName}</TableCell>
                                      <TableCell>{b.amount}</TableCell>
@@ -1421,6 +1421,7 @@ const WhatsappDialog: FC<{
     
 
     
+
 
 
 
