@@ -719,8 +719,14 @@ const PlayerCard: FC<{
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="text-lg">Buy-ins</Label>
-          <div className="space-y-2 mt-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Label className="text-lg">Buy-ins</Label>
+            <Button onClick={addBuyIn} variant="outline" size="icon" className="h-7 w-7">
+              <Plus className="h-4 w-4" />
+              <span className="sr-only">Re-buy</span>
+            </Button>
+          </div>
+          <div className="space-y-2">
              {player.buyIns.map((buyIn, index) => (
               <BuyInRow 
                 key={index}
@@ -735,7 +741,6 @@ const PlayerCard: FC<{
               />
             ))}
           </div>
-          <Button onClick={addBuyIn} className="w-full mt-2" variant="outline"><Plus className="h-4 w-4 mr-2"/>Re-buy</Button>
           <p className="text-xl font-bold mt-4">Total Verified: {totalBuyIns}</p>
         </div>
         <div>
@@ -986,18 +991,20 @@ const ManagePlayersDialog: FC<{
         }
 
         if (mobileNumber) {
-            const mobileRegex = /^\d{10}$/; // Simple 10-digit validation for the mobile part
+            // Regex for 10-14 digits, allowing for different country number lengths
+            const mobileRegex = /^\d{10,14}$/; 
             if (!mobileRegex.test(mobileNumber)) {
-                toast({
-                    variant: "destructive",
-                    title: "Invalid Mobile Number",
-                    description: "Please enter a valid 10-digit mobile number.",
-                });
-                return;
+                 toast({
+                     variant: "destructive",
+                     title: "Invalid Mobile Number",
+                     description: "Please enter a valid mobile number (10-14 digits, no spaces or symbols).",
+                 });
+                 return;
             }
         }
-
+        
         const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
+
 
         if (editingPlayer) {
             setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: fullWhatsappNumber} : p));
