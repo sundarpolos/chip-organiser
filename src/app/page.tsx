@@ -323,6 +323,7 @@ export default function ChipMaestroPage() {
                         player={player} 
                         masterPlayers={masterPlayers} 
                         onUpdate={updatePlayer}
+                        onNameChange={handlePlayerNameChange}
                         onRemove={removePlayer}
                         onRunAnomalyCheck={handleRunAnomalyDetection}
                         isOnlyPlayer={players.length === 1}
@@ -402,10 +403,11 @@ const PlayerCard: FC<{
   masterPlayers: MasterPlayer[],
   allPlayers: Player[],
   onUpdate: (id: string, newValues: Partial<Player>) => void,
+  onNameChange: (id: string, newName: string) => void,
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
   isOnlyPlayer: boolean
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...player.buyIns]
@@ -441,7 +443,7 @@ const PlayerCard: FC<{
         <div className="w-2/3">
           <Select
             value={player.name}
-            onValueChange={(newName) => onUpdate(player.id, { name: newName, whatsappNumber: masterPlayers.find(mp => mp.name === newName)?.whatsappNumber || '' })}
+            onValueChange={(newName) => onNameChange(player.id, newName)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Player" />
@@ -457,7 +459,7 @@ const PlayerCard: FC<{
           </Select>
         </div>
         <div className="flex gap-2">
-            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="sm"><ShieldAlert className="h-4 w-4 mr-2" />Analyze</Button>
+            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="sm" disabled={!player.name}><ShieldAlert className="h-4 w-4 mr-2" />Analyze</Button>
             {!isOnlyPlayer && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
         </div>
       </CardHeader>
