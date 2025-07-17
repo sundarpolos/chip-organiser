@@ -679,7 +679,7 @@ const ManagePlayersDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[80vh] flex flex-col">
+            <DialogContent className="h-[90vh] max-h-[500px] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Manage Players</DialogTitle>
                     <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
