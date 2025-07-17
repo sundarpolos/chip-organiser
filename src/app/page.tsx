@@ -326,6 +326,7 @@ export default function ChipMaestroPage() {
                         onRemove={removePlayer}
                         onRunAnomalyCheck={handleRunAnomalyDetection}
                         isOnlyPlayer={players.length === 1}
+                        allPlayers={players}
                       />
                     </TabsContent>
                   ))}
@@ -399,11 +400,12 @@ export default function ChipMaestroPage() {
 const PlayerCard: FC<{
   player: Player,
   masterPlayers: MasterPlayer[],
+  allPlayers: Player[],
   onUpdate: (id: string, newValues: Partial<Player>) => void,
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
   isOnlyPlayer: boolean
-}> = ({ player, masterPlayers, onUpdate, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onRemove, onRunAnomalyCheck, isOnlyPlayer }) => {
   
   const { toast } = useToast();
 
@@ -449,7 +451,15 @@ const PlayerCard: FC<{
     }
   }
 
-  const totalBuyIns = player.buyIns.reduce((sum, bi) => sum + bi.amount, 0)
+  const totalBuyIns = player.buyIns.reduce((sum, bi) => sum + bi.amount, 0);
+
+  const availableMasterPlayers = useMemo(() => {
+    const currentInGamePlayerNames = allPlayers
+      .filter(p => p.id !== player.id && p.name)
+      .map(p => p.name);
+    return masterPlayers.filter(mp => !currentInGamePlayerNames.includes(mp.name));
+  }, [masterPlayers, allPlayers, player.id]);
+
 
   return (
     <Card className="bg-slate-50 border-0 shadow-none">
@@ -463,7 +473,10 @@ const PlayerCard: FC<{
               <SelectValue placeholder="Select Player" />
             </SelectTrigger>
             <SelectContent>
-              {masterPlayers.map(mp => (
+              {player.name && !availableMasterPlayers.some(p => p.name === player.name) && (
+                <SelectItem value={player.name}>{player.name}</SelectItem>
+              )}
+              {availableMasterPlayers.map(mp => (
                 <SelectItem key={mp.id} value={mp.name}>{mp.name}</SelectItem>
               ))}
             </SelectContent>
@@ -878,4 +891,3 @@ const AnomalyReportDialog: FC<{
         </Dialog>
     )
 }
-
