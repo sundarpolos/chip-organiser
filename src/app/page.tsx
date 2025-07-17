@@ -292,13 +292,11 @@ export default function ChipMaestroPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div className="flex items-center gap-4">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">{currentVenue}</h1>
-        </div>
-        <div className="flex items-center gap-2 mt-4 sm:mt-0 p-1 px-3 bg-slate-100 text-slate-600 rounded-md">
+      <header className="flex justify-center items-center mb-6 gap-4">
+        <h1 className="text-xl font-bold text-gray-800 truncate">{currentVenue}</h1>
+        <div className="flex items-center gap-2 p-1 px-2 bg-slate-100 text-slate-600 rounded-md">
           <Timer className="h-4 w-4" />
-          <span className="font-mono text-xl font-semibold">{formattedTime}</span>
+          <span className="font-mono text-base font-semibold">{formattedTime}</span>
         </div>
       </header>
       
@@ -308,8 +306,8 @@ export default function ChipMaestroPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
-                  <Button onClick={handleNewGame} variant="destructive" size="sm"><Plus className="mr-2 h-4 w-4" />New Game</Button>
+                  <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm" className="sm:size-auto"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
+                  <Button onClick={handleNewGame} variant="destructive" size="sm" className="sm:size-auto"><Plus className="mr-2 h-4 w-4" />New Game</Button>
                 </div>
               </div>
             </CardHeader>
