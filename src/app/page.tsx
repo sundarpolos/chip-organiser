@@ -505,32 +505,38 @@ const BuyInRow: FC<{
         }
         setIsVerifying(false);
     };
-
-    if (buyIn.verified) {
-        return (
-            <div className="flex items-center gap-2 p-2 rounded-md border bg-slate-50 dark:bg-slate-900/50">
-                <p className="flex-1 text-sm">Buy-in: {buyIn.amount}</p>
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </div>
-        )
-    }
-
+    
     return (
-      <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
+        <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
             <div className="flex items-center gap-2">
-                <Input type="number" value={buyIn.amount} onChange={e => onBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" className="h-9 text-sm" disabled={showOtpInput} />
-                {canBeRemoved ? (
-                    <Button size="icon" variant="destructive" onClick={() => onRemoveBuyIn(index)}><Trash2 className="h-4 w-4" /></Button>
-                ) : <div className="w-10" /> }
+                <Input
+                    type="number"
+                    value={buyIn.amount}
+                    onChange={e => onBuyInChange(index, parseInt(e.target.value) || 0)}
+                    placeholder="Amount"
+                    className="h-9 text-sm"
+                    disabled={showOtpInput || buyIn.verified}
+                />
+                {buyIn.verified ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                ) : (
+                    showOtpInput ? <div className="w-10" /> : null
+                )}
+                 {canBeRemoved && (
+                    <Button size="icon" variant="destructive" onClick={() => onRemoveBuyIn(index)} className="h-9 w-9">
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                )}
             </div>
-            {showOtpInput ? (
+            {showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
                     <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
                         {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm"}
                     </Button>
                 </div>
-            ) : (
+            )}
+            {!showOtpInput && !buyIn.verified && (
                  <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
                      {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
                  </Button>
@@ -577,6 +583,8 @@ const PlayerCard: FC<{
     if (player.buyIns.length > 1) {
       const newBuyIns = player.buyIns.filter((_, i) => i !== index)
       onUpdate(player.id, { buyIns: newBuyIns })
+    } else {
+        toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
     }
   }
 
