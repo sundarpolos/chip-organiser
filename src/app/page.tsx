@@ -39,6 +39,7 @@ import {
   ShieldAlert,
   Crown,
   Share2,
+  Timer,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -291,13 +292,17 @@ export default function ChipMaestroPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="flex flex-col sm:flex-row justify-between items-center mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
-          <Crown className="text-primary h-8 w-8" />
-          Chip Maestro
-        </h1>
-        <div className="flex items-center gap-2 p-2 bg-white rounded-lg shadow-sm">
-          <span className="font-mono text-4xl font-bold text-primary">{formattedTime}</span>
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 flex items-center gap-3">
+            <Crown className="text-primary h-8 w-8" />
+            Chip Maestro
+          </h1>
+          <span className="text-xl text-muted-foreground font-medium">{currentVenue}</span>
+        </div>
+        <div className="flex items-center gap-2 mt-2 sm:mt-0 p-1 px-2 bg-slate-100 text-slate-600 rounded-md">
+          <Timer className="h-4 w-4" />
+          <span className="font-mono text-lg font-semibold">{formattedTime}</span>
         </div>
       </header>
       
@@ -306,7 +311,7 @@ export default function ChipMaestroPage() {
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle>Game: {currentVenue}</CardTitle>
+                <CardTitle>Player Dashboard</CardTitle>
                 <div className="flex items-center gap-2">
                   <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
                   <Button onClick={handleNewGame} variant="destructive" size="sm"><Plus className="mr-2 h-4 w-4" />New Game</Button>
