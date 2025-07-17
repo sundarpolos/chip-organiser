@@ -46,6 +46,10 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { config } from 'dotenv';
+
+config();
+
 
 const MAX_PLAYERS = 7;
 
@@ -478,7 +482,7 @@ const PlayerCard: FC<{
             {player.buyIns.map((buyIn, index) => (
               <div key={index} className="p-2 rounded-md border bg-white dark:bg-slate-800">
                 <div className="flex items-center gap-2">
-                  <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" />
+                  <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" className="h-9 text-sm" />
                   {index === player.buyIns.length - 1 ? (
                     <Button size="icon" variant="outline" onClick={addBuyIn}><Plus className="h-4 w-4" /></Button>
                   ) : (
@@ -494,7 +498,7 @@ const PlayerCard: FC<{
           <Label className="text-lg">Final Chips</Label>
           <Input 
             type="number" 
-            className="mt-2 text-xl h-12" 
+            className="mt-2 text-lg h-10" 
             value={player.finalChips} 
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
           />
