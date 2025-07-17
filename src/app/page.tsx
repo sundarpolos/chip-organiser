@@ -731,10 +731,10 @@ const ManagePlayersDialog: FC<{
                         <div className="space-y-2 py-4 pr-6">
                             {masterPlayers.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                                    <p className="text-sm font-medium">
-                                      {p.name}
-                                      {p.whatsappNumber && <span className="text-xs text-muted-foreground ml-2">({p.whatsappNumber})</span>}
-                                    </p>
+                                    <div className="flex items-center space-x-2">
+                                        <p className="text-sm font-medium">{p.name}</p>
+                                        {p.whatsappNumber && <p className="text-xs text-muted-foreground">({p.whatsappNumber})</p>}
+                                    </div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
                                         <Button size="sm" variant="destructive" onClick={() => handleRemove(p.id)}>Remove</Button>
