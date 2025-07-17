@@ -720,11 +720,11 @@ const PlayerCard: FC<{
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
+            <Label className="text-lg">Buy-ins</Label>
             <Button onClick={addBuyIn} variant="outline" size="icon" className="h-7 w-7">
               <Plus className="h-4 w-4" />
               <span className="sr-only">Re-buy</span>
             </Button>
-            <Label className="text-lg">Buy-ins</Label>
           </div>
           <div className="space-y-2">
              {player.buyIns.map((buyIn, index) => (
@@ -741,7 +741,7 @@ const PlayerCard: FC<{
               />
             ))}
           </div>
-          <p className="text-xl font-bold mt-4">Total Verified: {totalBuyIns}</p>
+          <p className="text-xl font-bold mt-4">{totalBuyIns}</p>
         </div>
         <div>
           <Label className="text-lg">Final Chips</Label>
@@ -777,7 +777,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="p-2">Player</TableHead>
-                                <TableHead className="p-2 text-right">Buy-ins</TableHead>
+                                <TableHead className="p-2 text-right">Buy</TableHead>
                                 <TableHead className="p-2 text-right">Chips</TableHead>
                                 <TableHead className="p-2 text-right">P/L</TableHead>
                             </TableRow>
