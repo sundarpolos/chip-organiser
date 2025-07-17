@@ -587,7 +587,7 @@ const BuyInRow: FC<{
             <div className="flex items-center gap-2">
                 <Input
                     type="number"
-                    value={buyIn.amount}
+                    value={buyIn.amount === 0 ? "" : buyIn.amount}
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
@@ -736,7 +736,7 @@ const PlayerCard: FC<{
             ))}
           </div>
           <Button onClick={addBuyIn} className="w-full mt-2" variant="outline"><Plus className="h-4 w-4 mr-2"/>Re-buy</Button>
-          <p className="text-xl font-bold mt-4 text-right">Total Verified: {totalBuyIns}</p>
+          <p className="text-xl font-bold mt-4">Total Verified: {totalBuyIns}</p>
         </div>
         <div>
           <Label className="text-lg">Final Chips</Label>
@@ -985,12 +985,18 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        const tenDigitRegex = /^\d{10}$/;
-        if (mobileNumber && !tenDigitRegex.test(mobileNumber)) {
-            toast({ variant: "destructive", title: "Invalid Mobile Number", description: "Please enter a valid 10-digit mobile number." });
-            return;
+        if (mobileNumber) {
+            const mobileRegex = /^\d{10}$/; // Simple 10-digit validation for the mobile part
+            if (!mobileRegex.test(mobileNumber)) {
+                toast({
+                    variant: "destructive",
+                    title: "Invalid Mobile Number",
+                    description: "Please enter a valid 10-digit mobile number.",
+                });
+                return;
+            }
         }
-        
+
         const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
 
         if (editingPlayer) {
