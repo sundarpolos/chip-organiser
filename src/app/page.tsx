@@ -681,24 +681,28 @@ const ManagePlayersDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-h-[80vh] flex flex-col">
                 <DialogHeader><DialogTitle>Manage Players</DialogTitle><DialogDescription>Add, edit, or remove players from your master list.</DialogDescription></DialogHeader>
-                <div className="space-y-2">
+                <div className="space-y-2 border-b pb-4">
                     <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} />
                     <Input placeholder="WhatsApp Number" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} />
                     <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
                     {editingPlayer && <Button variant="ghost" className="w-full" onClick={() => setEditingPlayer(null)}>Cancel Edit</Button>}
                 </div>
-                <ScrollArea className="flex-grow"><div className="space-y-2 pr-4">
-                    {masterPlayers.map(p => (
-                        <div key={p.id} className="flex items-center justify-between p-2 bg-slate-100 rounded-md">
-                            <div><p>{p.name}</p><p className="text-xs text-muted-foreground">{p.whatsappNumber}</p></div>
-                            <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleRemove(p.id)}>Remove</Button>
-                            </div>
+                <div className="flex-grow overflow-hidden relative">
+                    <ScrollArea className="h-full">
+                        <div className="space-y-2 pr-6">
+                            {masterPlayers.map(p => (
+                                <div key={p.id} className="flex items-center justify-between p-2 bg-slate-100 rounded-md">
+                                    <div><p>{p.name}</p><p className="text-xs text-muted-foreground">{p.whatsappNumber}</p></div>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleRemove(p.id)}>Remove</Button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div></ScrollArea>
-                <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
+                    </ScrollArea>
+                </div>
+                <DialogFooter className="pt-4 border-t"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
             </DialogContent>
         </Dialog>
     )
