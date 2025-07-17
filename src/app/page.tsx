@@ -45,6 +45,7 @@ import {
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const MAX_PLAYERS = 7;
 
@@ -291,8 +292,9 @@ export default function ChipMaestroPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="flex justify-center items-center mb-6 gap-4">
-        <h1 className="text-lg font-semibold text-gray-800 truncate">{currentVenue}</h1>
+      <header className="flex justify-between items-center mb-6 gap-4">
+        <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+        <ThemeToggle />
       </header>
       
       <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
@@ -444,7 +446,7 @@ const PlayerCard: FC<{
 
 
   return (
-    <Card className="bg-slate-50 border-0 shadow-none">
+    <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between">
         <div className="w-2/3">
           <Select
@@ -474,7 +476,7 @@ const PlayerCard: FC<{
           <Label className="text-lg">Buy-ins</Label>
           <div className="space-y-2 mt-2">
             {player.buyIns.map((buyIn, index) => (
-              <div key={index} className="p-2 rounded-md border bg-white">
+              <div key={index} className="p-2 rounded-md border bg-white dark:bg-slate-800">
                 <div className="flex items-center gap-2">
                   <Input type="number" value={buyIn.amount} onChange={e => handleBuyInChange(index, parseInt(e.target.value) || 0)} placeholder="Amount" />
                   {index === player.buyIns.length - 1 ? (
@@ -540,7 +542,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                     <h3 className="font-semibold mb-2">Money Transfers</h3>
                     <div className="space-y-1 text-sm">
                         {transfers.length > 0 ? transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 rounded-md" dangerouslySetInnerHTML={{ __html: t }} />
+                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t }} />
                         )) : <p className="text-muted-foreground">No transfers needed.</p>}
                     </div>
                 </div>
@@ -705,7 +707,7 @@ const ManagePlayersDialog: FC<{
                     <ScrollArea className="h-full">
                         <div className="space-y-2 py-4 pr-6">
                             {masterPlayers.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 rounded-md">
+                                <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
                                     <div><p className="text-sm font-medium">{p.name}</p><p className="text-xs text-muted-foreground">{p.whatsappNumber}</p></div>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
@@ -735,7 +737,7 @@ const LoadGameDialog: FC<{
             <DialogHeader><DialogTitle>Load Previous Game</DialogTitle></DialogHeader>
             <ScrollArea className="flex-grow">
                 {gameHistory.length > 0 ? gameHistory.map(g => (
-                    <div key={g.id} className="flex items-center justify-between p-2 mb-2 bg-slate-100 rounded-md">
+                    <div key={g.id} className="flex items-center justify-between p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
                         <div><p>{g.venue}</p><p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP p")}</p></div>
                         <Button onClick={() => onLoadGame(g.id)}>Load</Button>
                     </div>
@@ -812,7 +814,7 @@ const ReportsDialog: FC<{
                     </CardContent></Card>
                      <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
                         {transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
+                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
                         ))}
                     </CardContent></Card>
                      <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
