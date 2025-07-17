@@ -42,7 +42,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     const senderMobile = process.env.WHATSAPP_SENDER_MOBILE;
 
     if (!apiToken || !apiUrl || !senderMobile) {
-      const errorMsg = 'WhatsApp API credentials or sender number are not configured in the .env file.';
+      const errorMsg = 'WhatsApp API credentials are not fully configured in the .env file. Please check WHATSAPP_API_TOKEN, WHATSAPP_API_URL, and WHATSAPP_SENDER_MOBILE.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
@@ -67,21 +67,12 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       try {
         responseData = JSON.parse(responseText);
       } catch (e) {
-        // Handle cases where response is not valid JSON
-        console.error('Failed to parse API response as JSON. Raw response:', responseText);
-        // If the fetch was otherwise OK, but JSON parsing failed, let's check the status code.
-        if (response.ok) {
-            // It might be a successful text response. We can't know for sure without API docs.
-            // Let's assume for now it's an error if we expected JSON.
-            return { success: false, error: `Received an invalid response from the API: ${responseText}` };
-        }
-        // If fetch was not OK, use the status text.
-        return { success: false, error: `API request failed with status ${response.status}: ${response.statusText}. Raw response: ${responseText}` };
+        console.error(`Failed to parse API response as JSON. Status: ${response.status}. Raw response:`, responseText);
+        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 100)}...` };
       }
       
-      // Check for both HTTP error codes and API-level error flags
       if (!response.ok || String(responseData.success).toLowerCase() !== 'true') {
-        const apiError = responseData.error || responseData.message || `API returned status ${response.status}`;
+        const apiError = responseData.error || responseData.message || `API returned status ${response.status} with 'success: false'`;
         console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
         return { success: false, error: `API Error: ${apiError}` };
       }
@@ -90,9 +81,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       return { success: true, messageId: responseData.message_id || responseData.messageId || 'N/A' };
 
     } catch (error) {
-      console.error('An unexpected error occurred in sendWhatsappMessageFlow:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while sending the message.';
-      return { success: false, error: errorMessage };
+      console.error('An unexpected network or fetch error occurred in sendWhatsappMessageFlow:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown network error occurred while sending the message.';
+      return { success: false, error: `Network/Fetch Error: ${errorMessage}` };
     }
   }
 );

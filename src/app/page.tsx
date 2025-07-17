@@ -519,6 +519,9 @@ const BuyInRow: FC<{
 
     const handleAmountChange = (newAmount: number) => {
         if(buyIn.verified) {
+            setShowOtpInput(false);
+            setSentOtp("");
+            setOtp("");
             onVerify(index, false);
         }
         onBuyInChange(index, newAmount);
@@ -1125,7 +1128,7 @@ const WhatsappDialog: FC<{
   onOpenChange: (open: boolean) => void;
 }> = ({ isOpen, onOpenChange }) => {
   const [recipient, setRecipient] = useState('');
-  const [message, setMessage] = useState('TESTING');
+  const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
@@ -1147,6 +1150,8 @@ const WhatsappDialog: FC<{
           description: `Successfully sent message to ${recipient}.`,
         });
         onOpenChange(false);
+        setRecipient('');
+        setMessage('');
       } else {
         throw new Error(result.error || 'An unknown error occurred.');
       }
@@ -1156,6 +1161,7 @@ const WhatsappDialog: FC<{
         variant: 'destructive',
         title: 'Error Sending Message',
         description: errorMessage,
+        duration: 9000,
       });
     } finally {
       setIsSending(false);
@@ -1166,9 +1172,9 @@ const WhatsappDialog: FC<{
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send WhatsApp Message</DialogTitle>
+          <DialogTitle>Send Test WhatsApp Message</DialogTitle>
           <DialogDescription>
-            Send a test message to any WhatsApp number.
+            Use this to test your WhatsApp API credentials.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -1185,6 +1191,7 @@ const WhatsappDialog: FC<{
             <Label htmlFor="message">Message</Label>
             <Textarea
               id="message"
+              placeholder="Enter your test message here."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
