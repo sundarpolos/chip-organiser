@@ -40,6 +40,7 @@ import {
   ShieldAlert,
   Crown,
   Share2,
+  Pencil,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -47,6 +48,8 @@ import { format } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+
 
 config();
 
@@ -678,6 +681,7 @@ const ManagePlayersDialog: FC<{
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
     const [whatsapp, setWhatsapp] = useState("");
+    const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
 
     useEffect(() => {
         if(editingPlayer) {
@@ -689,6 +693,13 @@ const ManagePlayersDialog: FC<{
         }
     }, [editingPlayer]);
     
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedPlayers([]);
+            setEditingPlayer(null);
+        }
+    }, [isOpen]);
+
     const handleSave = () => {
         const trimmedName = name.trim();
         if (!trimmedName) {
@@ -710,8 +721,21 @@ const ManagePlayersDialog: FC<{
         setEditingPlayer(null);
     }
 
-    const handleRemove = (id: string) => {
+    const handleSingleRemove = (id: string) => {
         setMasterPlayers(masterPlayers.filter(p => p.id !== id));
+    }
+    
+    const handleMultiRemove = () => {
+        setMasterPlayers(masterPlayers.filter(p => !selectedPlayers.includes(p.id)));
+        setSelectedPlayers([]);
+    }
+
+    const handleSelectPlayer = (id: string, isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedPlayers(prev => [...prev, id]);
+        } else {
+            setSelectedPlayers(prev => prev.filter(playerId => playerId !== id));
+        }
     }
 
     return (
@@ -735,20 +759,33 @@ const ManagePlayersDialog: FC<{
                         <div className="space-y-2 py-4 pr-6">
                             {masterPlayers.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                                    <div className="grid grid-cols-2 gap-4 flex-1 mr-4">
-                                        <p className="text-sm font-medium truncate col-span-1">{p.name}</p>
-                                        <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
+                                    <div className="flex items-center gap-3 flex-1 mr-4">
+                                        <Checkbox 
+                                            id={`select-${p.id}`}
+                                            checked={selectedPlayers.includes(p.id)}
+                                            onCheckedChange={(checked) => handleSelectPlayer(p.id, !!checked)}
+                                        />
+                                        <div className="grid grid-cols-2 gap-4 flex-1">
+                                            <p className="text-sm font-medium truncate col-span-1">{p.name}</p>
+                                            <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
+                                        </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}>Edit</Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleRemove(p.id)}>Remove</Button>
+                                        <Button size="icon" variant="ghost" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
+                                        <Button size="icon" variant="destructive" onClick={() => handleSingleRemove(p.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </ScrollArea>
                 </div>
-                <DialogFooter className="pt-4 border-t">
+                <DialogFooter className="pt-4 border-t flex justify-between">
+                    {selectedPlayers.length > 0 ? (
+                        <Button variant="destructive" onClick={handleMultiRemove}>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Selected ({selectedPlayers.length})
+                        </Button>
+                    ) : <div></div>}
                     <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                 </DialogFooter>
             </DialogContent>
