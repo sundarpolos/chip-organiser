@@ -7,6 +7,8 @@
  * - SendWhatsappMessageInput - The input type for the sendWhatsappMessage function.
  * - SendWhatsappMessageOutput - The return type for the sendWhatsappMessage function.
  */
+import { config } from 'dotenv';
+config();
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
@@ -35,13 +37,13 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     outputSchema: SendWhatsappMessageOutputSchema,
   },
   async ({ to, message }) => {
-    const apiToken = process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN;
-    const apiUrl = process.env.NEXT_PUBLIC_WHATSAPP_API_URL;
-    const senderMobile = process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE;
+    const apiToken = process.env.WHATSAPP_API_TOKEN;
+    const apiUrl = process.env.WHATSAPP_API_URL;
+    const senderMobile = process.env.WHATSAPP_SENDER_MOBILE;
 
     if (!apiToken || !apiUrl || !senderMobile) {
       const errorMsg = 'WhatsApp credentials, sender number, or API URL are not set in env file.';
-      console.error(errorMsg);
+      console.error(errorMsg, { apiToken: !!apiToken, apiUrl: !!apiUrl, senderMobile: !!senderMobile});
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
@@ -56,11 +58,12 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: formData,
+        body: formData.toString(),
       });
 
       const responseText = await response.text();
       let responseData;
+
       try {
         responseData = JSON.parse(responseText);
       } catch (e) {
