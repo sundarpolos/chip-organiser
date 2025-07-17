@@ -59,7 +59,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       const responseData = await response.json();
 
-      if (!response.ok || responseData.success === 'false' || responseData.success === false) {
+      if (!response.ok || String(responseData.success) === 'false') {
         console.error('Failed to send WhatsApp message:', responseData);
         return { success: false, error: responseData.error || responseData.message || 'Unknown error from WhatsApp API.' };
       }
