@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
+import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
@@ -26,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Plus,
   Trash2,
@@ -38,6 +40,7 @@ import {
   ShieldAlert,
   Crown,
   Share2,
+  MessageSquare,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -68,6 +71,7 @@ export default function ChipMaestroPage() {
   const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false)
   const [isReportsModalOpen, setReportsModalOpen] = useState(false)
   const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false)
+  const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
   
   // Specific Modal Content State
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null)
@@ -300,6 +304,9 @@ export default function ChipMaestroPage() {
                   <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" size="sm" className="sm:size-auto"><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
                   <Button onClick={handleNewGame} variant="destructive" size="sm" className="sm:size-auto"><Plus className="mr-2 h-4 w-4" />New Game</Button>
                 </div>
+                <div>
+                  <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="sm"><MessageSquare className="mr-2 h-4 w-4" />WhatsApp</Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -387,6 +394,10 @@ export default function ChipMaestroPage() {
         player={anomalyPlayer}
         isLoading={isAnomalyLoading}
         result={anomalyResult}
+      />
+      <WhatsappDialog
+        isOpen={isWhatsappModalOpen}
+        onOpenChange={setWhatsappModalOpen}
       />
     </div>
   )
@@ -875,3 +886,86 @@ const AnomalyReportDialog: FC<{
         </Dialog>
     )
 }
+
+const WhatsappDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}> = ({ isOpen, onOpenChange }) => {
+  const [recipient, setRecipient] = useState('');
+  const [message, setMessage] = useState('TESTING');
+  const [isSending, setIsSending] = useState(false);
+  const { toast } = useToast();
+
+  const handleSend = async () => {
+    if (!recipient || !message) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please provide a recipient number and a message.',
+      });
+      return;
+    }
+    setIsSending(true);
+    try {
+      const result = await sendWhatsappMessage({ to: recipient, message });
+      if (result.success) {
+        toast({
+          title: 'Message Sent!',
+          description: `Successfully sent message to ${recipient}.`,
+        });
+        onOpenChange(false);
+      } else {
+        throw new Error(result.error || 'An unknown error occurred.');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message.';
+      toast({
+        variant: 'destructive',
+        title: 'Error Sending Message',
+        description: errorMessage,
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send WhatsApp Message</DialogTitle>
+          <DialogDescription>
+            Send a test message to any WhatsApp number.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="recipient">Recipient Number</Label>
+            <Input
+              id="recipient"
+              placeholder="e.g., 919876543210 (with country code)"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="message">Message</Label>
+            <Textarea
+              id="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSend} disabled={isSending}>
+            {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
