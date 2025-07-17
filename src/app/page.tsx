@@ -69,8 +69,6 @@ import { Calendar } from "@/components/ui/calendar"
 config();
 
 
-const MAX_PLAYERS = 7;
-
 const WhatsappIcon = () => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -219,10 +217,6 @@ export default function ChipMaestroPage() {
       toast({ variant: "destructive", title: "Unnamed Player Exists", description: "Please name the existing new player before adding another." });
       return;
     }
-    if (players.length >= MAX_PLAYERS) {
-      toast({ variant: "destructive", title: "Max players reached", description: `You can only have up to ${MAX_PLAYERS} players.` })
-      return
-    }
     const newPlayer: Player = {
       id: `player-${Date.now()}`,
       name: "",
@@ -266,7 +260,7 @@ export default function ChipMaestroPage() {
         return;
     }
 
-    if (players.some(p => p.buyIns.some(b => !b.verified && b.amount > 0))) {
+    if (players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
       toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
       return;
     }
@@ -414,9 +408,9 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-7">
+                  <TabsList className="grid w-full grid-cols-4 sm:grid-cols-flow">
                     {players.map(p => (
-                      <TabsTrigger key={p.id} value={p.id} className="text-xs p-1 sm:text-sm sm:p-1.5">{p.name || "New Player"}</TabsTrigger>
+                      <TabsTrigger key={p.id} value={p.id} className="text-xs p-1 sm:text-sm sm:p-1.5 truncate">{p.name || "New Player"}</TabsTrigger>
                     ))}
                   </TabsList>
                   {players.map(player => (
@@ -444,7 +438,7 @@ export default function ChipMaestroPage() {
             </CardContent>
             <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
-                  <Button onClick={addNewPlayer} disabled={players.length >= MAX_PLAYERS}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
+                  <Button onClick={addNewPlayer}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
                   <Button onClick={handleSaveGame} variant="secondary"><Save className="mr-2 h-4 w-4" />Save Game</Button>
                 </div>
                 <div className="flex gap-2">
@@ -1421,6 +1415,7 @@ const WhatsappDialog: FC<{
     
 
     
+
 
 
 
