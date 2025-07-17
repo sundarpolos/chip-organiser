@@ -51,24 +51,25 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
+        body: formData,
       });
 
+      // The API seems to return JSON, so we'll try to parse it.
       const responseData = await response.json();
-
-      if (!response.ok || String(responseData.success) === 'false') {
-        console.error('Failed to send WhatsApp message:', responseData);
-        return { success: false, error: responseData.error || responseData.message || 'Unknown error from WhatsApp API.' };
+      
+      // Check both the HTTP status code and the 'success' field in the JSON payload
+      if (!response.ok || String(responseData.success).toLowerCase() !== 'true') {
+        console.error('Failed to send WhatsApp message. API Response:', responseData);
+        // Provide a more specific error message from the API if available
+        const apiError = responseData.error || responseData.message || `API returned status ${response.status}`;
+        return { success: false, error: apiError };
       }
       
       return { success: true, messageId: responseData.messageId || 'N/A' };
 
     } catch (error) {
       console.error('Error in sendWhatsappMessageFlow:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while sending the message.';
       return { success: false, error: errorMessage };
     }
   }
