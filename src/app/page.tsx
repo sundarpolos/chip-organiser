@@ -113,7 +113,11 @@ export default function ChipMaestroPage() {
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
 
   // App Settings
-  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
+  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ 
+    apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '', 
+    apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '', 
+    senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || '' 
+  });
 
   // Modal & Dialog State
   const [isVenueModalOpen, setVenueModalOpen] = useState(false)
@@ -149,7 +153,7 @@ export default function ChipMaestroPage() {
       if (savedOtpPreference !== null) {
           setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
       }
-       if (savedWhatsappConfig) {
+      if (savedWhatsappConfig) {
         setWhatsappConfig(JSON.parse(savedWhatsappConfig));
       }
       
@@ -345,7 +349,7 @@ export default function ChipMaestroPage() {
         setActiveTab(gameToLoad.players[0].id)
       }
       setLoadGameModalOpen(false);
-      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy p")}.` });
+      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
     }
   };
   
@@ -861,7 +865,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
     <Card>
         <CardHeader>
             <CardTitle>Game Summary</CardTitle>
-            {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy p")}</CardDescription>}
+            {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-6">
              {!activeGame || activeGame.players.length === 0 ? (
@@ -1298,7 +1302,7 @@ const ReportsDialog: FC<{
         pdf.setFontSize(18);
         pdf.text(activeGame.venue, 14, 22);
         pdf.setFontSize(11);
-        pdf.text(format(new Date(activeGame.timestamp), "dd/MMM/yy p"), 14, 30);
+        pdf.text(format(new Date(activeGame.timestamp), "dd/MMM/yy"), 14, 30);
 
         autoTable(pdf, {
             startY: 40,
@@ -1329,7 +1333,7 @@ const ReportsDialog: FC<{
             <ScrollArea className="max-h-[85vh]">
                 <DialogHeader>
                     <DialogTitle>Game Report: {activeGame.venue}</DialogTitle>
-                    <DialogDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy p")}</DialogDescription>
+                    <DialogDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</DialogDescription>
                 </DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
                     <Card><CardHeader><CardTitle>Player Performance</CardTitle></CardHeader><CardContent>
