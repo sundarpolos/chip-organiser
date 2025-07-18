@@ -16,6 +16,9 @@ import { z } from 'genkit';
 const SendWhatsappMessageInputSchema = z.object({
   to: z.string().describe('The recipient WhatsApp number.'),
   message: z.string().describe('The message content to send.'),
+  apiUrl: z.string().optional().describe('The WhatsApp API URL.'),
+  apiToken: z.string().optional().describe('The WhatsApp API Token.'),
+  senderMobile: z.string().optional().describe('The sender WhatsApp number.'),
 });
 export type SendWhatsappMessageInput = z.infer<typeof SendWhatsappMessageInputSchema>;
 
@@ -36,13 +39,14 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     inputSchema: SendWhatsappMessageInputSchema,
     outputSchema: SendWhatsappMessageOutputSchema,
   },
-  async ({ to, message }) => {
-    const apiToken = process.env.WHATSAPP_API_TOKEN;
-    const apiUrl = process.env.WHATSAPP_API_URL;
-    const senderMobile = process.env.WHATSAPP_SENDER_MOBILE;
+  async ({ to, message, apiUrl, apiToken, senderMobile }) => {
+    // Prefer credentials passed in, but fall back to environment variables
+    const finalApiUrl = apiUrl || process.env.WHATSAPP_API_URL;
+    const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
+    const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
-    if (!apiToken || !apiUrl || !senderMobile) {
-      const errorMsg = 'WhatsApp API credentials are not fully configured in the .env file. Please check WHATSAPP_API_TOKEN, WHATSAPP_API_URL, and WHATSAPP_SENDER_MOBILE.';
+    if (!finalApiToken || !finalApiUrl || !finalSenderMobile) {
+      const errorMsg = 'WhatsApp API credentials are not fully configured. Please provide them in the WA Settings or in the .env file.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
@@ -51,9 +55,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       const formData = new URLSearchParams();
       formData.append('receiver', to);
       formData.append('msgtext', message);
-      formData.append('token', apiToken);
+      formData.append('token', finalApiToken);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetch(finalApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

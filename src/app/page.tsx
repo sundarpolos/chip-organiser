@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn, WhatsappConfig } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -57,7 +57,8 @@ import {
   Pencil,
   CheckCircle2,
   TimerIcon,
-  MoreVertical
+  MoreVertical,
+  Settings,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -111,6 +112,9 @@ export default function ChipMaestroPage() {
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null)
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
 
+  // App Settings
+  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
+
   // Modal & Dialog State
   const [isVenueModalOpen, setVenueModalOpen] = useState(false)
   const [isManagePlayersModalOpen, setManagePlayersModalOpen] = useState(false)
@@ -118,6 +122,8 @@ export default function ChipMaestroPage() {
   const [isReportsModalOpen, setReportsModalOpen] = useState(false)
   const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false)
   const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [isWhatsappSettingsModalOpen, setWhatsappSettingsModalOpen] = useState(false);
+
   
   // Specific Modal Content State
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null)
@@ -132,6 +138,7 @@ export default function ChipMaestroPage() {
       const savedMasterVenues = localStorage.getItem("masterVenues")
       const savedGameHistory = localStorage.getItem("gameHistory")
       const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
+      const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
 
       if (savedMasterPlayers) setMasterPlayers(JSON.parse(savedMasterPlayers))
       if (savedMasterVenues) setMasterVenues(JSON.parse(savedMasterVenues))
@@ -141,6 +148,9 @@ export default function ChipMaestroPage() {
       }
       if (savedOtpPreference !== null) {
           setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
+      }
+       if (savedWhatsappConfig) {
+        setWhatsappConfig(JSON.parse(savedWhatsappConfig));
       }
       
       const lastActiveGame = localStorage.getItem("activeGame");
@@ -181,7 +191,8 @@ export default function ChipMaestroPage() {
     localStorage.setItem("masterVenues", JSON.stringify(masterVenues))
     localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
     localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
-  }, [masterPlayers, masterVenues, gameHistory, isOtpVerificationEnabled, isDataReady])
+    localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig));
+  }, [masterPlayers, masterVenues, gameHistory, isOtpVerificationEnabled, whatsappConfig, isDataReady])
 
   // Game timer effect
   useEffect(() => {
@@ -450,6 +461,10 @@ export default function ChipMaestroPage() {
                   <WhatsappIcon />
                   <span className="ml-2">Test WhatsApp</span>
                 </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
+                  <Settings className="h-4 w-4" />
+                  <span className="ml-2">WA Settings</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
         </div>
@@ -486,6 +501,7 @@ export default function ChipMaestroPage() {
                         allPlayers={players}
                         toast={toast}
                         isOtpEnabled={isOtpVerificationEnabled}
+                        whatsappConfig={whatsappConfig}
                       />
                     </TabsContent>
                   ))}
@@ -557,6 +573,14 @@ export default function ChipMaestroPage() {
       <WhatsappDialog
         isOpen={isWhatsappModalOpen}
         onOpenChange={setWhatsappModalOpen}
+        whatsappConfig={whatsappConfig}
+      />
+      <WhatsappSettingsDialog
+        isOpen={isWhatsappSettingsModalOpen}
+        onOpenChange={setWhatsappSettingsModalOpen}
+        config={whatsappConfig}
+        onSave={setWhatsappConfig}
+        toast={toast}
       />
     </div>
   )
@@ -573,8 +597,9 @@ const BuyInRow: FC<{
     onVerify: (index: number, verified: boolean) => void;
     onAddBuyIn: () => void;
     isOtpEnabled: boolean;
+    whatsappConfig: WhatsappConfig;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -609,6 +634,7 @@ const BuyInRow: FC<{
                 buyInAmount: buyIn.amount,
                 buyInCount: verifiedBuyIns.length + 1,
                 totalBuyInAmount: totalVerifiedAmount,
+                whatsappConfig,
             });
 
             if (result.success && result.otp) {
@@ -717,8 +743,9 @@ const PlayerCard: FC<{
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
   isOtpEnabled: boolean;
+  whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOtpEnabled, toast }) => {
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -809,6 +836,7 @@ const PlayerCard: FC<{
                 onVerify={handleVerifyBuyIn}
                 onAddBuyIn={addBuyIn}
                 isOtpEnabled={isOtpEnabled}
+                whatsappConfig={whatsappConfig}
                 toast={toast}
               />
             ))}
@@ -1329,7 +1357,7 @@ const ReportsDialog: FC<{
                      <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
                          <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
                          <TableBody>
-                             {(activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
+                             {((activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
                                  <TableRow key={i}>
                                      <TableCell>{b.playerName}</TableCell>
                                      <TableCell>{b.amount}</TableCell>
@@ -1401,7 +1429,8 @@ const AnomalyReportDialog: FC<{
 const WhatsappDialog: FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-}> = ({ isOpen, onOpenChange }) => {
+  whatsappConfig: WhatsappConfig;
+}> = ({ isOpen, onOpenChange, whatsappConfig }) => {
   const [recipient, setRecipient] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -1418,7 +1447,11 @@ const WhatsappDialog: FC<{
     }
     setIsSending(true);
     try {
-      const result = await sendWhatsappMessage({ to: recipient, message });
+      const result = await sendWhatsappMessage({ 
+        to: recipient, 
+        message,
+        ...whatsappConfig
+      });
       if (result.success) {
         toast({
           title: 'Message Sent!',
@@ -1479,6 +1512,79 @@ const WhatsappDialog: FC<{
           <Button onClick={handleSend} disabled={isSending}>
             {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const WhatsappSettingsDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  config: WhatsappConfig;
+  onSave: (config: WhatsappConfig) => void;
+  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
+}> = ({ isOpen, onOpenChange, config, onSave, toast }) => {
+  const [currentConfig, setCurrentConfig] = useState(config);
+
+  useEffect(() => {
+    setCurrentConfig(config);
+  }, [config, isOpen]);
+
+  const handleChange = (field: keyof WhatsappConfig, value: string) => {
+    setCurrentConfig(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = () => {
+    onSave(currentConfig);
+    toast({ title: 'Settings Saved', description: 'WhatsApp credentials have been updated.' });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>WhatsApp API Settings</DialogTitle>
+          <DialogDescription>
+            Enter your WhatsApp provider credentials here. These are stored locally in your browser.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="apiUrl">API URL</Label>
+            <Input
+              id="apiUrl"
+              placeholder="https://api.provider.com/send"
+              value={currentConfig.apiUrl}
+              onChange={(e) => handleChange('apiUrl', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="apiToken">API Token</Label>
+            <Input
+              id="apiToken"
+              type="password"
+              placeholder="Your secret API token"
+              value={currentConfig.apiToken}
+              onChange={(e) => handleChange('apiToken', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="senderMobile">Sender Mobile</Label>
+            <Input
+              id="senderMobile"
+              placeholder="e.g., 14155552671"
+              value={currentConfig.senderMobile}
+              onChange={(e) => handleChange('senderMobile', e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSave}>Save Settings</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

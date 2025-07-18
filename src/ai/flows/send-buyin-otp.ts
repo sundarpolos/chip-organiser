@@ -10,7 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { sendWhatsappMessage } from './send-whatsapp-message';
+import { sendWhatsappMessage, type SendWhatsappMessageInput } from './send-whatsapp-message';
 
 const SendBuyInOtpInputSchema = z.object({
   playerName: z.string().describe('The name of the player.'),
@@ -18,6 +18,11 @@ const SendBuyInOtpInputSchema = z.object({
   buyInAmount: z.number().describe('The buy-in amount to be verified.'),
   buyInCount: z.number().describe('The number of this buy-in for the player (e.g., 1 for 1st).'),
   totalBuyInAmount: z.number().describe("The player's total verified buy-in amount so far."),
+  whatsappConfig: z.object({
+    apiUrl: z.string().optional(),
+    apiToken: z.string().optional(),
+    senderMobile: z.string().optional(),
+  }).describe('WhatsApp API credentials.'),
 });
 export type SendBuyInOtpInput = z.infer<typeof SendBuyInOtpInputSchema>;
 
@@ -50,7 +55,7 @@ const sendBuyInOtpFlow = ai.defineFlow(
     inputSchema: SendBuyInOtpInputSchema,
     outputSchema: SendBuyInOtpOutputSchema,
   },
-  async ({ playerName, whatsappNumber, buyInAmount, buyInCount, totalBuyInAmount }) => {
+  async ({ playerName, whatsappNumber, buyInAmount, buyInCount, totalBuyInAmount, whatsappConfig }) => {
     if (!whatsappNumber) {
         return { success: false, error: 'WhatsApp number is not provided.' };
     }
@@ -63,7 +68,15 @@ Previous Total: ₹${totalBuyInAmount}
 After verification, your new grand total will be ₹${newTotal}.`;
 
     try {
-      const whatsappResult = await sendWhatsappMessage({ to: whatsappNumber, message });
+      const whatsappPayload: SendWhatsappMessageInput = { 
+        to: whatsappNumber, 
+        message,
+        apiUrl: whatsappConfig.apiUrl,
+        apiToken: whatsappConfig.apiToken,
+        senderMobile: whatsappConfig.senderMobile,
+      };
+
+      const whatsappResult = await sendWhatsappMessage(whatsappPayload);
       
       if (whatsappResult.success) {
         // In a real application, you wouldn't return the OTP to the client.

@@ -36,3 +36,9 @@ export interface GameHistory {
     startTime?: string;
     duration?: number; // in milliseconds
 }
+
+export interface WhatsappConfig {
+  apiUrl: string;
+  apiToken: string;
+  senderMobile: string;
+}
