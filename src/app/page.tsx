@@ -109,10 +109,10 @@ export default function ChipMaestroPage() {
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
 
   // App Settings
-  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ 
-    apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '', 
-    apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '', 
-    senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || '' 
+  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
+    apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '',
+    apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '',
+    senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
   });
 
   // Modal & Dialog State
@@ -283,6 +283,13 @@ export default function ChipMaestroPage() {
   };
   
   const handlePlayerNameChange = (id: string, newName: string) => {
+    // Check for duplicates in the current game
+    const isDuplicate = players.some(p => p.name === newName && p.id !== id);
+    if (isDuplicate) {
+        toast({ variant: "destructive", title: "Duplicate Player", description: `${newName} is already in this game.` });
+        return;
+    }
+
     const masterPlayer = masterPlayers.find(mp => mp.name === newName);
     const updatedDetails: Partial<Player> = { name: newName };
     if (masterPlayer) {
