@@ -62,6 +62,7 @@ import {
   MoreVertical,
   Settings,
   Upload,
+  AlertCircle,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -1840,6 +1841,11 @@ const SaveConfirmDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, onUpdatePlayer }) => {
     if (!activeGame) return null;
 
+    const totalBuyInsSum = activeGame.players.reduce((sum, p) => sum + p.totalBuyIns, 0);
+    const totalFinalChipsSum = activeGame.players.reduce((sum, p) => sum + p.finalChips, 0);
+    const totalProfitLossSum = activeGame.players.reduce((sum, p) => sum + p.profitLoss, 0);
+    const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01; // Use tolerance for floating point
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl">
@@ -1851,42 +1857,63 @@ const SaveConfirmDialog: FC<{
                 </DialogHeader>
                 <div className="my-4">
                     <h3 className="text-lg font-semibold mb-2">{activeGame.venue} - {format(new Date(activeGame.timestamp), 'dd/MMM/yy')}</h3>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-right">Total Buy-in</TableHead>
-                                <TableHead className="text-right">Final Chips</TableHead>
-                                <TableHead className="text-right">Profit/Loss</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {activeGame.players.map(p => (
-                                <TableRow key={p.id}>
-                                    <TableCell className="font-medium">{p.name}</TableCell>
-                                    <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                    <TableCell className="text-right w-32">
-                                        <Input
-                                            type="number"
-                                            className="h-8 text-right"
-                                            value={p.finalChips === 0 ? "" : p.finalChips}
-                                            onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
-                                            placeholder="Chips"
-                                        />
-                                    </TableCell>
-                                    <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {p.profitLoss.toFixed(0)}
-                                    </TableCell>
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Player</TableHead>
+                                    <TableHead className="text-right">Total Buy-in</TableHead>
+                                    <TableHead className="text-right">Final Chips</TableHead>
+                                    <TableHead className="text-right">Profit/Loss</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {activeGame.players.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell className="text-right">{p.totalBuyIns}</TableCell>
+                                        <TableCell className="text-right w-32">
+                                            <Input
+                                                type="number"
+                                                className="h-8 text-right"
+                                                value={p.finalChips === 0 ? "" : p.finalChips}
+                                                onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
+                                                placeholder="Chips"
+                                            />
+                                        </TableCell>
+                                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {p.profitLoss.toFixed(0)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFoot>
+                                <TableRow className="bg-muted/50 font-bold">
+                                    <TableCell>Totals</TableCell>
+                                    <TableCell className="text-right">{totalBuyInsSum}</TableCell>
+                                    <TableCell className="text-right">{totalFinalChipsSum}</TableCell>
+                                    <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
+                                </TableRow>
+                            </TableFoot>
+                        </Table>
+                    </div>
                 </div>
+
+                {!isBalanced && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Totals Do Not Match!</AlertTitle>
+                        <AlertDescription>
+                            The total buy-ins ({totalBuyInsSum}) and total final chips ({totalFinalChipsSum}) must be equal. Please correct the values before saving.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <DialogFooter>
                     <DialogClose asChild>
                         <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={onConfirmSave}>
+                    <Button onClick={onConfirmSave} disabled={!isBalanced}>
                         <Save className="mr-2 h-4 w-4" />
                         Confirm & Save
                     </Button>
