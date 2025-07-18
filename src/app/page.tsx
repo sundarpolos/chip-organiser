@@ -1,12 +1,12 @@
 
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, type FC } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -63,7 +63,7 @@ import {
   Upload,
 } from "lucide-react"
 import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
+import html2canvas from "html2canvas"
 import { format, isSameDay, set, intervalToDuration } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
@@ -1106,11 +1106,11 @@ const VenueDialog: FC<{
 }
 
 const countryCodes = [
-    { value: "+91", label: "IN (+91)" },
-    { value: "+1", label: "US (+1)" },
-    { value: "+44", label: "UK (+44)" },
-    { value: "+61", label: "AU (+61)" },
-    { value: "+81", label: "JP (+81)" },
+    { value: "91", label: "IN (+91)" },
+    { value: "1", label: "US (+1)" },
+    { value: "44", label: "UK (+44)" },
+    { value: "61", label: "AU (+61)" },
+    { value: "81", label: "JP (+81)" },
 ];
 
 const ManagePlayersDialog: FC<{
@@ -1122,30 +1122,21 @@ const ManagePlayersDialog: FC<{
 }> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
-    const [countryCode, setCountryCode] = useState("+91");
+    const [countryCode, setCountryCode] = useState("91");
     const [mobileNumber, setMobileNumber] = useState("");
     const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
 
     const splitPhoneNumber = (fullNumber: string) => {
-        if (!fullNumber) return { cc: "+91", num: "" };
-
-        // Ensure the fullNumber is treated as a string before checking startsWith
+        if (!fullNumber) return { cc: "91", num: "" };
         const fullNumberStr = String(fullNumber);
 
         for (const code of countryCodes) {
-            // Check against code value (e.g., '+91')
             if (fullNumberStr.startsWith(code.value)) {
                 return { cc: code.value, num: fullNumberStr.substring(code.value.length) };
             }
-            // Also check against code value without '+' (e.g., '91')
-            const codeWithoutPlus = code.value.substring(1);
-            if (fullNumberStr.startsWith(codeWithoutPlus)) {
-                return { cc: code.value, num: fullNumberStr.substring(codeWithoutPlus.length) };
-            }
         }
         
-        // Default if no logic matches
-        return { cc: "+91", num: fullNumberStr };
+        return { cc: "91", num: fullNumberStr };
     };
 
     useEffect(() => {
@@ -1156,7 +1147,7 @@ const ManagePlayersDialog: FC<{
             setMobileNumber(num);
         } else {
             setName("");
-            setCountryCode("+91");
+            setCountryCode("91");
             setMobileNumber("");
         }
     }, [editingPlayer]);
@@ -1181,11 +1172,9 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        const sanitizedCountryCode = countryCode.replace('+', '');
-        const fullWhatsappNumber = mobileNumber ? `${sanitizedCountryCode}${mobileNumber}` : "";
+        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
 
         if (mobileNumber) {
-            // Validate the number without the plus sign for consistency
             const mobileRegex = /^\d{10,14}$/;
             if (!mobileRegex.test(fullWhatsappNumber.replace(/\s/g, ''))) {
                  toast({
@@ -1378,30 +1367,37 @@ const ReportsDialog: FC<{
     activeGame: GameHistory | null,
     transfers: string[],
 }> = ({ isOpen, onOpenChange, activeGame, transfers }) => {
+    const reportContentRef = useRef<HTMLDivElement>(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const { toast } = useToast();
     
-    const handleExportPdf = () => {
-        if (!activeGame) return;
-        const pdf = new jsPDF();
-        pdf.setFontSize(18);
-        pdf.text(activeGame.venue, 14, 22);
-        pdf.setFontSize(11);
-        pdf.text(format(new Date(activeGame.timestamp), "dd/MMM/yy"), 14, 30);
-
-        autoTable(pdf, {
-            startY: 40,
-            head: [['Player', 'Buy-ins', 'Final Chips', 'Profit/Loss']],
-            body: activeGame.players.map(p => [p.name, p.totalBuyIns, p.finalChips, p.profitLoss]),
-        });
+    const handleExportPdf = async () => {
+        if (!activeGame || !reportContentRef.current) return;
         
-        const finalY = (pdf as any).lastAutoTable.finalY;
-        pdf.setFontSize(14);
-        pdf.text("Money Transfers", 14, finalY + 15);
-        autoTable(pdf, {
-            startY: finalY + 20,
-            body: transfers.map(t => [t.replace(/<[^>]*>/g, '')]),
-        })
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(reportContentRef.current, {
+                scale: 2, // Higher scale for better quality
+                useCORS: true,
+                backgroundColor: null, // Use element's background
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
 
-        pdf.save(`${activeGame.venue.replace(/\s/g, '_')}_report.pdf`);
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save(`${activeGame.venue.replace(/\s/g, '_')}_report.pdf`);
+            toast({ title: "Success", description: "Report has been exported as a PDF." });
+        } catch (error) {
+            console.error("Failed to export PDF:", error);
+            toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     if (!activeGame) return null;
@@ -1413,52 +1409,57 @@ const ReportsDialog: FC<{
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[90vh]">
-            <ScrollArea className="max-h-[85vh]">
-                <DialogHeader>
-                    <DialogTitle>Game Report: {activeGame.venue}</DialogTitle>
-                    <DialogDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</DialogDescription>
-                </DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-                    <Card><CardHeader><CardTitle>Player Performance</CardTitle></CardHeader><CardContent>
-                        {activeGame.players.map(p => (
-                            <div key={p.id} className="mb-4">
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span>{p.name}</span>
-                                    <span className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {p.profitLoss > 0 ? '+' : ''}{p.profitLoss.toFixed(0)} ({p.totalBuyIns > 0 ? ((p.profitLoss / p.totalBuyIns) * 100).toFixed(0) : 'inf'}%)
-                                    </span>
-                                </div>
-                                <Progress value={p.totalBuyIns > 0 ? Math.min(100, Math.abs(p.profitLoss/p.totalBuyIns * 100)) : 100} 
-                                className={p.profitLoss >= 0 ? '[&>div]:bg-green-500' : '[&>div]:bg-red-500'}/>
-                            </div>
-                        ))}
-                    </CardContent></Card>
-                    <Card><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
-                        <ChipDistributionChart data={pieChartData} />
-                    </CardContent></Card>
-                     <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
-                        {transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
-                        ))}
-                    </CardContent></Card>
-                     <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
-                         <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
-                         <TableBody>
-                             {(activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
-                                 <TableRow key={i}>
-                                     <TableCell>{b.playerName}</TableCell>
-                                     <TableCell>{b.amount}</TableCell>
-                                     <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
-                                 </TableRow>
-                             ))}
-                         </TableBody>
-                         </Table>
-                     </CardContent></Card>
-                </div>
-                 <DialogFooter className="pr-4 pb-2">
-                    <Button onClick={handleExportPdf}><FileDown className="h-4 w-4 mr-2" />Export PDF</Button>
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                </DialogFooter>
+                <ScrollArea className="max-h-[85vh]">
+                    <div ref={reportContentRef} className="p-4 bg-background">
+                        <DialogHeader className="mb-6 text-center">
+                            <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
+                            <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card><CardHeader><CardTitle>Player Performance</CardTitle></CardHeader><CardContent>
+                                {activeGame.players.map(p => (
+                                    <div key={p.id} className="mb-4">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span>{p.name}</span>
+                                            <span className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {p.profitLoss > 0 ? '+' : ''}{p.profitLoss.toFixed(0)} ({p.totalBuyIns > 0 ? ((p.profitLoss / p.totalBuyIns) * 100).toFixed(0) : 'inf'}%)
+                                            </span>
+                                        </div>
+                                        <Progress value={p.totalBuyIns > 0 ? Math.min(100, Math.abs(p.profitLoss/p.totalBuyIns * 100)) : 100} 
+                                        className={p.profitLoss >= 0 ? '[&>div]:bg-green-500' : '[&>div]:bg-red-500'}/>
+                                    </div>
+                                ))}
+                            </CardContent></Card>
+                            <Card><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
+                                <ChipDistributionChart data={pieChartData} />
+                            </CardContent></Card>
+                             <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
+                                {transfers.length > 0 ? transfers.map((t, i) => (
+                                    <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
+                                )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
+                            </CardContent></Card>
+                             <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
+                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
+                                 <TableBody>
+                                     {(activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
+                                         <TableRow key={i}>
+                                             <TableCell>{b.playerName}</TableCell>
+                                             <TableCell>{b.amount}</TableCell>
+                                             <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
+                                         </TableRow>
+                                     ))}
+                                 </TableBody>
+                                 </Table>
+                             </CardContent></Card>
+                        </div>
+                    </div>
+                    <DialogFooter className="pr-4 pb-2 mt-4">
+                        <Button onClick={handleExportPdf} disabled={isExporting}>
+                            {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
+                            Export PDF
+                        </Button>
+                        <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                    </DialogFooter>
                 </ScrollArea>
             </DialogContent>
         </Dialog>
@@ -1737,6 +1738,3 @@ const ImportGameDialog: FC<{
     </Dialog>
   );
 };
-
-
-    
