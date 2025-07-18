@@ -259,16 +259,30 @@ export default function ChipMaestroPage() {
   }, [activeGame, isDataReady]);
 
   const addNewPlayer = () => {
+    const inGamePlayerNames = players.map(p => p.name);
+    const availableMasterPlayers = masterPlayers.filter(mp => !inGamePlayerNames.includes(mp.name));
+
+    if (availableMasterPlayers.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No More Players",
+        description: "All saved players are already in the game. Add more via 'Manage Players'.",
+      });
+      return;
+    }
+
+    const playerToAdd = availableMasterPlayers[0];
     const newPlayer: Player = {
       id: `player-${Date.now()}`,
-      name: "",
-      whatsappNumber: "",
+      name: playerToAdd.name,
+      whatsappNumber: playerToAdd.whatsappNumber,
       buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
       finalChips: 0,
-    }
-    setPlayers([...players, newPlayer])
-    setActiveTab(newPlayer.id)
-  }
+    };
+    
+    setPlayers([...players, newPlayer]);
+    setActiveTab(newPlayer.id);
+  };
   
   const removePlayer = (idToRemove: string) => {
     const updatedPlayers = players.filter(p => p.id !== idToRemove)
@@ -1364,13 +1378,13 @@ const ReportsDialog: FC<{
                      <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
                          <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
                          <TableBody>
-                             {((activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
+                             {(activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
                                  <TableRow key={i}>
                                      <TableCell>{b.playerName}</TableCell>
                                      <TableCell>{b.amount}</TableCell>
                                      <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
                                  </TableRow>
-                             )))}
+                             ))}
                          </TableBody>
                          </Table>
                      </CardContent></Card>
