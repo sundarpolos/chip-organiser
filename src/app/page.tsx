@@ -64,6 +64,7 @@ import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
+import { Switch } from "@/components/ui/switch"
 
 
 config();
@@ -95,6 +96,7 @@ export default function ChipMaestroPage() {
   const [currentVenue, setCurrentVenue] = useState<string>("Untitled Game")
   const [isDataReady, setIsDataReady] = useState(false)
   const [gameDate, setGameDate] = useState<Date>(new Date())
+  const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
 
   // Master Data State
   const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([])
@@ -124,12 +126,16 @@ export default function ChipMaestroPage() {
       const savedMasterPlayers = localStorage.getItem("masterPlayers")
       const savedMasterVenues = localStorage.getItem("masterVenues")
       const savedGameHistory = localStorage.getItem("gameHistory")
+      const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
 
       if (savedMasterPlayers) setMasterPlayers(JSON.parse(savedMasterPlayers))
       if (savedMasterVenues) setMasterVenues(JSON.parse(savedMasterVenues))
       if (savedGameHistory) {
         const history = JSON.parse(savedGameHistory)
         setGameHistory(history)
+      }
+      if (savedOtpPreference !== null) {
+          setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
       }
       
       const lastActiveGame = localStorage.getItem("activeGame");
@@ -166,7 +172,8 @@ export default function ChipMaestroPage() {
     localStorage.setItem("masterPlayers", JSON.stringify(masterPlayers))
     localStorage.setItem("masterVenues", JSON.stringify(masterVenues))
     localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
-  }, [masterPlayers, masterVenues, gameHistory, isDataReady])
+    localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
+  }, [masterPlayers, masterVenues, gameHistory, isOtpVerificationEnabled, isDataReady])
 
   // This effect rebuilds the activeGame object whenever the core game state changes.
   useEffect(() => {
@@ -221,7 +228,7 @@ export default function ChipMaestroPage() {
       id: `player-${Date.now()}`,
       name: "",
       whatsappNumber: "",
-      buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: false }],
+      buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
       finalChips: 0,
     }
     setPlayers([...players, newPlayer])
@@ -391,7 +398,17 @@ export default function ChipMaestroPage() {
             <span className="sr-only">Send WhatsApp Message</span>
           </Button>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-2">
+                <Switch 
+                    id="otp-verification" 
+                    checked={isOtpVerificationEnabled} 
+                    onCheckedChange={setOtpVerificationEnabled}
+                />
+                <Label htmlFor="otp-verification" className="text-sm text-muted-foreground">OTP</Label>
+            </div>
+            <ThemeToggle />
+        </div>
       </header>
       
       <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
@@ -425,6 +442,7 @@ export default function ChipMaestroPage() {
                         isOnlyPlayer={players.length === 1}
                         allPlayers={players}
                         toast={toast}
+                        isOtpEnabled={isOtpVerificationEnabled}
                       />
                     </TabsContent>
                   ))}
@@ -511,13 +529,21 @@ const BuyInRow: FC<{
     onRemoveBuyIn: (index: number) => void;
     onVerify: (index: number, verified: boolean) => void;
     onAddBuyIn: () => void;
+    isOtpEnabled: boolean;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
     const [showOtpInput, setShowOtpInput] = useState(false);
+
+    useEffect(() => {
+        // If OTP is disabled and the buy-in isn't verified yet, verify it automatically.
+        if (!isOtpEnabled && !buyIn.verified && buyIn.amount > 0) {
+            onVerify(index, true);
+        }
+    }, [isOtpEnabled, buyIn.verified, buyIn.amount, index, onVerify]);
 
     const handleSendOtp = async () => {
         if (!player.whatsappNumber) {
@@ -573,7 +599,7 @@ const BuyInRow: FC<{
             setShowOtpInput(false);
             setSentOtp("");
             setOtp("");
-            onVerify(index, false);
+            onVerify(index, false); // Re-verification needed if amount changes
         }
         onBuyInChange(index, newAmount);
     }
@@ -587,7 +613,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={buyIn.verified}
+                    disabled={buyIn.verified && isOtpEnabled}
                 />
                 {isLastRow && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -598,7 +624,7 @@ const BuyInRow: FC<{
                 {buyIn.verified ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                 ) : (
-                    showOtpInput ? <div className="w-5" /> : null
+                    showOtpInput && isOtpEnabled ? <div className="w-5" /> : null
                 )}
                  {canBeRemoved && (
                     <AlertDialog>
@@ -622,7 +648,7 @@ const BuyInRow: FC<{
                     </AlertDialog>
                 )}
             </div>
-            {showOtpInput && !buyIn.verified && (
+            {isOtpEnabled && showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
                     <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
@@ -630,7 +656,7 @@ const BuyInRow: FC<{
                     </Button>
                 </div>
             )}
-            {!showOtpInput && !buyIn.verified && (
+            {isOtpEnabled && !showOtpInput && !buyIn.verified && (
                  <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
                      {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
                  </Button>
@@ -648,8 +674,9 @@ const PlayerCard: FC<{
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
   isOnlyPlayer: boolean,
+  isOtpEnabled: boolean;
   toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer, toast }) => {
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer, isOtpEnabled, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -669,7 +696,7 @@ const PlayerCard: FC<{
         toast({ variant: "destructive", title: "Unverified Buy-in", description: "Please verify the current buy-in before adding a new one." });
         return;
     }
-    const newBuyIns = [...(player.buyIns || []), { amount: 0, timestamp: new Date().toISOString(), verified: false }]
+    const newBuyIns = [...(player.buyIns || []), { amount: 0, timestamp: new Date().toISOString(), verified: !isOtpEnabled }]
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
@@ -735,6 +762,7 @@ const PlayerCard: FC<{
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
                 onAddBuyIn={addBuyIn}
+                isOtpEnabled={isOtpEnabled}
                 toast={toast}
               />
             ))}
@@ -1256,13 +1284,13 @@ const ReportsDialog: FC<{
                      <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
                          <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
                          <TableBody>
-                             {activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
+                             {(activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
                                  <TableRow key={i}>
                                      <TableCell>{b.playerName}</TableCell>
                                      <TableCell>{b.amount}</TableCell>
                                      <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
                                  </TableRow>
-                             ))}
+                             )))}
                          </TableBody>
                          </Table>
                      </CardContent></Card>
@@ -1415,6 +1443,7 @@ const WhatsappDialog: FC<{
     
 
     
+
 
 
 
