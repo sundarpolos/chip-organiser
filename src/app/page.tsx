@@ -677,6 +677,7 @@ export default function ChipMaestroPage() {
         onOpenChange={setSaveConfirmOpen}
         activeGame={activeGame}
         onConfirmSave={handleSaveGame}
+        onUpdatePlayer={updatePlayer}
       />
     </div>
   )
@@ -1835,7 +1836,8 @@ const SaveConfirmDialog: FC<{
     onOpenChange: (open: boolean) => void,
     activeGame: GameHistory | null,
     onConfirmSave: () => void,
-}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave }) => {
+    onUpdatePlayer: (id: string, newValues: Partial<Player>) => void,
+}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, onUpdatePlayer }) => {
     if (!activeGame) return null;
 
     return (
@@ -1844,7 +1846,7 @@ const SaveConfirmDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Confirm Game Details</DialogTitle>
                     <DialogDescription>
-                        Review the game summary below before saving to your history.
+                        Review and edit final chip counts below before saving to your history.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="my-4">
@@ -1863,7 +1865,15 @@ const SaveConfirmDialog: FC<{
                                 <TableRow key={p.id}>
                                     <TableCell className="font-medium">{p.name}</TableCell>
                                     <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                    <TableCell className="text-right">{p.finalChips}</TableCell>
+                                    <TableCell className="text-right w-32">
+                                        <Input
+                                            type="number"
+                                            className="h-8 text-right"
+                                            value={p.finalChips === 0 ? "" : p.finalChips}
+                                            onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
+                                            placeholder="Chips"
+                                        />
+                                    </TableCell>
                                     <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {p.profitLoss.toFixed(0)}
                                     </TableCell>
