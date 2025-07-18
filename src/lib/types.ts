@@ -33,4 +33,6 @@ export interface GameHistory {
     venue: string;
     timestamp: string;
     players: CalculatedPlayer[];
+    startTime?: string;
+    duration?: number; // in milliseconds
 }

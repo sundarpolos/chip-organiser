@@ -54,11 +54,12 @@ import {
   Crown,
   Share2,
   Pencil,
-  CheckCircle2
+  CheckCircle2,
+  TimerIcon
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { format, isSameDay, set } from "date-fns"
+import { format, isSameDay, set, intervalToDuration } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
@@ -105,6 +106,8 @@ export default function ChipMaestroPage() {
   // Game History & Results State
   const [gameHistory, setGameHistory] = useState<GameHistory[]>([])
   const [activeGame, setActiveGame] = useState<GameHistory | null>(null)
+  const [gameStartTime, setGameStartTime] = useState<Date | null>(null)
+  const [gameDuration, setGameDuration] = useState<string>("00:00:00");
 
   // Modal & Dialog State
   const [isVenueModalOpen, setVenueModalOpen] = useState(false)
@@ -151,6 +154,9 @@ export default function ChipMaestroPage() {
               buyIns: p.buyIns,
               finalChips: p.finalChips,
           })));
+          if (game.startTime) {
+              setGameStartTime(new Date(game.startTime));
+          }
           if (game.players.length > 0) {
               setActiveTab(game.players[0].id)
           }
@@ -174,6 +180,24 @@ export default function ChipMaestroPage() {
     localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
     localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
   }, [masterPlayers, masterVenues, gameHistory, isOtpVerificationEnabled, isDataReady])
+
+  // Game timer effect
+  useEffect(() => {
+    if (!gameStartTime) {
+      setGameDuration("00:00:00");
+      return;
+    }
+
+    const timerInterval = setInterval(() => {
+      const duration = intervalToDuration({ start: gameStartTime, end: new Date() });
+      const paddedHours = String(duration.hours || 0).padStart(2, '0');
+      const paddedMinutes = String(duration.minutes || 0).padStart(2, '0');
+      const paddedSeconds = String(duration.seconds || 0).padStart(2, '0');
+      setGameDuration(`${paddedHours}:${paddedMinutes}:${paddedSeconds}`);
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [gameStartTime]);
 
   // This effect rebuilds the activeGame object whenever the core game state changes.
   useEffect(() => {
@@ -205,9 +229,11 @@ export default function ChipMaestroPage() {
         venue: currentVenue,
         timestamp: finalTimestamp,
         players: calculatedPlayers,
+        startTime: gameStartTime?.toISOString(),
+        duration: gameStartTime ? (new Date().getTime() - gameStartTime.getTime()) : undefined
     }
     setActiveGame(currentGame);
-  }, [players, currentVenue, gameDate, isDataReady, activeGame?.id]);
+  }, [players, currentVenue, gameDate, isDataReady, activeGame?.id, gameStartTime]);
 
   // This effect saves the activeGame to localStorage whenever it's updated.
   useEffect(() => {
@@ -220,10 +246,6 @@ export default function ChipMaestroPage() {
   }, [activeGame, isDataReady]);
 
   const addNewPlayer = () => {
-    if (players.some(p => p.name === "")) {
-      toast({ variant: "destructive", title: "Unnamed Player Exists", description: "Please name the existing new player before adding another." });
-      return;
-    }
     const newPlayer: Player = {
       id: `player-${Date.now()}`,
       name: "",
@@ -305,6 +327,7 @@ export default function ChipMaestroPage() {
         buyIns: p.buyIns,
         finalChips: p.finalChips,
       })));
+      setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
       if (gameToLoad.players.length > 0) {
         setActiveTab(gameToLoad.players[0].id)
       }
@@ -317,6 +340,7 @@ export default function ChipMaestroPage() {
     setPlayers([]);
     setActiveGame(null);
     setGameDate(new Date());
+    setGameStartTime(null);
     setActiveTab("");
     setVenueModalOpen(true);
   }
@@ -324,6 +348,7 @@ export default function ChipMaestroPage() {
   const handleStartGameFromVenue = (venue: string, date: Date) => {
     setCurrentVenue(venue);
     setGameDate(date);
+    setGameStartTime(new Date());
     setVenueModalOpen(false);
     if (players.length === 0) {
       addNewPlayer();
@@ -387,11 +412,19 @@ export default function ChipMaestroPage() {
   
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="flex justify-between items-center mb-6 gap-4">
+      <header className="flex justify-between items-start mb-6 gap-4">
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
-            <p className="text-sm text-muted-foreground">{format(gameDate, "PPP")}</p>
+            <div className="text-sm text-muted-foreground flex items-center gap-4">
+                <span>{format(gameDate, "PPP")}</span>
+                {gameStartTime && (
+                    <div className="flex items-center gap-1">
+                        <TimerIcon className="h-4 w-4" />
+                        <span>{gameDuration}</span>
+                    </div>
+                )}
+            </div>
           </div>
           <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="icon" className="h-8 w-8">
             <WhatsappIcon />
@@ -439,7 +472,6 @@ export default function ChipMaestroPage() {
                         onNameChange={handlePlayerNameChange}
                         onRemove={removePlayer}
                         onRunAnomalyCheck={handleRunAnomalyDetection}
-                        isOnlyPlayer={players.length === 1}
                         allPlayers={players}
                         toast={toast}
                         isOtpEnabled={isOtpVerificationEnabled}
@@ -673,10 +705,9 @@ const PlayerCard: FC<{
   onNameChange: (id: string, newName: string) => void,
   onRemove: (id: string) => void,
   onRunAnomalyCheck: (player: Player) => void,
-  isOnlyPlayer: boolean,
   isOtpEnabled: boolean;
   toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOnlyPlayer, isOtpEnabled, toast }) => {
+}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOtpEnabled, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -743,7 +774,7 @@ const PlayerCard: FC<{
         </div>
         <div className="flex gap-2">
             <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="sm" disabled={!player.name}><ShieldAlert className="h-4 w-4 mr-2" />Analyze</Button>
-            {!isOnlyPlayer && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
+            {allPlayers.length > 1 && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
         </div>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -803,7 +834,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="p-2">Player</TableHead>
-                                <TableHead className="p-2 text-right">Buy</TableHead>
+                                <TableHead className="p-2 text-right">Buy-in</TableHead>
                                 <TableHead className="p-2 text-right">Chips</TableHead>
                                 <TableHead className="p-2 text-right">P/L</TableHead>
                             </TableRow>
@@ -1439,13 +1470,3 @@ const WhatsappDialog: FC<{
     </Dialog>
   );
 };
-
-    
-
-    
-
-
-
-
-
-
