@@ -505,7 +505,7 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 sm:grid-cols-flow">
+                  <TabsList className="grid w-full grid-cols-4 gap-2 sm:grid-cols-flow">
                     {players.map(p => (
                       <TabsTrigger key={p.id} value={p.id} className="text-xs p-1 sm:text-sm sm:p-1.5 truncate">{p.name || "New Player"}</TabsTrigger>
                     ))}
