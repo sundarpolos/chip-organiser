@@ -64,14 +64,10 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format, isSameDay, set, intervalToDuration } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { config } from 'dotenv';
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
-
-
-config();
 
 
 const WhatsappIcon = () => (
