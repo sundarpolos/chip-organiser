@@ -63,6 +63,7 @@ import {
   Settings,
   Upload,
   AlertCircle,
+  CalendarIcon,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -73,6 +74,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
+import { cn } from "@/lib/utils"
 
 
 const WhatsappIcon = () => (
@@ -1046,6 +1048,8 @@ const VenueDialog: FC<{
     useEffect(() => {
       if(isOpen) {
         setDate(initialDate)
+        setNewVenue("")
+        setSelectedVenue("")
       }
     }, [isOpen, initialDate])
 
@@ -1078,35 +1082,51 @@ const VenueDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader><DialogTitle>Set Game Venue & Date</DialogTitle><DialogDescription>Select or create a venue and date to start a new game.</DialogDescription></DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Existing Venues</Label>
-                            <div className="flex gap-2">
-                            <Select onValueChange={setSelectedVenue} value={selectedVenue}>
-                                <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
-                                <SelectContent>
-                                    {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                             <Label>Or Enter New Venue</Label>
-                            <div className="flex gap-2">
-                                <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
-                                <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
-                            </div>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Game Date</Label>
+                         <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !date && "text-muted-foreground"
+                                )}
+                                >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                mode="single"
+                                selected={date}
+                                onSelect={setDate}
+                                initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Existing Venues</Label>
+                        <div className="flex gap-2">
+                        <Select onValueChange={setSelectedVenue} value={selectedVenue}>
+                            <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
+                            <SelectContent>
+                                {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
                         </div>
                     </div>
-                     <div className="flex justify-center">
-                        <Calendar
-                          mode="single"
-                          selected={date}
-                          onSelect={setDate}
-                          className="rounded-md border"
-                        />
+                    <div className="space-y-2">
+                         <Label>Or Enter New Venue</Label>
+                        <div className="flex gap-2">
+                            <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
+                            <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>
