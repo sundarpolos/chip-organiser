@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo, useCallback, type FC } from "react"
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
+import { importGameFromText } from "@/ai/flows/import-game"
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, BuyIn, WhatsappConfig } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
@@ -31,7 +32,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
@@ -59,6 +60,7 @@ import {
   TimerIcon,
   MoreVertical,
   Settings,
+  Upload,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -123,6 +125,7 @@ export default function ChipMaestroPage() {
   const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false)
   const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [isWhatsappSettingsModalOpen, setWhatsappSettingsModalOpen] = useState(false);
+  const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -312,38 +315,38 @@ export default function ChipMaestroPage() {
     updatePlayer(id, updatedDetails);
   };
   
-  const handleSaveGame = () => {
-    if (!activeGame || players.length === 0) {
+  const handleSaveGame = (gameToSave: GameHistory) => {
+    if (!gameToSave || gameToSave.players.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
         return;
     }
 
-    if (players.some(p => !p.name)) {
+    if (gameToSave.players.some(p => !p.name)) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
         return;
     }
 
-    if (players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
+    if (gameToSave.players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
       toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
       return;
     }
 
     // Check if a game from the same day and venue already exists
     const existingGameIndex = gameHistory.findIndex(
-      g => g.venue === activeGame.venue && isSameDay(new Date(g.timestamp), new Date(activeGame.timestamp))
+      g => g.venue === gameToSave.venue && isSameDay(new Date(g.timestamp), new Date(gameToSave.timestamp))
     );
 
     let updatedHistory;
     if (existingGameIndex !== -1) {
       // Update the existing game
       updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id }; // Retain original ID
-      toast({ title: "Game Updated!", description: `${currentVenue} has been updated in your history.` });
+      updatedHistory[existingGameIndex] = {...gameToSave, id: gameHistory[existingGameIndex].id }; // Retain original ID
+      toast({ title: "Game Updated!", description: `${gameToSave.venue} has been updated in your history.` });
     } else {
       // Add a new game
-      const newGameToSave = {...activeGame, id: `game-hist-${Date.now()}`}; // Create new ID for history
-      updatedHistory = [newGameToSave, ...gameHistory];
-      toast({ title: "Game Saved!", description: `${currentVenue} has been saved to your history.` });
+      const newGameToSaveWithId = {...gameToSave, id: `game-hist-${Date.now()}`}; // Create new ID for history
+      updatedHistory = [newGameToSaveWithId, ...gameHistory];
+      toast({ title: "Game Saved!", description: `${gameToSave.venue} has been saved to your history.` });
     }
     
     setGameHistory(updatedHistory);
@@ -423,6 +426,57 @@ export default function ChipMaestroPage() {
     }
   };
 
+  const handleImportedGame = (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
+    // 1. Update master players list
+    const existingMasterNames = masterPlayers.map(mp => mp.name);
+    const newMasterPlayers = importedGame.players
+        .filter(p => !existingMasterNames.includes(p.name))
+        .map(p => ({
+            id: `mp-${Date.now()}-${p.name}`,
+            name: p.name,
+            whatsappNumber: p.whatsappNumber || ""
+        }));
+    
+    if (newMasterPlayers.length > 0) {
+        setMasterPlayers(prev => [...prev, ...newMasterPlayers]);
+        toast({ title: "Players Added", description: `${newMasterPlayers.length} new player(s) have been added to your master list.`});
+    }
+
+    // 2. Load game into state
+    setCurrentVenue(importedGame.venue);
+    const newGameDate = new Date(importedGame.timestamp);
+    setGameDate(newGameDate);
+    setPlayers(importedGame.players);
+    setGameStartTime(newGameDate); // Or null if you don't want the timer to start
+
+    if (importedGame.players.length > 0) {
+        setActiveTab(importedGame.players[0].id);
+    }
+
+    // 3. Create a GameHistory object and save it
+    const calculatedPlayers: CalculatedPlayer[] = importedGame.players.map(p => {
+        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+        return {
+            ...p,
+            totalBuyIns,
+            profitLoss: p.finalChips - totalBuyIns,
+        }
+    });
+    
+    const gameToSave: GameHistory = {
+        id: `game-hist-${Date.now()}`,
+        venue: importedGame.venue,
+        timestamp: importedGame.timestamp,
+        players: calculatedPlayers,
+        startTime: newGameDate.toISOString(),
+        duration: 0,
+    };
+    handleSaveGame(gameToSave);
+
+    setImportGameModalOpen(false);
+};
+
+
   const transfers = useMemo(() => {
     if (!activeGame) return [];
     return calculateInterPlayerTransfers(activeGame.players);
@@ -478,6 +532,11 @@ export default function ChipMaestroPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
+                  <Upload className="h-4 w-4" />
+                  <span className="ml-2">Import Game</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
                   <WhatsappIcon />
                   <span className="ml-2">Test WhatsApp</span>
@@ -505,7 +564,7 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 gap-2 sm:grid-cols-flow">
+                  <TabsList className="grid w-full grid-cols-4 sm:grid-cols-flow gap-2">
                     {players.map(p => (
                       <TabsTrigger key={p.id} value={p.id} className="text-xs p-1 sm:text-sm sm:p-1.5 truncate">{p.name || "New Player"}</TabsTrigger>
                     ))}
@@ -537,7 +596,7 @@ export default function ChipMaestroPage() {
             <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
                   <Button onClick={addNewPlayer}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
-                  <Button onClick={handleSaveGame} variant="secondary"><Save className="mr-2 h-4 w-4" />Save Game</Button>
+                  {activeGame && <Button onClick={() => handleSaveGame(activeGame)} variant="secondary"><Save className="mr-2 h-4 w-4" />Save Game</Button>}
                 </div>
                 <div className="flex gap-2">
                     <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
@@ -601,6 +660,12 @@ export default function ChipMaestroPage() {
         onOpenChange={setWhatsappSettingsModalOpen}
         config={whatsappConfig}
         onSave={setWhatsappConfig}
+        toast={toast}
+      />
+      <ImportGameDialog
+        isOpen={isImportGameModalOpen}
+        onOpenChange={setImportGameModalOpen}
+        onImport={handleImportedGame}
         toast={toast}
       />
     </div>
@@ -1607,6 +1672,66 @@ const WhatsappSettingsDialog: FC<{
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button onClick={handleSave}>Save Settings</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
+const ImportGameDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onImport: (gameData: { venue: string; timestamp: string; players: Player[] }) => void;
+  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
+}> = ({ isOpen, onOpenChange, onImport, toast }) => {
+  const [gameLog, setGameLog] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImport = async () => {
+    if (!gameLog.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please paste the game log to import.' });
+      return;
+    }
+    setIsImporting(true);
+    try {
+      const result = await importGameFromText({ gameLog });
+      onImport(result);
+      toast({ title: 'Success', description: 'Game data has been imported successfully.' });
+      setGameLog(''); // Clear text area on success
+    } catch (error) {
+      console.error('Import failed', error);
+      const errorMessage = error instanceof Error ? error.message : 'Could not parse the game log.';
+      toast({ variant: 'destructive', title: 'Import Failed', description: errorMessage });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Import Game from Text</DialogTitle>
+          <DialogDescription>
+            Paste your raw game log below. The AI will parse the players, buy-ins, and final chip counts.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <Textarea
+            placeholder="Paste your game log here..."
+            className="h-64"
+            value={gameLog}
+            onChange={e => setGameLog(e.target.value)}
+          />
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleImport} disabled={isImporting}>
+            {isImporting ? <Loader2 className="animate-spin" /> : <> <Upload className="mr-2 h-4 w-4" /> Import Game </>}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
