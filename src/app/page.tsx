@@ -839,7 +839,7 @@ const PlayerCard: FC<{
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
                 onAddBuyIn={addBuyIn}
-                isOtpEnabled={isOtpEnabled}
+                isOtpEnabled={isOtpVerificationEnabled}
                 whatsappConfig={whatsappConfig}
                 toast={toast}
               />
