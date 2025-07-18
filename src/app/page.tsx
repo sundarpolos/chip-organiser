@@ -332,7 +332,7 @@ export default function ChipMaestroPage() {
         setActiveTab(gameToLoad.players[0].id)
       }
       setLoadGameModalOpen(false);
-      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "PPP p")}.` });
+      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy p")}.` });
     }
   };
   
@@ -417,7 +417,7 @@ export default function ChipMaestroPage() {
           <div>
             <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
             <div className="text-sm text-muted-foreground flex items-center gap-4">
-                <span>{format(gameDate, "PPP")}</span>
+                <span>{format(gameDate, "dd/MMM/yy")}</span>
                 {gameStartTime && (
                     <div className="flex items-center gap-1">
                         <TimerIcon className="h-4 w-4" />
@@ -822,7 +822,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
     <Card>
         <CardHeader>
             <CardTitle>Game Summary</CardTitle>
-            {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "PPP p")}</CardDescription>}
+            {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy p")}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-6">
              {!activeGame || activeGame.players.length === 0 ? (
@@ -1207,7 +1207,7 @@ const LoadGameDialog: FC<{
         {selectedDate && (
           <div className="flex-grow mt-4">
             <h3 className="text-lg font-semibold mb-2 text-center">
-              Games on {format(selectedDate, "PPP")}
+              Games on {format(selectedDate, "dd/MMM/yy")}
             </h3>
             <ScrollArea className="h-48">
               {gamesOnSelectedDate.length > 0 ? (
@@ -1259,7 +1259,7 @@ const ReportsDialog: FC<{
         pdf.setFontSize(18);
         pdf.text(activeGame.venue, 14, 22);
         pdf.setFontSize(11);
-        pdf.text(format(new Date(activeGame.timestamp), "PPP p"), 14, 30);
+        pdf.text(format(new Date(activeGame.timestamp), "dd/MMM/yy p"), 14, 30);
 
         autoTable(pdf, {
             startY: 40,
@@ -1290,7 +1290,7 @@ const ReportsDialog: FC<{
             <ScrollArea className="max-h-[85vh]">
                 <DialogHeader>
                     <DialogTitle>Game Report: {activeGame.venue}</DialogTitle>
-                    <DialogDescription>{format(new Date(activeGame.timestamp), "PPP p")}</DialogDescription>
+                    <DialogDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy p")}</DialogDescription>
                 </DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
                     <Card><CardHeader><CardTitle>Player Performance</CardTitle></CardHeader><CardContent>
