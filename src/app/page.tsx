@@ -31,6 +31,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
@@ -55,7 +56,8 @@ import {
   Share2,
   Pencil,
   CheckCircle2,
-  TimerIcon
+  TimerIcon,
+  MoreVertical
 } from "lucide-react"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -413,25 +415,20 @@ export default function ChipMaestroPage() {
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-start mb-6 gap-4">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
-            <div className="text-sm text-muted-foreground flex items-center gap-4">
-                <span>{format(gameDate, "dd/MMM/yy")}</span>
-                {gameStartTime && (
-                    <div className="flex items-center gap-1">
-                        <TimerIcon className="h-4 w-4" />
-                        <span>{gameDuration}</span>
-                    </div>
-                )}
-            </div>
+        <div>
+          <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
+          <div className="text-sm text-muted-foreground flex items-center gap-4">
+              <span>{format(gameDate, "dd/MMM/yy")}</span>
+              {gameStartTime && (
+                  <div className="flex items-center gap-1">
+                      <TimerIcon className="h-4 w-4" />
+                      <span>{gameDuration}</span>
+                  </div>
+              )}
           </div>
-          <Button onClick={() => setWhatsappModalOpen(true)} variant="outline" size="icon" className="h-8 w-8">
-            <WhatsappIcon />
-            <span className="sr-only">Send WhatsApp Message</span>
-          </Button>
         </div>
-        <div className="flex items-center gap-4">
+        
+        <div className="flex items-center gap-2">
             <div className="flex items-center space-x-2">
                 <Switch 
                     id="otp-verification" 
@@ -441,6 +438,20 @@ export default function ChipMaestroPage() {
                 <Label htmlFor="otp-verification" className="text-sm text-muted-foreground">OTP</Label>
             </div>
             <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-5 w-5" />
+                  <span className="sr-only">More options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
+                  <WhatsappIcon />
+                  <span className="ml-2">Test WhatsApp</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </header>
       
