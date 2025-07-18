@@ -185,7 +185,7 @@ export default function ChipMaestroPage() {
       setVenueModalOpen(true);
     }
     setIsDataReady(true)
-  }, [])
+  }, [toast])
 
 
   // Persist master data and game history to localStorage whenever they change
@@ -839,7 +839,7 @@ const PlayerCard: FC<{
                 onRemoveBuyIn={removeBuyIn}
                 onVerify={handleVerifyBuyIn}
                 onAddBuyIn={addBuyIn}
-                isOtpEnabled={isOtpVerificationEnabled}
+                isOtpEnabled={isOtpEnabled}
                 whatsappConfig={whatsappConfig}
                 toast={toast}
               />
