@@ -128,6 +128,7 @@ export default function ChipMaestroPage() {
   const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [isWhatsappSettingsModalOpen, setWhatsappSettingsModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
+  const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -317,41 +318,42 @@ export default function ChipMaestroPage() {
     updatePlayer(id, updatedDetails);
   };
   
-  const handleSaveGame = (gameToSave: GameHistory) => {
-    if (!gameToSave || gameToSave.players.length === 0) {
+  const handleSaveGame = () => {
+    if (!activeGame || activeGame.players.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
         return;
     }
 
-    if (gameToSave.players.some(p => !p.name)) {
+    if (activeGame.players.some(p => !p.name)) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
         return;
     }
 
-    if (gameToSave.players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
+    if (activeGame.players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
       toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
       return;
     }
 
     // Check if a game from the same day and venue already exists
     const existingGameIndex = gameHistory.findIndex(
-      g => g.venue === gameToSave.venue && isSameDay(new Date(g.timestamp), new Date(gameToSave.timestamp))
+      g => g.venue === activeGame.venue && isSameDay(new Date(g.timestamp), new Date(activeGame.timestamp))
     );
 
     let updatedHistory;
     if (existingGameIndex !== -1) {
       // Update the existing game
       updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = {...gameToSave, id: gameHistory[existingGameIndex].id }; // Retain original ID
-      toast({ title: "Game Updated!", description: `${gameToSave.venue} has been updated in your history.` });
+      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id }; // Retain original ID
+      toast({ title: "Game Updated!", description: `${activeGame.venue} has been updated in your history.` });
     } else {
       // Add a new game
-      const newGameToSaveWithId = {...gameToSave, id: `game-hist-${Date.now()}`}; // Create new ID for history
+      const newGameToSaveWithId = {...activeGame, id: `game-hist-${Date.now()}`}; // Create new ID for history
       updatedHistory = [newGameToSaveWithId, ...gameHistory];
-      toast({ title: "Game Saved!", description: `${gameToSave.venue} has been saved to your history.` });
+      toast({ title: "Game Saved!", description: `${activeGame.venue} has been saved to your history.` });
     }
     
     setGameHistory(updatedHistory);
+    setSaveConfirmOpen(false);
   };
   
   const handleLoadGame = (gameId: string) => {
@@ -473,7 +475,7 @@ export default function ChipMaestroPage() {
         startTime: newGameDate.toISOString(),
         duration: 0,
     };
-    handleSaveGame(gameToSave);
+    handleSaveGame(); // This will save directly for now.
 
     setImportGameModalOpen(false);
 };
@@ -598,7 +600,7 @@ export default function ChipMaestroPage() {
             <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
                   <Button onClick={addNewPlayer}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
-                  {activeGame && <Button onClick={() => handleSaveGame(activeGame)} variant="secondary"><Save className="mr-2 h-4 w-4" />Save Game</Button>}
+                  {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
                 </div>
                 <div className="flex gap-2">
                     <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
@@ -669,6 +671,12 @@ export default function ChipMaestroPage() {
         onOpenChange={setImportGameModalOpen}
         onImport={handleImportedGame}
         toast={toast}
+      />
+      <SaveConfirmDialog
+        isOpen={isSaveConfirmOpen}
+        onOpenChange={setSaveConfirmOpen}
+        activeGame={activeGame}
+        onConfirmSave={handleSaveGame}
       />
     </div>
   )
@@ -1820,4 +1828,60 @@ const ImportGameDialog: FC<{
       </DialogContent>
     </Dialog>
   );
+};
+
+const SaveConfirmDialog: FC<{
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    activeGame: GameHistory | null,
+    onConfirmSave: () => void,
+}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave }) => {
+    if (!activeGame) return null;
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Confirm Game Details</DialogTitle>
+                    <DialogDescription>
+                        Review the game summary below before saving to your history.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="my-4">
+                    <h3 className="text-lg font-semibold mb-2">{activeGame.venue} - {format(new Date(activeGame.timestamp), 'dd/MMM/yy')}</h3>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead className="text-right">Total Buy-in</TableHead>
+                                <TableHead className="text-right">Final Chips</TableHead>
+                                <TableHead className="text-right">Profit/Loss</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {activeGame.players.map(p => (
+                                <TableRow key={p.id}>
+                                    <TableCell className="font-medium">{p.name}</TableCell>
+                                    <TableCell className="text-right">{p.totalBuyIns}</TableCell>
+                                    <TableCell className="text-right">{p.finalChips}</TableCell>
+                                    <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {p.profitLoss.toFixed(0)}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={onConfirmSave}>
+                        <Save className="mr-2 h-4 w-4" />
+                        Confirm & Save
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 };
