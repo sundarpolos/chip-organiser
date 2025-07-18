@@ -71,7 +71,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
 
 
 const WhatsappIcon = () => (
@@ -1383,6 +1383,8 @@ const ReportsDialog: FC<{
                 useCORS: true,
                 backgroundColor: null, // Use element's background
             });
+            
+            const imgData = canvas.toDataURL('image/png');
             
             const pdf = new jsPDF({
                 orientation: 'portrait',
