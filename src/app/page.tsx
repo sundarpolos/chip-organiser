@@ -1335,24 +1335,41 @@ const LoadGameDialog: FC<{
       <DialogContent className="max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Load Previous Game</DialogTitle>
+          <DialogDescription>Select a date to see saved games.</DialogDescription>
         </DialogHeader>
-        <div className="flex justify-center">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            month={month}
-            onMonthChange={setMonth}
-            modifiers={{ played: gameDates }}
-            modifiersClassNames={{
-              played: "bg-primary/20 rounded-full",
-            }}
-            className="rounded-md border"
-          />
+        <div className="flex justify-center py-4">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !selectedDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "PPP") : <span>Select a date with games</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                month={month}
+                onMonthChange={setMonth}
+                modifiers={{ played: gameDates }}
+                modifiersClassNames={{
+                  played: "bg-primary/20 text-primary-foreground rounded-full",
+                }}
+                className="rounded-md border"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {selectedDate && (
-          <div className="flex-grow mt-4">
+          <div className="flex-grow mt-4 border-t pt-4">
             <h3 className="text-lg font-semibold mb-2 text-center">
               Games on {format(selectedDate, "dd/MMM/yy")}
             </h3>
@@ -1375,7 +1392,7 @@ const LoadGameDialog: FC<{
         )}
         
         {gameHistory.length > 0 && !selectedDate && (
-            <p className="text-center text-muted-foreground py-4">Select a highlighted date to see games.</p>
+            <p className="text-center text-muted-foreground py-4">Select a date to see games. Dates with saved games are highlighted.</p>
         )}
 
         {gameHistory.length === 0 && (
