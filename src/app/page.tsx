@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -70,6 +71,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
 
 
 const WhatsappIcon = () => (
@@ -1128,7 +1130,7 @@ const ManagePlayersDialog: FC<{
 
     const splitPhoneNumber = (fullNumber: string) => {
         if (!fullNumber) return { cc: "91", num: "" };
-        const fullNumberStr = String(fullNumber);
+        const fullNumberStr = String(fullNumber).replace('+', '');
 
         for (const code of countryCodes) {
             if (fullNumberStr.startsWith(code.value)) {
@@ -1382,7 +1384,6 @@ const ReportsDialog: FC<{
                 backgroundColor: null, // Use element's background
             });
             
-            const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'px',
@@ -1402,50 +1403,130 @@ const ReportsDialog: FC<{
 
     if (!activeGame) return null;
     
+    // Data processing for charts
     const pieChartData = activeGame.players
         .filter(p => p.finalChips > 0)
-        .map(p => ({ name: p.name, value: p.finalChips, fill: "" }));
+        .map(p => ({ name: p.name, value: p.finalChips }));
+
+    const barChartData = activeGame.players.map(p => ({
+        name: p.name,
+        'P/L': p.profitLoss
+    }));
+
+    const buyInTimeline = (activeGame.players || [])
+      .flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name})))
+      .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .reduce((acc, buyIn) => {
+          const lastTotal = acc.length > 0 ? acc[acc.length - 1].total : 0;
+          acc.push({
+              time: format(new Date(buyIn.timestamp), 'p'),
+              total: lastTotal + buyIn.amount
+          });
+          return acc;
+      }, [] as {time: string, total: number}[]);
+
+    const scatterData = activeGame.players.map(p => ({
+        x: p.totalBuyIns,
+        y: p.profitLoss,
+        z: Math.abs(p.profitLoss) || 1, // for bubble size
+        name: p.name
+    }));
+
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
-                <ScrollArea className="max-h-[85vh]">
+            <DialogContent className="max-w-6xl max-h-[90vh]">
+                <ScrollArea className="max-h-[85vh] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
                         <DialogHeader className="mb-6 text-center">
                             <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
                             <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
                         </DialogHeader>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card><CardHeader><CardTitle>Player Performance</CardTitle></CardHeader><CardContent>
-                                {activeGame.players.map(p => (
-                                    <div key={p.id} className="mb-4">
-                                        <div className="flex justify-between text-sm mb-1">
-                                            <span>{p.name}</span>
-                                            <span className={`font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {p.profitLoss > 0 ? '+' : ''}{p.profitLoss.toFixed(0)} ({p.totalBuyIns > 0 ? ((p.profitLoss / p.totalBuyIns) * 100).toFixed(0) : 'inf'}%)
-                                            </span>
-                                        </div>
-                                        <Progress value={p.totalBuyIns > 0 ? Math.min(100, Math.abs(p.profitLoss/p.totalBuyIns * 100)) : 100} 
-                                        className={p.profitLoss >= 0 ? '[&>div]:bg-green-500' : '[&>div]:bg-red-500'}/>
-                                    </div>
-                                ))}
+                            
+                            <Card className="md:col-span-2"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={barChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
+                                        <YAxis />
+                                        <Tooltip
+                                            content={({ payload }) => {
+                                                if (!payload || !payload.length) return null;
+                                                const data = payload[0].payload;
+                                                return (
+                                                    <div className="bg-background border p-2 rounded-md shadow-lg">
+                                                        <p className="font-bold">{data.name}</p>
+                                                        <p className={data['P/L'] >= 0 ? 'text-green-600' : 'text-red-600'}>P/L: {data['P/L'].toFixed(0)}</p>
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                        <Legend />
+                                        <Bar dataKey="P/L" name="Profit/Loss">
+                                        {barChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry['P/L'] >= 0 ? '#10b981' : '#ef4444'} />
+                                        ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </CardContent></Card>
+
                             <Card><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
                                 <ChipDistributionChart data={pieChartData} />
                             </CardContent></Card>
+
+                            <Card><CardHeader><CardTitle>Buy-in vs. Profit/Loss</CardTitle></CardHeader><CardContent>
+                               <ResponsiveContainer width="100%" height={300}>
+                                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                    <CartesianGrid />
+                                    <XAxis type="number" dataKey="x" name="Total Buy-in" unit=" " label={{ value: 'Total Buy-in', position: 'insideBottom', offset: -15 }}/>
+                                    <YAxis type="number" dataKey="y" name="Profit/Loss" unit=" " label={{ value: 'Profit/Loss', angle: -90, position: 'insideLeft' }}/>
+                                    <ZAxis type="number" dataKey="z" range={[100, 1000]} name="magnitude" />
+                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ payload }) => {
+                                         if (!payload || payload.length < 2) return null;
+                                         const data = payload[0].payload;
+                                         return (
+                                            <div className="bg-background border p-2 rounded-md shadow-lg">
+                                                <p className="font-bold">{data.name}</p>
+                                                <p>Buy-in: {data.x}</p>
+                                                <p className={data.y >= 0 ? 'text-green-600' : 'text-red-600'}>P/L: {data.y.toFixed(0)}</p>
+                                            </div>
+                                         )
+                                    }}/>
+                                    <Legend />
+                                    <Scatter name="Players" data={scatterData} fill="#8884d8" />
+                                </ScatterChart>
+                               </ResponsiveContainer>
+                            </CardContent></Card>
+
+                            <Card className="md:col-span-2"><CardHeader><CardTitle>Game Action Timeline</CardTitle><CardDescription>Cumulative buy-ins over time</CardDescription></CardHeader><CardContent>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <LineChart data={buyInTimeline} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="time" />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={2} name="Total Buy-in Pool"/>
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent></Card>
+
                              <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
                                 {transfers.length > 0 ? transfers.map((t, i) => (
                                     <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
                                 )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
                             </CardContent></Card>
-                             <Card><CardHeader><CardTitle>Game Log</CardTitle></CardHeader><CardContent>
-                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead>Time</TableHead></TableRow></TableHeader>
+
+                             <Card><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
+                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Buy-in</TableHead><TableHead>P/L</TableHead></TableRow></TableHeader>
                                  <TableBody>
-                                     {(activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name}))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map((b, i) => (
-                                         <TableRow key={i}>
-                                             <TableCell>{b.playerName}</TableCell>
-                                             <TableCell>{b.amount}</TableCell>
-                                             <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
+                                     {activeGame.players.sort((a,b) => b.profitLoss - a.profitLoss).map((p) => (
+                                         <TableRow key={p.id}>
+                                             <TableCell>{p.name}</TableCell>
+                                             <TableCell>{p.totalBuyIns}</TableCell>
+                                             <TableCell className={p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}>{p.profitLoss.toFixed(0)}</TableCell>
                                          </TableRow>
                                      ))}
                                  </TableBody>
@@ -1453,6 +1534,7 @@ const ReportsDialog: FC<{
                              </CardContent></Card>
                         </div>
                     </div>
+                    </ScrollArea>
                     <DialogFooter className="pr-4 pb-2 mt-4">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
@@ -1460,7 +1542,6 @@ const ReportsDialog: FC<{
                         </Button>
                         <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                     </DialogFooter>
-                </ScrollArea>
             </DialogContent>
         </Dialog>
     )
