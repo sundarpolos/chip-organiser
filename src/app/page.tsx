@@ -1064,22 +1064,23 @@ const ManagePlayersDialog: FC<{
     const splitPhoneNumber = (fullNumber: string) => {
         if (!fullNumber) return { cc: "+91", num: "" };
 
+        // Ensure the fullNumber is treated as a string before checking startsWith
+        const fullNumberStr = String(fullNumber);
+
         for (const code of countryCodes) {
-            if (fullNumber.startsWith(code.value)) {
-                return { cc: code.value, num: fullNumber.substring(code.value.length) };
+            // Check against code value (e.g., '+91')
+            if (fullNumberStr.startsWith(code.value)) {
+                return { cc: code.value, num: fullNumberStr.substring(code.value.length) };
             }
-        }
-        
-        // Fallback for numbers without a known country code
-        if (fullNumber.startsWith('+')) {
-            const firstSpace = fullNumber.indexOf(' ');
-            if (firstSpace > -1) {
-                return { cc: fullNumber.substring(0, firstSpace), num: fullNumber.substring(firstSpace + 1) };
+            // Also check against code value without '+' (e.g., '91')
+            const codeWithoutPlus = code.value.substring(1);
+            if (fullNumberStr.startsWith(codeWithoutPlus)) {
+                return { cc: code.value, num: fullNumberStr.substring(codeWithoutPlus.length) };
             }
         }
         
         // Default if no logic matches
-        return { cc: "+91", num: fullNumber.replace("+91", "") };
+        return { cc: "+91", num: fullNumberStr };
     };
 
     useEffect(() => {
@@ -1115,22 +1116,22 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
+        const sanitizedCountryCode = countryCode.replace('+', '');
+        const fullWhatsappNumber = mobileNumber ? `${sanitizedCountryCode}${mobileNumber}` : "";
+
         if (mobileNumber) {
-            const mobileRegex = /^\+?\d{10,14}$/;
-            const fullNumberForValidation = `${countryCode}${mobileNumber}`;
-            if (!mobileRegex.test(fullNumberForValidation.replace(/\s/g, ''))) {
+            // Validate the number without the plus sign for consistency
+            const mobileRegex = /^\d{10,14}$/;
+            if (!mobileRegex.test(fullWhatsappNumber.replace(/\s/g, ''))) {
                  toast({
                      variant: "destructive",
                      title: "Invalid Mobile Number",
-                     description: "Please enter a valid mobile number (e.g., +919876543210). It should be 10-14 digits plus an optional country code.",
+                     description: "Please enter a valid mobile number (e.g., 919876543210). It should be 10-14 digits including country code.",
                  });
                  return;
             }
         }
         
-        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
-
-
         if (editingPlayer) {
             setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: fullWhatsappNumber} : p));
         } else {
