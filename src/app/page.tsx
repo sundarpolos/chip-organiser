@@ -754,12 +754,12 @@ const PlayerCard: FC<{
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between">
-        <div className="w-2/3">
+        <div className="flex items-center gap-2 flex-1">
           <Select
             value={player.name}
             onValueChange={(newName) => onNameChange(player.id, newName)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="flex-1">
               <SelectValue placeholder="Select Player" />
             </SelectTrigger>
             <SelectContent>
@@ -771,9 +771,13 @@ const PlayerCard: FC<{
               ))}
             </SelectContent>
           </Select>
+          <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon" disabled={!player.name}>
+            <ShieldAlert className="h-4 w-4" />
+            <span className="sr-only">Analyze</span>
+          </Button>
         </div>
-        <div className="flex gap-2">
-            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="sm" disabled={!player.name}><ShieldAlert className="h-4 w-4 mr-2" />Analyze</Button>
+        <div className="flex items-center gap-2">
+            <p className="text-xl font-bold">{totalBuyIns}</p>
             {allPlayers.length > 1 && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
         </div>
       </CardHeader>
@@ -798,7 +802,6 @@ const PlayerCard: FC<{
               />
             ))}
           </div>
-          <p className="text-xl font-bold mt-4">{totalBuyIns}</p>
         </div>
         <div>
           <Label className="text-lg">Final Chips</Label>
