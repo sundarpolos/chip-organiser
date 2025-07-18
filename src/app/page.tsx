@@ -504,6 +504,17 @@ export default function ChipMaestroPage() {
   if (!isDataReady) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
+
+  const tabColors = [
+    "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200",
+    "bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200",
+    "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200",
+    "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200",
+    "bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200",
+    "bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-200",
+    "bg-lime-100 dark:bg-lime-900/50 text-lime-800 dark:text-lime-200",
+    "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
+  ];
   
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
@@ -572,8 +583,18 @@ export default function ChipMaestroPage() {
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-4 sm:grid-cols-flow gap-2">
-                    {players.map(p => (
-                      <TabsTrigger key={p.id} value={p.id} className="truncate rounded-md text-xs p-1.5">{p.name || "New Player"}</TabsTrigger>
+                    {players.map((p, index) => (
+                      <TabsTrigger 
+                        key={p.id} 
+                        value={p.id} 
+                        className={cn(
+                          "truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
+                          `data-[state=inactive]:${tabColors[index % tabColors.length]}`,
+                          "data-[state=active]:ring-2 data-[state=active]:ring-ring"
+                        )}
+                      >
+                        {p.name || "New Player"}
+                      </TabsTrigger>
                     ))}
                   </TabsList>
                   {players.map(player => (
