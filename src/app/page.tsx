@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -268,29 +267,25 @@ export default function ChipMaestroPage() {
   }, [activeGame, isDataReady]);
 
   const addNewPlayer = () => {
-    const inGamePlayerNames = players.map(p => p.name);
-    const availableMasterPlayers = masterPlayers.filter(mp => !inGamePlayerNames.includes(mp.name));
-
-    if (availableMasterPlayers.length === 0) {
+    const availablePlayers = masterPlayers.filter(mp => !players.some(p => p.name === mp.name));
+    if (availablePlayers.length === 0) {
       toast({
         variant: "destructive",
-        title: "No More Players",
-        description: "All saved players are already in the game. Add more via 'Manage Players'.",
-      });
+        title: "No more players",
+        description: "All players from your master list are already in the game.",
+      })
       return;
     }
-
-    const playerToAdd = availableMasterPlayers[0];
-    const newPlayer: Player = {
+    const newPlayer = availablePlayers[0];
+    const playerToAdd: Player = {
       id: `player-${Date.now()}`,
-      name: playerToAdd.name,
-      whatsappNumber: playerToAdd.whatsappNumber,
+      name: newPlayer.name,
+      whatsappNumber: newPlayer.whatsappNumber,
       buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
       finalChips: 0,
     };
-    
-    setPlayers([...players, newPlayer]);
-    setActiveTab(newPlayer.id);
+    setPlayers([...players, playerToAdd]);
+    setActiveTab(playerToAdd.id);
   };
   
   const removePlayer = (idToRemove: string) => {
@@ -306,7 +301,6 @@ export default function ChipMaestroPage() {
   };
   
   const handlePlayerNameChange = (id: string, newName: string) => {
-    // Check for duplicates in the current game
     const isDuplicate = players.some(p => p.name === newName && p.id !== id);
     if (isDuplicate) {
         toast({ variant: "destructive", title: "Duplicate Player", description: `${newName} is already in this game.` });
@@ -337,20 +331,17 @@ export default function ChipMaestroPage() {
       return;
     }
 
-    // Check if a game from the same day and venue already exists
     const existingGameIndex = gameHistory.findIndex(
       g => g.venue === activeGame.venue && isSameDay(new Date(g.timestamp), new Date(activeGame.timestamp))
     );
 
     let updatedHistory;
     if (existingGameIndex !== -1) {
-      // Update the existing game
       updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id }; // Retain original ID
+      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id };
       toast({ title: "Game Updated!", description: `${activeGame.venue} has been updated in your history.` });
     } else {
-      // Add a new game
-      const newGameToSaveWithId = {...activeGame, id: `game-hist-${Date.now()}`}; // Create new ID for history
+      const newGameToSaveWithId = {...activeGame, id: `game-hist-${Date.now()}`};
       updatedHistory = [newGameToSaveWithId, ...gameHistory];
       toast({ title: "Game Saved!", description: `${activeGame.venue} has been saved to your history.` });
     }
@@ -434,7 +425,6 @@ export default function ChipMaestroPage() {
   };
 
   const handleImportedGame = (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
-    // 1. Update master players list
     const existingMasterNames = masterPlayers.map(mp => mp.name);
     const newMasterPlayers = importedGame.players
         .filter(p => !existingMasterNames.includes(p.name))
@@ -449,36 +439,17 @@ export default function ChipMaestroPage() {
         toast({ title: "Players Added", description: `${newMasterPlayers.length} new player(s) have been added to your master list.`});
     }
 
-    // 2. Load game into state
     setCurrentVenue(importedGame.venue);
     const newGameDate = new Date(importedGame.timestamp);
     setGameDate(newGameDate);
     setPlayers(importedGame.players);
-    setGameStartTime(newGameDate); // Or null if you don't want the timer to start
+    setGameStartTime(newGameDate);
 
     if (importedGame.players.length > 0) {
         setActiveTab(importedGame.players[0].id);
     }
-
-    // 3. Create a GameHistory object and save it
-    const calculatedPlayers: CalculatedPlayer[] = importedGame.players.map(p => {
-        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
-        return {
-            ...p,
-            totalBuyIns,
-            profitLoss: p.finalChips - totalBuyIns,
-        }
-    });
     
-    const gameToSave: GameHistory = {
-        id: `game-hist-${Date.now()}`,
-        venue: importedGame.venue,
-        timestamp: importedGame.timestamp,
-        players: calculatedPlayers,
-        startTime: newGameDate.toISOString(),
-        duration: 0,
-    };
-    handleSaveGame(); // This will save directly for now.
+    handleSaveGame();
 
     setImportGameModalOpen(false);
 };
@@ -1902,63 +1873,64 @@ const SaveConfirmDialog: FC<{
     const totalBuyInsSum = activeGame.players.reduce((sum, p) => sum + p.totalBuyIns, 0);
     const totalFinalChipsSum = activeGame.players.reduce((sum, p) => sum + p.finalChips, 0);
     const totalProfitLossSum = activeGame.players.reduce((sum, p) => sum + p.profitLoss, 0);
-    const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01; // Use tolerance for floating point
+    const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
                 <DialogHeader>
                     <DialogTitle>Confirm Game Details</DialogTitle>
                     <DialogDescription>
                         Review and edit final chip counts below before saving to your history.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="my-4">
-                    <h3 className="text-lg font-semibold mb-2">{activeGame.venue} - {format(new Date(activeGame.timestamp), 'dd/MMM/yy')}</h3>
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Player</TableHead>
-                                    <TableHead className="text-right">Total Buy-in</TableHead>
-                                    <TableHead className="text-right">Final Chips</TableHead>
-                                    <TableHead className="text-right">Profit/Loss</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {activeGame.players.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.name}</TableCell>
-                                        <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                        <TableCell className="text-right w-32">
-                                            <Input
-                                                type="number"
-                                                className="h-8 text-right"
-                                                value={p.finalChips === 0 ? "" : p.finalChips}
-                                                onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
-                                                placeholder="Chips"
-                                            />
-                                        </TableCell>
-                                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {p.profitLoss.toFixed(0)}
-                                        </TableCell>
+                <div className="flex-grow overflow-hidden">
+                    <ScrollArea className="h-full">
+                        <h3 className="text-lg font-semibold mb-2 px-1">{activeGame.venue} - {format(new Date(activeGame.timestamp), 'dd/MMM/yy')}</h3>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Player</TableHead>
+                                        <TableHead className="text-right">Total Buy-in</TableHead>
+                                        <TableHead className="text-right">Final Chips</TableHead>
+                                        <TableHead className="text-right">Profit/Loss</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFoot>
-                                <TableRow className="bg-muted/50 font-bold">
-                                    <TableCell>Totals</TableCell>
-                                    <TableCell className="text-right">{totalBuyInsSum}</TableCell>
-                                    <TableCell className="text-right">{totalFinalChipsSum}</TableCell>
-                                    <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
-                                </TableRow>
-                            </TableFoot>
-                        </Table>
-                    </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {activeGame.players.map(p => (
+                                        <TableRow key={p.id}>
+                                            <TableCell className="font-medium">{p.name}</TableCell>
+                                            <TableCell className="text-right">{p.totalBuyIns}</TableCell>
+                                            <TableCell className="text-right w-32">
+                                                <Input
+                                                    type="number"
+                                                    className="h-8 text-right"
+                                                    value={p.finalChips === 0 ? "" : p.finalChips}
+                                                    onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
+                                                    placeholder="Chips"
+                                                />
+                                            </TableCell>
+                                            <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {p.profitLoss.toFixed(0)}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                <TableFoot>
+                                    <TableRow className="bg-muted/50 font-bold">
+                                        <TableCell>Totals</TableCell>
+                                        <TableCell className="text-right">{totalBuyInsSum}</TableCell>
+                                        <TableCell className="text-right">{totalFinalChipsSum}</TableCell>
+                                        <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
+                                    </TableRow>
+                                </TableFoot>
+                            </Table>
+                        </div>
+                    </ScrollArea>
                 </div>
-
                 {!isBalanced && (
-                    <Alert variant="destructive">
+                    <Alert variant="destructive" className="mt-4 flex-shrink-0">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Totals Do Not Match!</AlertTitle>
                         <AlertDescription>
@@ -1966,8 +1938,7 @@ const SaveConfirmDialog: FC<{
                         </AlertDescription>
                     </Alert>
                 )}
-
-                <DialogFooter>
+                <DialogFooter className="pt-4 flex-shrink-0">
                     <DialogClose asChild>
                         <Button variant="outline">Cancel</Button>
                     </DialogClose>
