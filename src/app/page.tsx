@@ -747,6 +747,7 @@ export default function ChipMaestroPage() {
         isOpen={isWhatsappModalOpen}
         onOpenChange={setWhatsappModalOpen}
         whatsappConfig={whatsappConfig}
+        masterPlayers={masterPlayers}
       />
       <WhatsappSettingsDialog
         isOpen={isWhatsappSettingsModalOpen}
@@ -1710,44 +1711,81 @@ const WhatsappDialog: FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   whatsappConfig: WhatsappConfig;
-}> = ({ isOpen, onOpenChange, whatsappConfig }) => {
-  const [recipient, setRecipient] = useState('');
+  masterPlayers: MasterPlayer[];
+}> = ({ isOpen, onOpenChange, whatsappConfig, masterPlayers }) => {
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
+  const playersWithNumbers = useMemo(() => {
+    return masterPlayers.filter(p => p.whatsappNumber);
+  }, [masterPlayers]);
+
+  const handleSelectPlayer = (number: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedNumbers(prev => [...prev, number]);
+    } else {
+      setSelectedNumbers(prev => prev.filter(n => n !== number));
+    }
+  };
+
+  const handleSelectAll = (isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedNumbers(playersWithNumbers.map(p => p.whatsappNumber));
+    } else {
+      setSelectedNumbers([]);
+    }
+  };
+
   const handleSend = async () => {
-    if (!recipient || !message) {
+    if (selectedNumbers.length === 0 || !message) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please provide a recipient number and a message.',
+        description: 'Please select at least one recipient and enter a message.',
       });
       return;
     }
     setIsSending(true);
+    
     try {
-      const result = await sendWhatsappMessage({ 
-        to: recipient, 
-        message,
-        ...whatsappConfig
-      });
-      if (result.success) {
+      const sendPromises = selectedNumbers.map(number => 
+        sendWhatsappMessage({ 
+          to: number, 
+          message,
+          ...whatsappConfig
+        })
+      );
+      
+      const results = await Promise.all(sendPromises);
+      const successfulSends = results.filter(r => r.success).length;
+      const failedSends = results.length - successfulSends;
+      
+      if (successfulSends > 0) {
         toast({
-          title: 'Message Sent!',
-          description: `Successfully sent message to ${recipient}.`,
+          title: 'Messages Sent!',
+          description: `Successfully sent message to ${successfulSends} recipient(s).`,
         });
-        onOpenChange(false);
-        setRecipient('');
-        setMessage('');
-      } else {
-        throw new Error(result.error || 'An unknown error occurred.');
       }
+      if (failedSends > 0) {
+         toast({
+          variant: 'destructive',
+          title: 'Some Messages Failed',
+          description: `Failed to send message to ${failedSends} recipient(s). Check console for details.`,
+        });
+        results.filter(r => !r.success).forEach(r => console.error(r.error));
+      }
+
+      onOpenChange(false);
+      setSelectedNumbers([]);
+      setMessage('');
+
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send messages.';
       toast({
         variant: 'destructive',
-        title: 'Error Sending Message',
+        title: 'Error Sending Messages',
         description: errorMessage,
         duration: 9000,
       });
@@ -1758,28 +1796,47 @@ const WhatsappDialog: FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Send Test WhatsApp Message</DialogTitle>
+          <DialogTitle>Send Group WhatsApp Message</DialogTitle>
           <DialogDescription>
-            Use this to test your WhatsApp API credentials.
+            Select players to message. A separate message will be sent to each.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="recipient">Recipient Number</Label>
-            <Input
-              id="recipient"
-              placeholder="e.g., 919876543210 (with country code)"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-            />
+            <Label>Recipients</Label>
+            <div className="flex items-center space-x-2 border-b pb-2">
+                <Checkbox
+                    id="select-all"
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                    checked={playersWithNumbers.length > 0 && selectedNumbers.length === playersWithNumbers.length}
+                    disabled={playersWithNumbers.length === 0}
+                />
+                <Label htmlFor="select-all" className="font-medium">Select All</Label>
+            </div>
+            <ScrollArea className="h-40 border rounded-md p-2">
+                {playersWithNumbers.length > 0 ? (
+                    playersWithNumbers.map(player => (
+                        <div key={player.id} className="flex items-center space-x-2 p-1">
+                            <Checkbox 
+                                id={`p-${player.id}`} 
+                                onCheckedChange={(checked) => handleSelectPlayer(player.whatsappNumber, !!checked)}
+                                checked={selectedNumbers.includes(player.whatsappNumber)}
+                            />
+                            <Label htmlFor={`p-${player.id}`} className="flex-1">{player.name} ({player.whatsappNumber})</Label>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers found.</p>
+                )}
+            </ScrollArea>
           </div>
           <div className="space-y-2">
             <Label htmlFor="message">Message</Label>
             <Textarea
               id="message"
-              placeholder="Enter your test message here."
+              placeholder="Enter your group message here."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
             />
@@ -1789,8 +1846,8 @@ const WhatsappDialog: FC<{
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSend} disabled={isSending}>
-            {isSending ? <Loader2 className="animate-spin" /> : 'Send Message'}
+          <Button onClick={handleSend} disabled={isSending || selectedNumbers.length === 0 || !message}>
+            {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedNumbers.length} Player(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>
