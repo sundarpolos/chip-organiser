@@ -113,6 +113,8 @@ export default function ChipMaestroPage() {
   const [activeGame, setActiveGame] = useState<GameHistory | null>(null)
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null)
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
+  const [gameEndTime, setGameEndTime] = useState<Date | null>(null);
+
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
@@ -177,6 +179,9 @@ export default function ChipMaestroPage() {
           if (game.startTime) {
               setGameStartTime(new Date(game.startTime));
           }
+           if (game.endTime) {
+              setGameEndTime(new Date(game.endTime));
+          }
           if (game.players.length > 0) {
               setActiveTab(game.players[0].id)
           }
@@ -204,8 +209,16 @@ export default function ChipMaestroPage() {
 
   // Game timer effect
   useEffect(() => {
-    if (!gameStartTime) {
-      setGameDuration("00:00:00");
+    if (!gameStartTime || gameEndTime) {
+      if (gameStartTime && gameEndTime) {
+          const duration = intervalToDuration({ start: gameStartTime, end: gameEndTime });
+          const paddedHours = String(duration.hours || 0).padStart(2, '0');
+          const paddedMinutes = String(duration.minutes || 0).padStart(2, '0');
+          const paddedSeconds = String(duration.seconds || 0).padStart(2, '0');
+          setGameDuration(`${paddedHours}:${paddedMinutes}:${paddedSeconds}`);
+      } else {
+          setGameDuration("00:00:00");
+      }
       return;
     }
 
@@ -218,7 +231,8 @@ export default function ChipMaestroPage() {
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [gameStartTime]);
+  }, [gameStartTime, gameEndTime]);
+
 
   // This effect rebuilds the activeGame object whenever the core game state changes.
   useEffect(() => {
@@ -251,10 +265,11 @@ export default function ChipMaestroPage() {
         timestamp: finalTimestamp,
         players: calculatedPlayers,
         startTime: gameStartTime?.toISOString(),
-        duration: gameStartTime ? (new Date().getTime() - gameStartTime.getTime()) : undefined
+        endTime: gameEndTime?.toISOString(),
+        duration: gameStartTime ? ((gameEndTime || new Date()).getTime() - gameStartTime.getTime()) : undefined
     }
     setActiveGame(currentGame);
-  }, [players, currentVenue, gameDate, isDataReady, activeGame?.id, gameStartTime]);
+  }, [players, currentVenue, gameDate, isDataReady, activeGame?.id, gameStartTime, gameEndTime]);
 
   // This effect saves the activeGame to localStorage whenever it's updated.
   useEffect(() => {
@@ -266,27 +281,43 @@ export default function ChipMaestroPage() {
       }
   }, [activeGame, isDataReady]);
 
-  const addNewPlayer = () => {
-    const availablePlayers = masterPlayers.filter(mp => !players.some(p => p.name === mp.name));
-    if (availablePlayers.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "No more players",
-        description: "All players from your master list are already in the game.",
-      })
-      return;
+  const addNewPlayer = (playerToAdd: MasterPlayer | null = null) => {
+    let newPlayer: Player;
+
+    if (playerToAdd) {
+        newPlayer = {
+            id: `player-${Date.now()}`,
+            name: playerToAdd.name,
+            whatsappNumber: playerToAdd.whatsappNumber,
+            buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
+            finalChips: 0,
+        };
+    } else {
+        const availablePlayers = masterPlayers.filter(mp => !players.some(p => p.name === mp.name));
+        if (availablePlayers.length === 0) {
+            newPlayer = {
+                id: `player-${Date.now()}`,
+                name: `Player ${players.length + 1}`,
+                whatsappNumber: "",
+                buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
+                finalChips: 0,
+            };
+        } else {
+            const masterPlayer = availablePlayers[0];
+            newPlayer = {
+                id: `player-${Date.now()}`,
+                name: masterPlayer.name,
+                whatsappNumber: masterPlayer.whatsappNumber,
+                buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
+                finalChips: 0,
+            };
+        }
     }
-    const newPlayer = availablePlayers[0];
-    const playerToAdd: Player = {
-      id: `player-${Date.now()}`,
-      name: newPlayer.name,
-      whatsappNumber: newPlayer.whatsappNumber,
-      buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
-      finalChips: 0,
-    };
-    setPlayers([...players, playerToAdd]);
-    setActiveTab(playerToAdd.id);
-  };
+
+    const updatedPlayers = [...players, newPlayer];
+    setPlayers(updatedPlayers);
+    setActiveTab(newPlayer.id);
+};
   
   const removePlayer = (idToRemove: string) => {
     const updatedPlayers = players.filter(p => p.id !== idToRemove)
@@ -315,35 +346,54 @@ export default function ChipMaestroPage() {
     updatePlayer(id, updatedDetails);
   };
   
-  const handleSaveGame = () => {
-    if (!activeGame || activeGame.players.length === 0) {
+  const handleSaveGame = (finalPlayers: CalculatedPlayer[]) => {
+    if (finalPlayers.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
         return;
     }
 
-    if (activeGame.players.some(p => !p.name)) {
+    if (finalPlayers.some(p => !p.name)) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
         return;
     }
 
-    if (activeGame.players.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
+    if (finalPlayers.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
       toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
       return;
     }
+    
+    const now = new Date();
+    const finalTimestamp = set(gameDate, { 
+        hours: now.getHours(), 
+        minutes: now.getMinutes(), 
+        seconds: now.getSeconds() 
+    }).toISOString();
+
+    setGameEndTime(now);
+    
+    const finalGame: GameHistory = {
+        id: activeGame?.id || `game-${Date.now()}`,
+        venue: currentVenue,
+        timestamp: finalTimestamp,
+        players: finalPlayers,
+        startTime: gameStartTime?.toISOString(),
+        endTime: now.toISOString(),
+        duration: gameStartTime ? (now.getTime() - gameStartTime.getTime()) : undefined
+    }
 
     const existingGameIndex = gameHistory.findIndex(
-      g => g.venue === activeGame.venue && isSameDay(new Date(g.timestamp), new Date(activeGame.timestamp))
+      g => g.venue === finalGame.venue && isSameDay(new Date(g.timestamp), new Date(finalGame.timestamp))
     );
 
     let updatedHistory;
     if (existingGameIndex !== -1) {
       updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = {...activeGame, id: gameHistory[existingGameIndex].id };
-      toast({ title: "Game Updated!", description: `${activeGame.venue} has been updated in your history.` });
+      updatedHistory[existingGameIndex] = {...finalGame, id: gameHistory[existingGameIndex].id };
+      toast({ title: "Game Updated!", description: `${finalGame.venue} has been updated in your history.` });
     } else {
-      const newGameToSaveWithId = {...activeGame, id: `game-hist-${Date.now()}`};
+      const newGameToSaveWithId = {...finalGame, id: `game-hist-${Date.now()}`};
       updatedHistory = [newGameToSaveWithId, ...gameHistory];
-      toast({ title: "Game Saved!", description: `${activeGame.venue} has been saved to your history.` });
+      toast({ title: "Game Saved!", description: `${finalGame.venue} has been saved to your history.` });
     }
     
     setGameHistory(updatedHistory);
@@ -363,6 +413,7 @@ export default function ChipMaestroPage() {
         finalChips: p.finalChips,
       })));
       setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
+      setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
       if (gameToLoad.players.length > 0) {
         setActiveTab(gameToLoad.players[0].id)
       }
@@ -376,6 +427,7 @@ export default function ChipMaestroPage() {
     setActiveGame(null);
     setGameDate(new Date());
     setGameStartTime(null);
+    setGameEndTime(null);
     setActiveTab("");
     setVenueModalOpen(true);
   }
@@ -384,6 +436,7 @@ export default function ChipMaestroPage() {
     setCurrentVenue(venue);
     setGameDate(date);
     setGameStartTime(new Date());
+    setGameEndTime(null);
     setVenueModalOpen(false);
     if (players.length === 0) {
       addNewPlayer();
@@ -444,12 +497,22 @@ export default function ChipMaestroPage() {
     setGameDate(newGameDate);
     setPlayers(importedGame.players);
     setGameStartTime(newGameDate);
+    
+    // Create calculated players to pass to save game
+    const calculatedPlayers = importedGame.players.map(p => {
+        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+        return {
+            ...p,
+            totalBuyIns,
+            profitLoss: p.finalChips - totalBuyIns,
+        }
+    });
 
     if (importedGame.players.length > 0) {
         setActiveTab(importedGame.players[0].id);
     }
     
-    handleSaveGame();
+    handleSaveGame(calculatedPlayers);
 
     setImportGameModalOpen(false);
 };
@@ -471,6 +534,12 @@ export default function ChipMaestroPage() {
   }, [players]);
 
   const grandTotalBuyIn = useMemo(() => totalBuyInLog.reduce((sum, item) => sum + (item.verified ? item.amount : 0), 0), [totalBuyInLog]);
+
+  const availablePlayersForDropdown = useMemo(() => {
+      const inGamePlayerNames = players.map(p => p.name);
+      return masterPlayers.filter(mp => !inGamePlayerNames.includes(mp.name));
+  }, [players, masterPlayers]);
+
 
   if (!isDataReady) {
     return <div className="flex h-screen items-center justify-center"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -588,13 +657,31 @@ export default function ChipMaestroPage() {
               ) : (
                  <div className="text-center py-10">
                     <p className="text-muted-foreground mb-4">No players in the game.</p>
-                    <Button onClick={addNewPlayer}><Plus className="mr-2 h-4 w-4"/>Add First Player</Button>
+                    <Button onClick={() => addNewPlayer()}><Plus className="mr-2 h-4 w-4"/>Add First Player</Button>
                  </div>
               )}
             </CardContent>
             <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                 <div className="flex gap-2">
-                  <Button onClick={addNewPlayer}><Plus className="mr-2 h-4 w-4" />Add Player</Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button><Plus className="mr-2 h-4 w-4" />Add Player</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            {availablePlayersForDropdown.length > 0 ? (
+                                availablePlayersForDropdown.map(p => (
+                                    <DropdownMenuItem key={p.id} onClick={() => addNewPlayer(p)}>
+                                        {p.name}
+                                    </DropdownMenuItem>
+                                ))
+                            ) : (
+                                <DropdownMenuItem disabled>No available players</DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => addNewPlayer(null)}>Add new blank player</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                   {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
                 </div>
                 <div className="flex gap-2">
@@ -670,9 +757,8 @@ export default function ChipMaestroPage() {
       <SaveConfirmDialog
         isOpen={isSaveConfirmOpen}
         onOpenChange={setSaveConfirmOpen}
-        activeGame={activeGame}
+        players={activeGame?.players || []}
         onConfirmSave={handleSaveGame}
-        onUpdatePlayer={updatePlayer}
       />
     </div>
   )
@@ -884,12 +970,12 @@ const PlayerCard: FC<{
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between">
-        <div className="flex items-center gap-2 flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <Select
             value={player.name}
             onValueChange={(newName) => onNameChange(player.id, newName)}
           >
-            <SelectTrigger className="flex-1">
+            <SelectTrigger className="flex-1 w-full truncate">
               <SelectValue placeholder="Select Player" />
             </SelectTrigger>
             <SelectContent>
@@ -901,14 +987,14 @@ const PlayerCard: FC<{
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon" disabled={!player.name}>
+          <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon" disabled={!player.name} className="flex-shrink-0">
             <ShieldAlert className="h-4 w-4" />
             <span className="sr-only">Analyze</span>
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
             <p className="text-xl font-bold">{totalBuyIns}</p>
-            {allPlayers.length > 1 && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
+            <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>
         </div>
       </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1482,6 +1568,12 @@ const ReportsDialog: FC<{
                         <DialogHeader className="mb-6 text-center">
                             <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
                             <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                             {activeGame.startTime && (
+                                <p className="text-sm text-muted-foreground">
+                                    Started: {format(new Date(activeGame.startTime), 'p')}
+                                    {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
+                                </p>
+                            )}
                         </DialogHeader>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             
@@ -1864,73 +1956,93 @@ const ImportGameDialog: FC<{
 const SaveConfirmDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
-    activeGame: GameHistory | null,
-    onConfirmSave: () => void,
-    onUpdatePlayer: (id: string, newValues: Partial<Player>) => void,
-}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, onUpdatePlayer }) => {
-    if (!activeGame) return null;
+    players: CalculatedPlayer[],
+    onConfirmSave: (finalPlayers: CalculatedPlayer[]) => void,
+}> = ({ isOpen, onOpenChange, players, onConfirmSave }) => {
+    const [localPlayers, setLocalPlayers] = useState<CalculatedPlayer[]>([]);
 
-    const totalBuyInsSum = activeGame.players.reduce((sum, p) => sum + p.totalBuyIns, 0);
-    const totalFinalChipsSum = activeGame.players.reduce((sum, p) => sum + p.finalChips, 0);
-    const totalProfitLossSum = activeGame.players.reduce((sum, p) => sum + p.profitLoss, 0);
-    const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01;
+    useEffect(() => {
+        if (isOpen) {
+            // Deep copy to prevent modifying original state directly
+            setLocalPlayers(JSON.parse(JSON.stringify(players)));
+        }
+    }, [isOpen, players]);
+    
+    const handleFinalChipsChange = (playerId: string, newFinalChips: number) => {
+        setLocalPlayers(currentPlayers => 
+            currentPlayers.map(p => 
+                p.id === playerId 
+                    ? { ...p, finalChips: newFinalChips, profitLoss: newFinalChips - p.totalBuyIns }
+                    : p
+            )
+        );
+    };
+
+    const { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced } = useMemo(() => {
+        const totalBuyInsSum = localPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0);
+        const totalFinalChipsSum = localPlayers.reduce((sum, p) => sum + p.finalChips, 0);
+        const totalProfitLossSum = localPlayers.reduce((sum, p) => sum + p.profitLoss, 0);
+        const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01;
+        return { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced };
+    }, [localPlayers]);
+    
+    if (!players || players.length === 0) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Confirm Game Details</DialogTitle>
                     <DialogDescription>
                         Review and edit final chip counts below before saving to your history.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow overflow-hidden">
-                    <ScrollArea className="h-full">
-                        <h3 className="text-lg font-semibold mb-2 px-1">{activeGame.venue} - {format(new Date(activeGame.timestamp), 'dd/MMM/yy')}</h3>
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Player</TableHead>
-                                        <TableHead className="text-right">Total Buy-in</TableHead>
-                                        <TableHead className="text-right">Final Chips</TableHead>
-                                        <TableHead className="text-right">Profit/Loss</TableHead>
+                <div className="relative">
+                    <ScrollArea className="h-72">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                                <TableRow>
+                                    <TableHead>Player</TableHead>
+                                    <TableHead className="text-right">Total Buy-in</TableHead>
+                                    <TableHead className="w-32 text-right">Final Chips</TableHead>
+                                    <TableHead className="text-right">Profit/Loss</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {localPlayers.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell className="text-right">{p.totalBuyIns}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Input
+                                                type="number"
+                                                className="h-8 text-right"
+                                                value={p.finalChips === 0 ? "" : p.finalChips}
+                                                onChange={(e) => handleFinalChipsChange(p.id, parseInt(e.target.value) || 0)}
+                                                placeholder="Chips"
+                                            />
+                                        </TableCell>
+                                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {p.profitLoss.toFixed(0)}
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {activeGame.players.map(p => (
-                                        <TableRow key={p.id}>
-                                            <TableCell className="font-medium">{p.name}</TableCell>
-                                            <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                            <TableCell className="text-right w-32">
-                                                <Input
-                                                    type="number"
-                                                    className="h-8 text-right"
-                                                    value={p.finalChips === 0 ? "" : p.finalChips}
-                                                    onChange={(e) => onUpdatePlayer(p.id, { finalChips: parseInt(e.target.value) || 0 })}
-                                                    placeholder="Chips"
-                                                />
-                                            </TableCell>
-                                            <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {p.profitLoss.toFixed(0)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                <TableFoot>
-                                    <TableRow className="bg-muted/50 font-bold">
-                                        <TableCell>Totals</TableCell>
-                                        <TableCell className="text-right">{totalBuyInsSum}</TableCell>
-                                        <TableCell className="text-right">{totalFinalChipsSum}</TableCell>
-                                        <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
-                                    </TableRow>
-                                </TableFoot>
-                            </Table>
-                        </div>
+                                ))}
+                            </TableBody>
+                        </Table>
                     </ScrollArea>
                 </div>
+                 <Table>
+                    <TableFoot>
+                        <TableRow className="bg-muted/50 font-bold">
+                            <TableCell>Totals</TableCell>
+                            <TableCell className="text-right">{totalBuyInsSum}</TableCell>
+                            <TableCell className="w-32 text-right">{totalFinalChipsSum}</TableCell>
+                            <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
+                        </TableRow>
+                    </TableFoot>
+                </Table>
                 {!isBalanced && (
-                    <Alert variant="destructive" className="mt-4 flex-shrink-0">
+                    <Alert variant="destructive" className="mt-4">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Totals Do Not Match!</AlertTitle>
                         <AlertDescription>
@@ -1938,11 +2050,11 @@ const SaveConfirmDialog: FC<{
                         </AlertDescription>
                     </Alert>
                 )}
-                <DialogFooter className="pt-4 flex-shrink-0">
+                <DialogFooter className="pt-4">
                     <DialogClose asChild>
                         <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={onConfirmSave} disabled={!isBalanced}>
+                    <Button onClick={() => onConfirmSave(localPlayers)} disabled={!isBalanced}>
                         <Save className="mr-2 h-4 w-4" />
                         Confirm & Save
                     </Button>
