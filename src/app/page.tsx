@@ -63,6 +63,7 @@ import {
   Upload,
   AlertCircle,
   CalendarIcon,
+  MessageCircleCode,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -579,14 +580,6 @@ export default function ChipMaestroPage() {
         </div>
         
         <div className="flex items-center gap-2">
-            <div className="flex items-center space-x-2">
-                <Switch 
-                    id="otp-verification" 
-                    checked={isOtpVerificationEnabled} 
-                    onCheckedChange={setOtpVerificationEnabled}
-                />
-                <Label htmlFor="otp-verification" className="text-sm text-muted-foreground">OTP</Label>
-            </div>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -596,14 +589,23 @@ export default function ChipMaestroPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                  <MessageCircleCode className="h-4 w-4" />
+                  <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
+                  <Switch
+                      id="otp-verification-toggle"
+                      checked={isOtpVerificationEnabled}
+                      onCheckedChange={setOtpVerificationEnabled}
+                  />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
                   <Upload className="h-4 w-4" />
                   <span className="ml-2">Import Game</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
+                 <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
                   <WhatsappIcon />
-                  <span className="ml-2">Test WhatsApp</span>
+                  <span className="ml-2">Group Message</span>
                 </DropdownMenuItem>
                  <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
                   <Settings className="h-4 w-4" />
