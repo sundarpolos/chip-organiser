@@ -1389,94 +1389,41 @@ const LoadGameDialog: FC<{
   gameHistory: GameHistory[];
   onLoadGame: (id: string) => void;
 }> = ({ isOpen, onOpenChange, gameHistory, onLoadGame }) => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [month, setMonth] = useState<Date>(new Date());
-
-  const gameDates = useMemo(() => {
-    return gameHistory.map(g => new Date(g.timestamp));
-  }, [gameHistory]);
-
-  const gamesOnSelectedDate = useMemo(() => {
-    if (!selectedDate) return [];
-    return gameHistory.filter(g => isSameDay(new Date(g.timestamp), selectedDate));
-  }, [gameHistory, selectedDate]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedDate(undefined);
-      setMonth(new Date());
-    }
-  }, [isOpen]);
+  const sortedHistory = useMemo(
+    () => [...gameHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [gameHistory]
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Load Previous Game</DialogTitle>
-          <DialogDescription>Select a date to see saved games.</DialogDescription>
+          <DialogDescription>Select a game from your history to load it.</DialogDescription>
         </DialogHeader>
-        <div className="flex justify-center py-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[280px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? format(selectedDate, "PPP") : <span>Select a date with games</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                month={month}
-                onMonthChange={setMonth}
-                modifiers={{ played: gameDates }}
-                modifiersClassNames={{
-                  played: "bg-primary/20 text-primary-foreground rounded-full",
-                }}
-                className="rounded-md border"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {selectedDate && (
-          <div className="flex-grow mt-4 border-t pt-4">
-            <h3 className="text-lg font-semibold mb-2 text-center">
-              Games on {format(selectedDate, "dd/MMM/yy")}
-            </h3>
-            <ScrollArea className="h-48">
-              {gamesOnSelectedDate.length > 0 ? (
-                gamesOnSelectedDate.map(g => (
-                  <div key={g.id} className="flex items-center justify-between p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
+        <div className="mt-4">
+          <ScrollArea className="h-72">
+            {sortedHistory.length > 0 ? (
+              <div className="space-y-2 pr-4">
+                {sortedHistory.map(g => (
+                  <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
                     <div>
-                      <p>{g.venue}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "p")}</p>
+                      <p className="font-semibold">{g.venue}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
                     </div>
-                    <Button onClick={() => onLoadGame(g.id)}>Load</Button>
+                    <Button onClick={() => onLoadGame(g.id)} size="sm">
+                      Load
+                    </Button>
                   </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-10">No games found for this date.</p>
-              )}
-            </ScrollArea>
-          </div>
-        )}
-        
-        {gameHistory.length > 0 && !selectedDate && (
-            <p className="text-center text-muted-foreground py-4">Select a date to see games. Dates with saved games are highlighted.</p>
-        )}
-
-        {gameHistory.length === 0 && (
-            <p className="text-center text-muted-foreground py-10">No games in history.</p>
-        )}
-
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-muted-foreground">No games in history.</p>
+              </div>
+            )}
+          </ScrollArea>
+        </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline">Close</Button>
@@ -1997,23 +1944,25 @@ const SaveConfirmDialog: FC<{
                         Review and edit final chip counts below before saving to your history.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="relative">
+                <div className="relative max-h-[60vh] flex flex-col">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead className="text-right">Total Buy-in</TableHead>
+                                <TableHead className="w-32 text-right">Final Chips</TableHead>
+                                <TableHead className="text-right">Profit/Loss</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                    </Table>
                     <ScrollArea className="h-72">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-background z-10">
-                                <TableRow>
-                                    <TableHead>Player</TableHead>
-                                    <TableHead className="text-right">Total Buy-in</TableHead>
-                                    <TableHead className="w-32 text-right">Final Chips</TableHead>
-                                    <TableHead className="text-right">Profit/Loss</TableHead>
-                                </TableRow>
-                            </TableHeader>
                             <TableBody>
                                 {localPlayers.map(p => (
                                     <TableRow key={p.id}>
                                         <TableCell className="font-medium">{p.name}</TableCell>
                                         <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="w-32 text-right">
                                             <Input
                                                 type="number"
                                                 className="h-8 text-right"
@@ -2030,17 +1979,17 @@ const SaveConfirmDialog: FC<{
                             </TableBody>
                         </Table>
                     </ScrollArea>
+                    <Table>
+                        <TableFoot className="sticky bottom-0 bg-background z-10">
+                            <TableRow className="bg-muted/50 font-bold">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right">{totalBuyInsSum}</TableCell>
+                                <TableCell className="w-32 text-right">{totalFinalChipsSum}</TableCell>
+                                <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
+                            </TableRow>
+                        </TableFoot>
+                    </Table>
                 </div>
-                 <Table>
-                    <TableFoot>
-                        <TableRow className="bg-muted/50 font-bold">
-                            <TableCell>Totals</TableCell>
-                            <TableCell className="text-right">{totalBuyInsSum}</TableCell>
-                            <TableCell className="w-32 text-right">{totalFinalChipsSum}</TableCell>
-                            <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
-                        </TableRow>
-                    </TableFoot>
-                </Table>
                 {!isBalanced && (
                     <Alert variant="destructive" className="mt-4">
                         <AlertCircle className="h-4 w-4" />
