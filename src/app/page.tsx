@@ -421,6 +421,12 @@ export default function ChipMaestroPage() {
       toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
     }
   };
+
+  const handleDeleteGame = (gameId: string) => {
+    const updatedHistory = gameHistory.filter(g => g.id !== gameId);
+    setGameHistory(updatedHistory);
+    toast({ title: "Game Deleted", description: "The selected game has been removed from your history." });
+  };
   
   const handleNewGame = () => {
     setPlayers([]);
@@ -722,6 +728,7 @@ export default function ChipMaestroPage() {
         onOpenChange={setLoadGameModalOpen}
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
+        onDeleteGame={handleDeleteGame}
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1388,7 +1395,8 @@ const LoadGameDialog: FC<{
   onOpenChange: (open: boolean) => void;
   gameHistory: GameHistory[];
   onLoadGame: (id: string) => void;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame }) => {
+  onDeleteGame: (id: string) => void;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame }) => {
   const sortedHistory = useMemo(
     () => [...gameHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
     [gameHistory]
@@ -1399,21 +1407,44 @@ const LoadGameDialog: FC<{
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Load Previous Game</DialogTitle>
-          <DialogDescription>Select a game from your history to load it.</DialogDescription>
+          <DialogDescription>Select a game from your history to load or delete.</DialogDescription>
         </DialogHeader>
         <div className="mt-4">
           <ScrollArea className="h-72">
             {sortedHistory.length > 0 ? (
               <div className="space-y-2 pr-4">
                 {sortedHistory.map(g => (
-                  <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
+                  <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
                     <div>
                       <p className="font-semibold">{g.venue}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
                     </div>
-                    <Button onClick={() => onLoadGame(g.id)} size="sm">
-                      Load
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={() => onLoadGame(g.id)} size="sm">
+                            Load
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" className="h-9 w-9">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete the game from <strong>{g.venue}</strong> on {format(new Date(g.timestamp), "PPP")}. This action cannot be undone.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => onDeleteGame(g.id)}>
+                                    Delete
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -34,6 +34,7 @@ export interface GameHistory {
     timestamp: string;
     players: CalculatedPlayer[];
     startTime?: string;
+    endTime?: string;
     duration?: number; // in milliseconds
 }
 
