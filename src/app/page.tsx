@@ -1544,8 +1544,8 @@ const ReportsDialog: FC<{
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-6xl max-h-[90vh]">
-                <DialogHeader className="mb-6 flex-row items-center justify-between">
-                    <div className="text-left">
+                <DialogHeader className="mb-4 flex-row items-center justify-between">
+                    <div className="space-y-1">
                         <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
                         <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
                          {activeGame.startTime && (
@@ -1556,10 +1556,13 @@ const ReportsDialog: FC<{
                         )}
                     </div>
                      <div className="flex items-center gap-2">
-                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline" size="icon">
+                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                             <span className="sr-only">Export PDF</span>
+                             <span className="ml-2">Export PDF</span>
                         </Button>
+                        <DialogClose asChild>
+                            <Button variant="outline">Close</Button>
+                        </DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
