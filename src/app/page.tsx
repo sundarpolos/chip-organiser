@@ -1560,11 +1560,6 @@ const ReportsDialog: FC<{
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                              <span className="sr-only">Export PDF</span>
                         </Button>
-                        <DialogClose asChild>
-                            <Button variant="outline" size="icon">
-                               <span className="sr-only">Close</span>
-                            </Button>
-                        </DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
