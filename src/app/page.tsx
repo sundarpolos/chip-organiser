@@ -630,7 +630,7 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 sm:grid-cols-flow gap-2">
+                  <TabsList className="flex flex-wrap w-full h-auto gap-2">
                     {players.map((p, index) => (
                       <TabsTrigger 
                         key={p.id} 
@@ -1544,7 +1544,7 @@ const ReportsDialog: FC<{
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-6xl max-h-[90vh]">
-                <DialogHeader className="mb-4 flex-row items-center justify-between">
+                 <DialogHeader className="mb-4 flex-row items-center justify-between">
                     <div className="space-y-1">
                         <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
                         <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
@@ -1555,13 +1555,13 @@ const ReportsDialog: FC<{
                             </p>
                         )}
                     </div>
-                     <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                              <span className="ml-2">Export PDF</span>
                         </Button>
                         <DialogClose asChild>
-                            <Button variant="outline">Close</Button>
+                           <Button variant="outline">Close</Button>
                         </DialogClose>
                     </div>
                 </DialogHeader>
@@ -2106,3 +2106,4 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
+
