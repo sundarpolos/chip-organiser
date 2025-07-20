@@ -75,6 +75,9 @@ import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
 import { cn } from "@/lib/utils"
+import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/game-service"
+import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/services/player-service"
+import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
 
 
 const WhatsappIcon = () => (
@@ -142,71 +145,71 @@ export default function ChipMaestroPage() {
   const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
   const [isAnomalyLoading, setAnomalyLoading] = useState(false);
 
-  // Load data from localStorage on initial render
+  // Load data from Firestore on initial render
   useEffect(() => {
-    try {
-      const savedMasterPlayers = localStorage.getItem("masterPlayers")
-      const savedMasterVenues = localStorage.getItem("masterVenues")
-      const savedGameHistory = localStorage.getItem("gameHistory")
-      const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
-      const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
+    async function loadInitialData() {
+        try {
+            const [
+                loadedMasterPlayers,
+                loadedMasterVenues,
+                loadedGameHistory,
+            ] = await Promise.all([
+                getMasterPlayers(),
+                getMasterVenues(),
+                getGameHistory(),
+            ]);
 
-      if (savedMasterPlayers) setMasterPlayers(JSON.parse(savedMasterPlayers))
-      if (savedMasterVenues) setMasterVenues(JSON.parse(savedMasterVenues))
-      if (savedGameHistory) {
-        const history = JSON.parse(savedGameHistory)
-        setGameHistory(history)
-      }
-      if (savedOtpPreference !== null) {
-          setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
-      }
-      if (savedWhatsappConfig) {
-        setWhatsappConfig(JSON.parse(savedWhatsappConfig));
-      }
-      
-      const lastActiveGame = localStorage.getItem("activeGame");
-      if (lastActiveGame) {
-          const game = JSON.parse(lastActiveGame);
-          // Don't set activeGame here, let the state update from players/venue/date trigger it
-          setCurrentVenue(game.venue);
-          setGameDate(new Date(game.timestamp));
-          setPlayers(game.players.map((p: CalculatedPlayer) => ({
-              id: p.id,
-              name: p.name,
-              whatsappNumber: p.whatsappNumber,
-              buyIns: p.buyIns,
-              finalChips: p.finalChips,
-          })));
-          if (game.startTime) {
-              setGameStartTime(new Date(game.startTime));
-          }
-           if (game.endTime) {
-              setGameEndTime(new Date(game.endTime));
-          }
-          if (game.players.length > 0) {
-              setActiveTab(game.players[0].id)
-          }
-      } else {
-        setVenueModalOpen(true);
-      }
-    } catch (error) {
-      console.error("Failed to load data from localStorage", error)
-      toast({ variant: "destructive", title: "Error", description: "Could not load saved data." })
-      setVenueModalOpen(true);
+            setMasterPlayers(loadedMasterPlayers);
+            setMasterVenues(loadedMasterVenues);
+            setGameHistory(loadedGameHistory);
+            
+            const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
+            if (savedOtpPreference !== null) {
+                setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
+            }
+            
+            const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
+            if (savedWhatsappConfig) {
+                setWhatsappConfig(JSON.parse(savedWhatsappConfig));
+            }
+
+            const lastActiveGame = localStorage.getItem("activeGame");
+            if (lastActiveGame) {
+                const game = JSON.parse(lastActiveGame);
+                setCurrentVenue(game.venue);
+                setGameDate(new Date(game.timestamp));
+                setPlayers(game.players.map((p: CalculatedPlayer) => ({
+                    id: p.id,
+                    name: p.name,
+                    whatsappNumber: p.whatsappNumber,
+                    buyIns: p.buyIns,
+                    finalChips: p.finalChips,
+                })));
+                if (game.startTime) setGameStartTime(new Date(game.startTime));
+                if (game.endTime) setGameEndTime(new Date(game.endTime));
+                if (game.players.length > 0) setActiveTab(game.players[0].id);
+            } else {
+                setVenueModalOpen(true);
+            }
+
+        } catch (error) {
+            console.error("Failed to load data from Firestore", error);
+            toast({ variant: "destructive", title: "Error", description: "Could not load data from the cloud." });
+            setVenueModalOpen(true);
+        } finally {
+            setIsDataReady(true);
+        }
     }
-    setIsDataReady(true)
-  }, [toast])
+    loadInitialData();
+  }, [toast]);
 
 
-  // Persist master data and game history to localStorage whenever they change
+  // Persist non-firestore data to localStorage whenever they change
   useEffect(() => {
     if(!isDataReady) return;
-    localStorage.setItem("masterPlayers", JSON.stringify(masterPlayers))
-    localStorage.setItem("masterVenues", JSON.stringify(masterVenues))
-    localStorage.setItem("gameHistory", JSON.stringify(gameHistory))
     localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
     localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig));
-  }, [masterPlayers, masterVenues, gameHistory, isOtpVerificationEnabled, whatsappConfig, isDataReady])
+  }, [isOtpVerificationEnabled, whatsappConfig, isDataReady])
 
   // Game timer effect
   useEffect(() => {
@@ -347,7 +350,7 @@ export default function ChipMaestroPage() {
     updatePlayer(id, updatedDetails);
   };
   
-  const handleSaveGame = (finalPlayers: CalculatedPlayer[]) => {
+  const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
     if (finalPlayers.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
         return;
@@ -382,23 +385,26 @@ export default function ChipMaestroPage() {
         duration: gameStartTime ? (now.getTime() - gameStartTime.getTime()) : undefined
     }
 
-    const existingGameIndex = gameHistory.findIndex(
-      g => g.venue === finalGame.venue && isSameDay(new Date(g.timestamp), new Date(finalGame.timestamp))
-    );
+    try {
+        const savedGame = await saveGameHistory(finalGame);
+        const existingGameIndex = gameHistory.findIndex(g => g.id === savedGame.id);
 
-    let updatedHistory;
-    if (existingGameIndex !== -1) {
-      updatedHistory = [...gameHistory];
-      updatedHistory[existingGameIndex] = {...finalGame, id: gameHistory[existingGameIndex].id };
-      toast({ title: "Game Updated!", description: `${finalGame.venue} has been updated in your history.` });
-    } else {
-      const newGameToSaveWithId = {...finalGame, id: `game-hist-${Date.now()}`};
-      updatedHistory = [newGameToSaveWithId, ...gameHistory];
-      toast({ title: "Game Saved!", description: `${finalGame.venue} has been saved to your history.` });
+        let updatedHistory;
+        if (existingGameIndex !== -1) {
+            updatedHistory = [...gameHistory];
+            updatedHistory[existingGameIndex] = savedGame;
+            toast({ title: "Game Updated!", description: `${finalGame.venue} has been updated in your history.` });
+        } else {
+            updatedHistory = [savedGame, ...gameHistory];
+            toast({ title: "Game Saved!", description: `${finalGame.venue} has been saved to your history.` });
+        }
+        
+        setGameHistory(updatedHistory);
+        setSaveConfirmOpen(false);
+    } catch (error) {
+        console.error("Failed to save game:", error);
+        toast({ variant: "destructive", title: "Save Error", description: "Could not save game to the cloud." });
     }
-    
-    setGameHistory(updatedHistory);
-    setSaveConfirmOpen(false);
   };
   
   const handleLoadGame = (gameId: string) => {
@@ -423,10 +429,16 @@ export default function ChipMaestroPage() {
     }
   };
 
-  const handleDeleteGame = (gameId: string) => {
-    const updatedHistory = gameHistory.filter(g => g.id !== gameId);
-    setGameHistory(updatedHistory);
-    toast({ title: "Game Deleted", description: "The selected game has been removed from your history." });
+  const handleDeleteGame = async (gameId: string) => {
+    try {
+        await deleteGameHistory(gameId);
+        const updatedHistory = gameHistory.filter(g => g.id !== gameId);
+        setGameHistory(updatedHistory);
+        toast({ title: "Game Deleted", description: "The selected game has been removed from your history." });
+    } catch (error) {
+        console.error("Failed to delete game:", error);
+        toast({ variant: "destructive", title: "Delete Error", description: "Could not delete game from the cloud." });
+    }
   };
   
   const handleNewGame = () => {
@@ -484,19 +496,28 @@ export default function ChipMaestroPage() {
     }
   };
 
-  const handleImportedGame = (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
+  const handleImportedGame = async (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
     const existingMasterNames = masterPlayers.map(mp => mp.name);
-    const newMasterPlayers = importedGame.players
+    const newMasterPlayersPromises: Promise<MasterPlayer>[] = importedGame.players
         .filter(p => !existingMasterNames.includes(p.name))
-        .map(p => ({
-            id: `mp-${Date.now()}-${p.name}`,
-            name: p.name,
-            whatsappNumber: p.whatsappNumber || ""
-        }));
+        .map(p => {
+            const newPlayer: MasterPlayer = {
+                id: `mp-${Date.now()}-${p.name}`,
+                name: p.name,
+                whatsappNumber: p.whatsappNumber || ""
+            };
+            return saveMasterPlayer(newPlayer);
+        });
     
-    if (newMasterPlayers.length > 0) {
-        setMasterPlayers(prev => [...prev, ...newMasterPlayers]);
-        toast({ title: "Players Added", description: `${newMasterPlayers.length} new player(s) have been added to your master list.`});
+    try {
+        const createdPlayers = await Promise.all(newMasterPlayersPromises);
+        if (createdPlayers.length > 0) {
+            setMasterPlayers(prev => [...prev, ...createdPlayers]);
+            toast({ title: "Players Added", description: `${createdPlayers.length} new player(s) have been added to your master list.`});
+        }
+    } catch (error) {
+        console.error("Failed to save new master players from import:", error);
+        toast({variant: "destructive", title: "Player Save Error", description: "Could not save new players to the database."});
     }
 
     setCurrentVenue(importedGame.venue);
@@ -505,7 +526,6 @@ export default function ChipMaestroPage() {
     setPlayers(importedGame.players);
     setGameStartTime(newGameDate);
     
-    // Create calculated players to pass to save game
     const calculatedPlayers = importedGame.players.map(p => {
         const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
         return {
@@ -519,7 +539,7 @@ export default function ChipMaestroPage() {
         setActiveTab(importedGame.players[0].id);
     }
     
-    handleSaveGame(calculatedPlayers);
+    await handleSaveGame(calculatedPlayers);
 
     setImportGameModalOpen(false);
 };
@@ -630,7 +650,7 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="flex flex-wrap w-full h-auto gap-2">
+                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {players.map((p, index) => (
                       <TabsTrigger 
                         key={p.id} 
@@ -716,6 +736,7 @@ export default function ChipMaestroPage() {
         masterVenues={masterVenues}
         onStartGame={handleStartGameFromVenue}
         setMasterVenues={setMasterVenues}
+        toast={toast}
         initialDate={gameDate}
       />
       <ManagePlayersDialog 
@@ -1126,9 +1147,10 @@ const VenueDialog: FC<{
     onOpenChange: (open: boolean) => void,
     masterVenues: MasterVenue[],
     onStartGame: (venue: string, date: Date) => void,
-    setMasterVenues: (venues: MasterVenue[]) => void,
+    setMasterVenues: (venues: MasterVenue[] | ((prev: MasterVenue[]) => MasterVenue[])) => void,
+    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
     initialDate: Date
-}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, initialDate }) => {
+}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, toast, initialDate }) => {
     const [newVenue, setNewVenue] = useState("");
     const [selectedVenue, setSelectedVenue] = useState("");
     const [date, setDate] = useState<Date | undefined>(initialDate);
@@ -1141,27 +1163,49 @@ const VenueDialog: FC<{
       }
     }, [isOpen, initialDate])
 
-    const handleSaveNewVenue = () => {
+    const handleSaveNewVenue = async () => {
         if (!newVenue.trim()) return;
-        const newMasterVenues = [...masterVenues, { id: `venue-${Date.now()}`, name: newVenue.trim() }];
-        setMasterVenues(newMasterVenues);
-        setSelectedVenue(newVenue.trim());
-        setNewVenue("");
+        const venue: MasterVenue = { id: `venue-${Date.now()}`, name: newVenue.trim() };
+        try {
+            await saveMasterVenue(venue);
+            setMasterVenues(prev => [...prev, venue]);
+            setSelectedVenue(newVenue.trim());
+            setNewVenue("");
+            toast({ title: "Venue Saved", description: `${venue.name} has been added to the master list.` });
+        } catch (error) {
+            console.error("Failed to save new venue:", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue." });
+        }
     }
     
-    const handleDeleteVenue = () => {
+    const handleDeleteVenue = async () => {
         if(!selectedVenue) return;
-        const newMasterVenues = masterVenues.filter(v => v.name !== selectedVenue);
-        setMasterVenues(newMasterVenues);
-        setSelectedVenue("");
+        const venueToDelete = masterVenues.find(v => v.name === selectedVenue);
+        if (!venueToDelete) return;
+
+        try {
+            await deleteMasterVenue(venueToDelete.id);
+            setMasterVenues(prev => prev.filter(v => v.id !== venueToDelete.id));
+            setSelectedVenue("");
+            toast({ title: "Venue Deleted", description: `${selectedVenue} has been deleted.` });
+        } catch (error) {
+            console.error("Failed to delete venue:", error);
+            toast({ variant: "destructive", title: "Delete Error", description: `Could not delete ${selectedVenue}.` });
+        }
     }
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
         const venueToStart = selectedVenue || newVenue.trim();
         if (!venueToStart || !date) return;
         if (!masterVenues.some(v => v.name === venueToStart)) {
-            const newMasterVenues = [...masterVenues, { id: `venue-${Date.now()}`, name: venueToStart }];
-            setMasterVenues(newMasterVenues);
+            const venue: MasterVenue = { id: `venue-${Date.now()}`, name: venueToStart };
+            try {
+                await saveMasterVenue(venue);
+                setMasterVenues(prev => [...prev, venue]);
+            } catch (error) {
+                toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue before starting." });
+                return;
+            }
         }
         onStartGame(venueToStart, date);
     }
@@ -1237,7 +1281,7 @@ const ManagePlayersDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
     masterPlayers: MasterPlayer[],
-    setMasterPlayers: (players: MasterPlayer[]) => void,
+    setMasterPlayers: (players: MasterPlayer[] | ((prev: MasterPlayer[]) => MasterPlayer[])) => void,
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
 }> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
@@ -1279,7 +1323,7 @@ const ManagePlayersDialog: FC<{
         }
     }, [isOpen]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const trimmedName = name.trim();
         if (!trimmedName) {
             toast({ variant: "destructive", title: "Invalid Name", description: "Player name cannot be empty." });
@@ -1306,21 +1350,47 @@ const ManagePlayersDialog: FC<{
             }
         }
         
-        if (editingPlayer) {
-            setMasterPlayers(masterPlayers.map(p => p.id === editingPlayer.id ? {...p, name: trimmedName, whatsappNumber: fullWhatsappNumber} : p));
-        } else {
-            setMasterPlayers([...masterPlayers, {id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: fullWhatsappNumber}]);
+        try {
+            if (editingPlayer) {
+                const updatedPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber };
+                await saveMasterPlayer(updatedPlayer);
+                setMasterPlayers(mp => mp.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
+                toast({title: "Player Updated", description: "Player details have been saved."});
+            } else {
+                const newPlayer: MasterPlayer = { id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: fullWhatsappNumber };
+                await saveMasterPlayer(newPlayer);
+                setMasterPlayers(mp => [...mp, newPlayer]);
+                toast({title: "Player Added", description: "New player has been added to the list."});
+            }
+            setEditingPlayer(null);
+        } catch (error) {
+            console.error("Failed to save player:", error);
+            toast({variant: "destructive", title: "Save Error", description: "Could not save player to server."});
         }
-        setEditingPlayer(null);
     }
 
-    const handleSingleRemove = (id: string) => {
-        setMasterPlayers(masterPlayers.filter(p => p.id !== id));
+    const handleSingleRemove = async (id: string) => {
+        try {
+            await deleteMasterPlayer(id);
+            setMasterPlayers(mp => mp.filter(p => p.id !== id));
+            toast({title: "Player Deleted", description: "Player has been removed."});
+        } catch (error) {
+             console.error("Failed to delete player:", error);
+             toast({variant: "destructive", title: "Delete Error", description: "Could not delete player from server."});
+        }
     }
     
-    const handleMultiRemove = () => {
-        setMasterPlayers(masterPlayers.filter(p => !selectedPlayers.includes(p.id)));
-        setSelectedPlayers([]);
+    const handleMultiRemove = async () => {
+        const promises = selectedPlayers.map(id => deleteMasterPlayer(id));
+        try {
+            await Promise.all(promises);
+            setMasterPlayers(mp => mp.filter(p => !selectedPlayers.includes(p.id)));
+            setSelectedPlayers([]);
+            toast({title: "Players Deleted", description: `${selectedPlayers.length} player(s) have been removed.`});
+        } catch (error) {
+            console.error("Failed to delete multiple players:", error);
+            toast({variant: "destructive", title: "Delete Error", description: "Could not delete selected players."});
+        }
     }
 
     const handleSelectPlayer = (id: string, isSelected: boolean) => {
@@ -1555,15 +1625,6 @@ const ReportsDialog: FC<{
                             </p>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                             <span className="ml-2">Export PDF</span>
-                        </Button>
-                        <DialogClose asChild>
-                           <Button variant="outline">Close</Button>
-                        </DialogClose>
-                    </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
@@ -1660,6 +1721,15 @@ const ReportsDialog: FC<{
                         </div>
                     </div>
                 </ScrollArea>
+                 <DialogFooter className="flex items-center gap-2 pt-4">
+                    <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
+                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                         <span className="ml-2">Export PDF</span>
+                    </Button>
+                    <DialogClose asChild>
+                       <Button variant="outline">Close</Button>
+                    </DialogClose>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
@@ -2106,4 +2176,3 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
-
