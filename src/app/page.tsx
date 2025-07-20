@@ -1544,18 +1544,31 @@ const ReportsDialog: FC<{
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-6xl max-h-[90vh]">
-                <ScrollArea className="max-h-[85vh] pr-6">
+                <DialogHeader className="mb-6 flex-row items-center justify-between">
+                    <div className="text-left">
+                        <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
+                        <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                         {activeGame.startTime && (
+                            <p className="text-sm text-muted-foreground">
+                                Started: {format(new Date(activeGame.startTime), 'p')}
+                                {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
+                            </p>
+                        )}
+                    </div>
+                     <div className="flex items-center gap-2">
+                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline" size="icon">
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                             <span className="sr-only">Export PDF</span>
+                        </Button>
+                        <DialogClose asChild>
+                            <Button variant="outline" size="icon">
+                               <span className="sr-only">Close</span>
+                            </Button>
+                        </DialogClose>
+                    </div>
+                </DialogHeader>
+                <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
-                        <DialogHeader className="mb-6 text-center">
-                            <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
-                            <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
-                             {activeGame.startTime && (
-                                <p className="text-sm text-muted-foreground">
-                                    Started: {format(new Date(activeGame.startTime), 'p')}
-                                    {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
-                                </p>
-                            )}
-                        </DialogHeader>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             
                             <Card className="md:col-span-2"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
@@ -1648,14 +1661,7 @@ const ReportsDialog: FC<{
                              </CardContent></Card>
                         </div>
                     </div>
-                    </ScrollArea>
-                    <DialogFooter className="pr-4 pb-2 mt-4">
-                        <Button onClick={handleExportPdf} disabled={isExporting}>
-                            {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileDown className="h-4 w-4 mr-2" />}
-                            Export PDF
-                        </Button>
-                        <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                    </DialogFooter>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     )
