@@ -1,3 +1,5 @@
+'use server';
+
 import { db } from "@/lib/firebase";
 import { MasterPlayer } from "@/lib/types";
 import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";

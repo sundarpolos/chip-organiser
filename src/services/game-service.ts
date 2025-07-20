@@ -1,3 +1,5 @@
+'use server';
+
 import { db } from "@/lib/firebase";
 import { GameHistory } from "@/lib/types";
 import { collection, getDocs, doc, setDoc, deleteDoc, orderBy, query, limit } from "firebase/firestore";

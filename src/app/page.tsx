@@ -64,6 +64,7 @@ import {
   AlertCircle,
   CalendarIcon,
   MessageCircleCode,
+  X,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -500,13 +501,14 @@ export default function ChipMaestroPage() {
     const existingMasterNames = masterPlayers.map(mp => mp.name);
     const newMasterPlayersPromises: Promise<MasterPlayer>[] = importedGame.players
         .filter(p => !existingMasterNames.includes(p.name))
-        .map(p => {
+        .map(async p => {
             const newPlayer: MasterPlayer = {
                 id: `mp-${Date.now()}-${p.name}`,
                 name: p.name,
                 whatsappNumber: p.whatsappNumber || ""
             };
-            return saveMasterPlayer(newPlayer);
+            // This now calls the server action
+            return await saveMasterPlayer(newPlayer);
         });
     
     try {
@@ -650,13 +652,13 @@ export default function ChipMaestroPage() {
             <CardContent>
               {players.length > 0 ? (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  <TabsList className="h-auto flex flex-wrap justify-start -m-1">
                     {players.map((p, index) => (
                       <TabsTrigger 
                         key={p.id} 
                         value={p.id} 
                         className={cn(
-                          "truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
+                          "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
                           `data-[state=inactive]:${tabColors[index % tabColors.length]}`,
                           "data-[state=active]:ring-2 data-[state=active]:ring-ring"
                         )}
@@ -1614,7 +1616,7 @@ const ReportsDialog: FC<{
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-6xl max-h-[90vh]">
-                 <DialogHeader className="mb-4 flex-row items-center justify-between">
+                 <DialogHeader className="mb-4 flex-row items-start justify-between">
                     <div className="space-y-1">
                         <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
                         <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
@@ -1624,6 +1626,15 @@ const ReportsDialog: FC<{
                                 {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
                             </p>
                         )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                             <span className="ml-2">Export PDF</span>
+                        </Button>
+                        <DialogClose asChild>
+                           <Button variant="outline">Close</Button>
+                        </DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
@@ -1721,15 +1732,6 @@ const ReportsDialog: FC<{
                         </div>
                     </div>
                 </ScrollArea>
-                 <DialogFooter className="flex items-center gap-2 pt-4">
-                    <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
-                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                         <span className="ml-2">Export PDF</span>
-                    </Button>
-                    <DialogClose asChild>
-                       <Button variant="outline">Close</Button>
-                    </DialogClose>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
