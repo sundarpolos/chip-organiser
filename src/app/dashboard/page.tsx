@@ -1172,15 +1172,15 @@ const PlayerCard: FC<{
             </SelectTrigger>
             <SelectContent>
               {player.name && !masterPlayers.some(mp => mp.name === player.name) && (
-                  <SelectItem key="current-player" value={player.name}>
-                    {player.name}
-                  </SelectItem>
-                )}
+                <SelectItem key="current-unlisted-player" value={player.name}>
+                  {player.name}
+                </SelectItem>
+              )}
               {masterPlayers.map(mp => (
                 <SelectItem 
                   key={mp.id} 
                   value={mp.name}
-                  disabled={allPlayers.some(p => p.name === mp.name && p.id !== player.id)}
+                  disabled={allPlayers.some(p => p.id !== player.id && p.name === mp.name)}
                 >
                   {mp.name}
                 </SelectItem>
