@@ -191,8 +191,7 @@ export default function ChipMaestroPage() {
         `Time to crush it, ${currentUser.name}!`,
         `Let's see that winner's smile, ${currentUser.name}!`
       ];
-      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-      setGreeting(randomMessage);
+      setGreeting(messages[Math.floor(Math.random() * messages.length)]);
     }
   }, [currentUser]);
 
@@ -353,7 +352,7 @@ export default function ChipMaestroPage() {
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
           finalChips: 0,
-          permissions: { canEditBuyIns: true }, // Default to true on add
+          permissions: { canEditBuyIns: isAdmin },
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -981,7 +980,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={!isAdmin && (!canEdit || (buyIn.verified && isOtpEnabled))}
+                    disabled={!isAdmin}
                 />
                 {isLastRow && (isAdmin || canEdit) && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -1115,7 +1114,7 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
-            disabled={!isAdmin && !canEdit}
+            disabled={!isAdmin}
           />
         </div>
       </CardContent>
@@ -2403,6 +2402,8 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
+    
+
     
 
     
