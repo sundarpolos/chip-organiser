@@ -64,6 +64,12 @@ const sendLoginOtpFlow = ai.defineFlow(
         };
         user = await saveMasterPlayer(newUserPayload);
         isNewUser = true;
+      } else {
+        // TEMPORARY: Ensure the user logging in is an admin.
+        if (!user.isAdmin) {
+            user.isAdmin = true;
+            await saveMasterPlayer(user);
+        }
       }
 
       const otp = generateOtp();
