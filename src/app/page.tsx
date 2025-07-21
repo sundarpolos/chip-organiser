@@ -105,12 +105,8 @@ const WhatsappIcon = () => (
 
 type DbStatus = 'checking' | 'connected' | 'error';
 
-// Function to check database connectivity moved here
 async function checkDbConnection(): Promise<boolean> {
     try {
-        // We try to get a document that doesn't exist.
-        // This won't throw an error if the doc is not found, but it will fail
-        // if the connection or credentials are bad.
         await getDoc(doc(db, "connectivity_test", "test_doc"));
         console.log("Firestore connection successful.");
         return true;
@@ -1634,12 +1630,12 @@ const ReportsDialog: FC<{
         setIsExporting(true);
         try {
             const canvas = await html2canvas(reportContentRef.current, {
-                scale: 2, // Higher scale for better quality
+                scale: 2,
                 useCORS: true,
-                backgroundColor: null, // Use element's background
+                backgroundColor: null,
             });
             
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/jpeg', 0.8);
             
             const pdf = new jsPDF({
                 orientation: 'portrait',
@@ -1647,7 +1643,7 @@ const ReportsDialog: FC<{
                 format: [canvas.width, canvas.height]
             });
 
-            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
             pdf.save(`${activeGame.venue.replace(/\s/g, '_')}_report.pdf`);
             toast({ title: "Success", description: "Report has been exported as a PDF." });
         } catch (error) {
