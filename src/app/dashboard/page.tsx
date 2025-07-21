@@ -736,21 +736,17 @@ export default function ChipMaestroPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-start mb-6 gap-4">
         <div>
-           <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold truncate">{greeting}</h1>
+           <h1 className="text-2xl font-bold truncate">{currentVenue}</h1>
+           {greeting && <p className="text-lg font-semibold text-primary">{greeting}</p>}
+           <div className="text-sm text-muted-foreground flex items-center gap-4 mt-2">
+            <span>{format(gameDate, "dd MMMM yyyy")}</span>
+            {gameStartTime && (
+                <div className="flex items-center gap-1">
+                    <TimerIcon className="h-4 w-4" />
+                    <span>{gameDuration}</span>
+                </div>
+            )}
            </div>
-          <div className="text-sm text-muted-foreground flex flex-col items-start gap-1 mt-1">
-              <div className="flex items-center gap-4">
-                <span>{format(gameDate, "dd MMMM yyyy")}</span>
-                {gameStartTime && (
-                    <div className="flex items-center gap-1">
-                        <TimerIcon className="h-4 w-4" />
-                        <span>{gameDuration}</span>
-                    </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground/80">{currentVenue}</p>
-          </div>
         </div>
         
         <div className="flex items-center gap-2">
