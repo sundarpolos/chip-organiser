@@ -174,7 +174,7 @@ const AdminView: FC<{
                                         isOtpEnabled={isOtpVerificationEnabled}
                                         whatsappConfig={whatsappConfig}
                                         isAdmin={isAdmin}
-                                        colorClass={tabColors[index % tabColors.length]}
+                                        colorClass={player.id === activeTab ? tabColors[index % tabColors.length] : ''}
                                         toast={toast}
                                     />
                                 </TabsContent>
