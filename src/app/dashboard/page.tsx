@@ -981,7 +981,7 @@ const BuyInRow: FC<{
                     placeholder="Amount"
                     className="h-9 text-sm"
                 />
-                {isLastRow && (isAdmin || canEdit) && (
+                {isLastRow && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
                         <Plus className="h-4 w-4" />
                         <span className="sr-only">Re-buy</span>
@@ -992,7 +992,7 @@ const BuyInRow: FC<{
                 ) : (
                     showOtpInput && isOtpEnabled ? <div className="w-5" /> : null
                 )}
-                 {canBeRemoved && (isAdmin || canEdit) && (
+                 {canBeRemoved && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button size="icon" variant="destructive" className="h-9 w-9">
@@ -1014,7 +1014,7 @@ const BuyInRow: FC<{
                     </AlertDialog>
                 )}
             </div>
-            {(isAdmin || canEdit) && isOtpEnabled && showOtpInput && !buyIn.verified && (
+            {isOtpEnabled && showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
                     <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
@@ -1022,7 +1022,7 @@ const BuyInRow: FC<{
                     </Button>
                 </div>
             )}
-            {(isAdmin || canEdit) && isOtpEnabled && !showOtpInput && !buyIn.verified && (
+            {isOtpEnabled && !showOtpInput && !buyIn.verified && (
                  <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
                      {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
                  </Button>
@@ -2405,3 +2405,4 @@ const SaveConfirmDialog: FC<{
     
 
     
+
