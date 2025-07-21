@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter as TableFoot } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -812,14 +813,19 @@ export default function ChipMaestroPage() {
       <header className="flex justify-between items-start mb-6 gap-4">
         <div>
            <h1 className="text-2xl font-bold truncate">{currentVenue}</h1>
-           {greeting && <p className="text-lg font-semibold text-primary">{greeting}</p>}
-           <div className="text-sm text-muted-foreground flex items-center gap-4 mt-2">
+           <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             <span>{format(gameDate, "dd MMMM yyyy")}</span>
             {gameStartTime && (
                 <div className="flex items-center gap-1">
                     <TimerIcon className="h-4 w-4" />
                     <span>{gameDuration}</span>
                 </div>
+            )}
+            {greeting && (
+              <>
+                <Separator orientation="vertical" className="h-4" />
+                <p className="font-semibold text-primary">{greeting}</p>
+              </>
             )}
            </div>
         </div>
@@ -2779,5 +2785,6 @@ ${formattedTransfers}
         </Dialog>
     );
 };
+
 
 
