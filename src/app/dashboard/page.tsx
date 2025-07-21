@@ -122,7 +122,6 @@ export default function ChipMaestroPage() {
   const [isDataReady, setIsDataReady] = useState(false)
   const [gameDate, setGameDate] = useState<Date>(new Date())
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
-  const [dbStatus, setDbStatus] = useState<DbStatus>('checking');
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
 
 
@@ -181,33 +180,7 @@ export default function ChipMaestroPage() {
 
   // Load data from Firestore on initial render
   useEffect(() => {
-    async function checkDbConnection() {
-        try {
-            await getDoc(doc(db, "connectivity_test", "test_doc"));
-            console.log("Firestore connection successful.");
-            return true;
-        } catch (error) {
-            console.error("Firestore connection failed:", error);
-            return false;
-        }
-    }
-
     async function loadInitialData() {
-        setDbStatus('checking');
-        const isConnected = await checkDbConnection();
-        if (!isConnected) {
-            setDbStatus('error');
-            toast({
-                variant: "destructive",
-                title: "Database Connection Error",
-                description: "Could not connect to Firestore. Please check your credentials and internet connection.",
-                duration: 10000
-            });
-            setIsDataReady(true); // Still allow app to load, but in a degraded state
-            return;
-        }
-        setDbStatus('connected');
-
         try {
             const [
                 loadedMasterPlayers,
@@ -384,10 +357,6 @@ export default function ChipMaestroPage() {
   };
   
   const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
-    if (dbStatus !== 'connected') {
-        toast({ variant: "destructive", title: "Database Offline", description: "Cannot save game. Please check your connection." });
-        return;
-    }
     
     if (finalPlayers.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
@@ -491,7 +460,7 @@ export default function ChipMaestroPage() {
   }
   
   const handleStartGameFromVenue = async (venue: string, date: Date) => {
-    if (dbStatus === 'connected' && !masterVenues.some(v => v.name === venue)) {
+    if (!masterVenues.some(v => v.name === venue)) {
         const venueData: Omit<MasterVenue, 'id'> = { name: venue };
         const savedVenue = await saveMasterVenue(venueData);
         setMasterVenues(prev => [...prev, savedVenue]);
@@ -642,7 +611,7 @@ export default function ChipMaestroPage() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <Button onClick={() => setManagePlayersModalOpen(true)} variant="outline" disabled={dbStatus !== 'connected'}><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
+              <Button onClick={() => setManagePlayersModalOpen(true)}><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
               <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </div>
           </div>
@@ -694,10 +663,10 @@ export default function ChipMaestroPage() {
                     <Plus className="mr-2 h-4 w-4" />Add Player(s)
                 </Button>
 
-              {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame || dbStatus !== 'connected'}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
+              {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
             </div>
             <div className="flex gap-2">
-                <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" disabled={dbStatus !== 'connected'}><History className="mr-2 h-4 w-4" />Load Game</Button>
+                <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
                 <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
             </div>
         </CardFooter>
@@ -823,7 +792,6 @@ export default function ChipMaestroPage() {
         setMasterVenues={setMasterVenues}
         toast={toast}
         initialDate={gameDate}
-        dbStatus={dbStatus}
       />
       <ManagePlayersDialog 
         isOpen={isManagePlayersModalOpen}
@@ -1241,9 +1209,8 @@ const VenueDialog: FC<{
     onStartGame: (venue: string, date: Date) => void,
     setMasterVenues: (venues: MasterVenue[] | ((prev: MasterVenue[]) => MasterVenue[])) => void,
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-    initialDate: Date,
-    dbStatus: DbStatus
-}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, toast, initialDate, dbStatus }) => {
+    initialDate: Date
+}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, toast, initialDate }) => {
     const [newVenue, setNewVenue] = useState("");
     const [selectedVenue, setSelectedVenue] = useState("");
     const [date, setDate] = useState<Date | undefined>(initialDate);
@@ -1291,8 +1258,8 @@ const VenueDialog: FC<{
         let venueToStart = selectedVenue || newVenue.trim();
         if (!venueToStart || !date) return;
         
-        // If it's a new venue and DB is online, save it first.
-        if (dbStatus === 'connected' && !masterVenues.some(v => v.name === venueToStart)) {
+        // If it's a new venue, save it first.
+        if (!masterVenues.some(v => v.name === venueToStart)) {
             const venueData: Omit<MasterVenue, 'id'> = { name: venueToStart };
             try {
                 const savedVenue = await saveMasterVenue(venueData);
@@ -1341,20 +1308,20 @@ const VenueDialog: FC<{
                     <div className="space-y-2">
                         <Label>Existing Venues</Label>
                         <div className="flex gap-2">
-                        <Select onValueChange={setSelectedVenue} value={selectedVenue} disabled={dbStatus !== 'connected'}>
+                        <Select onValueChange={setSelectedVenue} value={selectedVenue}>
                             <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
                             <SelectContent>
                                 {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
                             </SelectContent>
                         </Select>
-                        <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue || dbStatus !== 'connected'}>Delete</Button>
+                        <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
                         </div>
                     </div>
                     <div className="space-y-2">
                          <Label>Or Enter New Venue</Label>
                         <div className="flex gap-2">
                             <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
-                            <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim() || dbStatus !== 'connected'}>Save New</Button>
+                            <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
                         </div>
                     </div>
                 </div>
