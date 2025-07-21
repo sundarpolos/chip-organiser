@@ -150,7 +150,7 @@ export default function LoginPage() {
               <Input
                 id="otp"
                 type="text"
-                placeholder="6-digit code"
+                placeholder="4-digit code"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
               />

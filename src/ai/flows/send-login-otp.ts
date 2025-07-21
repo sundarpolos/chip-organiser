@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -27,15 +28,15 @@ export type SendLoginOtpInput = z.infer<typeof SendLoginOtpInputSchema>;
 
 const SendLoginOtpOutputSchema = z.object({
   success: z.boolean().describe('Whether the OTP was sent successfully.'),
-  otp: z.string().optional().describe('The 6-digit OTP that was sent. This is returned for verification.'),
+  otp: z.string().optional().describe('The 4-digit OTP that was sent. This is returned for verification.'),
   isNewUser: z.boolean().describe('Whether a new user was created.'),
   error: z.string().optional().describe('Error message if sending failed.'),
 });
 export type SendLoginOtpOutput = z.infer<typeof SendLoginOtpOutputSchema>;
 
-// Helper function to generate a random 6-digit OTP
+// Helper function to generate a random 4-digit OTP
 function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 export async function sendLoginOtp(input: SendLoginOtpInput): Promise<SendLoginOtpOutput> {

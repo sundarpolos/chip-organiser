@@ -1692,7 +1692,7 @@ const ManagePlayersDialog: FC<{
                     <p className="text-sm text-muted-foreground text-center">An OTP has been sent to the Super Admin. Please enter it below to confirm this permanent action.</p>
                     <div className="w-full space-y-2">
                          <Label htmlFor="delete-otp">Verification OTP</Label>
-                         <Input id="delete-otp" type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-Digit OTP" className="text-center" />
+                         <Input id="delete-otp" type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="text-center" />
                     </div>
                     <div className="w-full flex flex-col gap-2">
                         <Button onClick={handleConfirmDelete} disabled={isVerifyingOtp}>
@@ -2672,4 +2672,3 @@ ${formattedTransfers}
         </Dialog>
     );
 };
-
