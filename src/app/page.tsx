@@ -452,7 +452,7 @@ export default function ChipMaestroPage() {
     setVenueModalOpen(true);
   }
   
-  const handleStartGameFromVenue = (venue: string, date: Date) => {
+  const handleStartGameFromVenue = async (venue: string, date: Date) => {
     setCurrentVenue(venue);
     setGameDate(date);
     setGameStartTime(new Date());
@@ -502,12 +502,10 @@ export default function ChipMaestroPage() {
     const newMasterPlayersPromises: Promise<MasterPlayer>[] = importedGame.players
         .filter(p => !existingMasterNames.includes(p.name))
         .map(async p => {
-            const newPlayer: MasterPlayer = {
-                id: `mp-${Date.now()}-${p.name}`,
+            const newPlayer: Omit<MasterPlayer, 'id'> = {
                 name: p.name,
                 whatsappNumber: p.whatsappNumber || ""
             };
-            // This now calls the server action
             return await saveMasterPlayer(newPlayer);
         });
     
@@ -1167,13 +1165,13 @@ const VenueDialog: FC<{
 
     const handleSaveNewVenue = async () => {
         if (!newVenue.trim()) return;
-        const venue: MasterVenue = { id: `venue-${Date.now()}`, name: newVenue.trim() };
+        const venue: Omit<MasterVenue, 'id'> = { name: newVenue.trim() };
         try {
-            await saveMasterVenue(venue);
-            setMasterVenues(prev => [...prev, venue]);
-            setSelectedVenue(newVenue.trim());
+            const savedVenue = await saveMasterVenue(venue);
+            setMasterVenues(prev => [...prev, savedVenue]);
+            setSelectedVenue(savedVenue.name);
             setNewVenue("");
-            toast({ title: "Venue Saved", description: `${venue.name} has been added to the master list.` });
+            toast({ title: "Venue Saved", description: `${savedVenue.name} has been added to the master list.` });
         } catch (error) {
             console.error("Failed to save new venue:", error);
             toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue." });
@@ -1197,13 +1195,14 @@ const VenueDialog: FC<{
     }
 
     const handleConfirm = async () => {
-        const venueToStart = selectedVenue || newVenue.trim();
+        let venueToStart = selectedVenue || newVenue.trim();
         if (!venueToStart || !date) return;
         if (!masterVenues.some(v => v.name === venueToStart)) {
-            const venue: MasterVenue = { id: `venue-${Date.now()}`, name: venueToStart };
+            const venue: Omit<MasterVenue, 'id'> = { name: venueToStart };
             try {
-                await saveMasterVenue(venue);
-                setMasterVenues(prev => [...prev, venue]);
+                const savedVenue = await saveMasterVenue(venue);
+                setMasterVenues(prev => [...prev, savedVenue]);
+                venueToStart = savedVenue.name;
             } catch (error) {
                 toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue before starting." });
                 return;
@@ -1354,14 +1353,14 @@ const ManagePlayersDialog: FC<{
         
         try {
             if (editingPlayer) {
-                const updatedPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber };
+                const updatedPlayer: MasterPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber };
                 await saveMasterPlayer(updatedPlayer);
                 setMasterPlayers(mp => mp.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
                 toast({title: "Player Updated", description: "Player details have been saved."});
             } else {
-                const newPlayer: MasterPlayer = { id: `mp-${Date.now()}`, name: trimmedName, whatsappNumber: fullWhatsappNumber };
-                await saveMasterPlayer(newPlayer);
-                setMasterPlayers(mp => [...mp, newPlayer]);
+                const newPlayer: Omit<MasterPlayer, 'id'> = { name: trimmedName, whatsappNumber: fullWhatsappNumber };
+                const savedPlayer = await saveMasterPlayer(newPlayer);
+                setMasterPlayers(mp => [...mp, savedPlayer]);
                 toast({title: "Player Added", description: "New player has been added to the list."});
             }
             setEditingPlayer(null);
