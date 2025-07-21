@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBqSROiVtpeGpH6-gfvfKdG9liWoz3WMaw",
   authDomain: "chip-maestro.firebaseapp.com",
   projectId: "chip-maestro",
-  storageBucket: "chip-maestro.firebasestorage.app",
+  storageBucket: "chip-maestro.appspot.com",
   messagingSenderId: "1069831670036",
   appId: "1:1069831670036:web:b523603757dc7be3c99a01"
 };
