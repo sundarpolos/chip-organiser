@@ -8,6 +8,7 @@ import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
+import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
@@ -314,9 +315,9 @@ export default function ChipMaestroPage() {
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
-    apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '',
-    apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '',
-    senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
+    apiUrl: '',
+    apiToken: '',
+    senderMobile: ''
   });
 
   // Modal & Dialog State
@@ -903,6 +904,8 @@ export default function ChipMaestroPage() {
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
         onDeleteGame={handleDeleteGame}
+        whatsappConfig={whatsappConfig}
+        toast={toast}
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1801,70 +1804,137 @@ const LoadGameDialog: FC<{
   gameHistory: GameHistory[];
   onLoadGame: (id: string) => void;
   onDeleteGame: (id: string) => void;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame }) => {
+  whatsappConfig: WhatsappConfig;
+  toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame, whatsappConfig, toast }) => {
+  const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
+  const [otp, setOtp] = useState('');
+  const [sentOtp, setSentOtp] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setGameToDelete(null);
+      setOtp('');
+      setSentOtp('');
+      setIsSendingOtp(false);
+      setIsVerifying(false);
+    }
+  }, [isOpen]);
+
   const sortedHistory = useMemo(
     () => [...gameHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
     [gameHistory]
   );
+  
+  const handleDeleteAttempt = async (game: GameHistory) => {
+    setGameToDelete(game);
+    setIsSendingOtp(true);
+    try {
+      const result = await sendDeleteGameOtp({
+        gameVenue: game.venue,
+        gameDate: format(new Date(game.timestamp), "PPP"),
+        whatsappConfig,
+      });
+      if (result.success && result.otp) {
+        setSentOtp(result.otp);
+        toast({ title: "OTP Sent", description: "OTP sent to Super Admin for delete verification." });
+      } else {
+        throw new Error(result.error || "Failed to send OTP.");
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "OTP Error", description: `Could not send verification OTP. ${e.message}` });
+      setGameToDelete(null);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!gameToDelete || otp !== sentOtp) {
+      toast({ variant: "destructive", title: "Invalid OTP", description: "The entered code is incorrect." });
+      return;
+    }
+    setIsVerifying(true);
+    onDeleteGame(gameToDelete.id);
+    // Reset state after deletion
+    setGameToDelete(null);
+    setOtp('');
+    setSentOtp('');
+    setIsVerifying(false);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Load Previous Game</DialogTitle>
-          <DialogDescription>Select a game from your history to load or delete.</DialogDescription>
+          <DialogTitle>{gameToDelete ? 'Confirm Game Deletion' : 'Load Previous Game'}</DialogTitle>
+          <DialogDescription>
+            {gameToDelete 
+              ? `Enter the OTP sent to the Super Admin to delete the game at ${gameToDelete.venue}.`
+              : 'Select a game from your history to load or delete.'}
+          </DialogDescription>
         </DialogHeader>
-        <div className="mt-4">
-          <ScrollArea className="h-72">
-            {sortedHistory.length > 0 ? (
-              <div className="space-y-2 pr-4">
-                {sortedHistory.map(g => (
-                  <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
-                    <div>
-                      <p className="font-semibold">{g.venue}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button onClick={() => onLoadGame(g.id)} size="sm">
-                            Load
-                        </Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" className="h-9 w-9">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This will permanently delete the game from <strong>{g.venue}</strong> on {format(new Date(g.timestamp), "PPP")}. This action cannot be undone.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onDeleteGame(g.id)}>
-                                    Delete
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
+        {gameToDelete ? (
+          <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="delete-game-otp">Verification OTP</Label>
+                <Input
+                  id="delete-game-otp"
+                  type="text"
+                  placeholder="4-Digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="text-center"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button onClick={handleConfirmDelete} disabled={isVerifying}>
+                  {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm & Delete Game"}
+                </Button>
+                <Button variant="outline" onClick={() => setGameToDelete(null)}>
+                  Cancel
+                </Button>
+              </div>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4">
+              <ScrollArea className="h-72">
+                {sortedHistory.length > 0 ? (
+                  <div className="space-y-2 pr-4">
+                    {sortedHistory.map(g => (
+                      <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
+                        <div>
+                          <p className="font-semibold">{g.venue}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={() => onLoadGame(g.id)} size="sm">
+                                Load
+                            </Button>
+                            <Button onClick={() => handleDeleteAttempt(g)} variant="destructive" size="icon" className="h-9 w-9" disabled={isSendingOtp}>
+                                {isSendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <p className="text-muted-foreground">No games in history.</p>
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-        </DialogFooter>
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="text-muted-foreground">No games in history.</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
