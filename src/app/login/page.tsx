@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { sendLoginOtp } from '@/ai/flows/send-login-otp';
 import { getMasterPlayers } from '@/services/player-service';
@@ -10,37 +11,60 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, KeyRound } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { MasterPlayer } from '@/lib/types';
 
 export default function LoginPage() {
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
 
+  useEffect(() => {
+    async function loadPlayers() {
+      try {
+        const players = await getMasterPlayers();
+        setMasterPlayers(players);
+      } catch (error) {
+        console.error("Failed to load players", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error Loading Players',
+          description: 'Could not fetch the list of registered players. Please try again.',
+        });
+      } finally {
+        setIsLoadingPlayers(false);
+      }
+    }
+    loadPlayers();
+  }, [toast]);
+
   const handleSendOtp = async () => {
-    const numberRegex = /^\d{10,15}$/;
-    if (!numberRegex.test(whatsappNumber)) {
+    const selectedPlayer = masterPlayers.find(p => p.id === selectedPlayerId);
+    if (!selectedPlayer || !selectedPlayer.whatsappNumber) {
       toast({
         variant: 'destructive',
-        title: 'Invalid Number',
-        description: 'Please enter a valid WhatsApp number with country code (e.g., 919876543210).',
+        title: 'Invalid Player',
+        description: 'Please select a valid player with a registered WhatsApp number.',
       });
       return;
     }
 
     setIsSending(true);
     try {
-      const result = await sendLoginOtp({ whatsappNumber, whatsappConfig: {} });
+      const result = await sendLoginOtp({ whatsappNumber: selectedPlayer.whatsappNumber, whatsappConfig: {} });
       if (result.success && result.otp) {
         setSentOtp(result.otp);
         setIsOtpSent(true);
         toast({
           title: 'OTP Sent!',
-          description: `An OTP has been sent to ${whatsappNumber}.`,
+          description: `An OTP has been sent to ${selectedPlayer.name}'s registered number.`,
         });
       } else {
         throw new Error(result.error || 'An unknown error occurred while sending OTP.');
@@ -68,9 +92,8 @@ export default function LoginPage() {
 
     setIsVerifying(true);
     try {
-      // On successful OTP verification, fetch the user's details
-      const allPlayers = await getMasterPlayers();
-      const currentUser = allPlayers.find(p => p.whatsappNumber === whatsappNumber);
+      // On successful OTP verification, the selected player is the current user
+      const currentUser = masterPlayers.find(p => p.id === selectedPlayerId);
 
       if (currentUser) {
         // Store user details in localStorage to simulate a session
@@ -90,6 +113,8 @@ export default function LoginPage() {
     }
   };
 
+  const selectedPlayer = masterPlayers.find(p => p.id === selectedPlayerId);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
       <Card className="w-full max-w-sm">
@@ -99,20 +124,25 @@ export default function LoginPage() {
             </div>
           <CardTitle>Chip Maestro Login</CardTitle>
           <CardDescription>
-            {isOtpSent ? 'Enter the OTP sent to your WhatsApp.' : 'Enter your WhatsApp number to receive an OTP.'}
+            {isOtpSent ? `Enter the OTP sent to ${selectedPlayer?.name}.` : 'Select your name to receive an OTP.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {!isOtpSent ? (
             <div className="space-y-2">
-              <Label htmlFor="whatsapp-number">WhatsApp Number</Label>
-              <Input
-                id="whatsapp-number"
-                type="tel"
-                placeholder="e.g., 919876543210"
-                value={whatsappNumber}
-                onChange={(e) => setWhatsappNumber(e.target.value)}
-              />
+              <Label htmlFor="player-select">Player Name</Label>
+               <Select onValueChange={setSelectedPlayerId} value={selectedPlayerId} disabled={isLoadingPlayers}>
+                <SelectTrigger id="player-select">
+                  <SelectValue placeholder={isLoadingPlayers ? "Loading players..." : "Select your name"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {masterPlayers.map(player => (
+                    <SelectItem key={player.id} value={player.id}>
+                      {player.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           ) : (
             <div className="space-y-2">
@@ -129,7 +159,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
           {!isOtpSent ? (
-            <Button onClick={handleSendOtp} disabled={isSending} className="w-full">
+            <Button onClick={handleSendOtp} disabled={isSending || !selectedPlayerId} className="w-full">
               {isSending ? <Loader2 className="animate-spin" /> : 'Send OTP'}
             </Button>
           ) : (
@@ -138,7 +168,7 @@ export default function LoginPage() {
                 {isVerifying ? <Loader2 className="animate-spin" /> : 'Login'}
               </Button>
               <Button variant="link" onClick={() => setIsOtpSent(false)}>
-                Use a different number
+                Use a different name
               </Button>
             </>
           )}
