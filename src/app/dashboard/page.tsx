@@ -389,6 +389,11 @@ export default function ChipMaestroPage() {
                 setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
             }
 
+            const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
+            if (savedWhatsappConfig) {
+              setWhatsappConfig(JSON.parse(savedWhatsappConfig));
+            }
+
             const lastActiveGame = localStorage.getItem("activeGame");
             if (lastActiveGame) {
                 const game = JSON.parse(lastActiveGame);
@@ -396,7 +401,7 @@ export default function ChipMaestroPage() {
                 setGameDate(new Date(game.timestamp));
                 setPlayers(game.players.map((p: CalculatedPlayer) => ({
                     ...p, // Spread existing player data
-                    buyIns: (p.buyIns || []).map((b, i) => ({
+                    buyIns: (p.buyIns || []).map((b: BuyIn, i: number) => ({
                       ...b,
                       id: b.id || `buyin-legacy-${Date.now()}-${i}`
                     })),
