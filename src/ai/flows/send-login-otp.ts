@@ -13,6 +13,8 @@ import { z } from 'genkit';
 import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
 import { sendWhatsappMessage, type SendWhatsappMessageInput } from './send-whatsapp-message';
 
+const SUPER_ADMIN_WHATSAPP = '919843350000';
+
 const SendLoginOtpInputSchema = z.object({
   whatsappNumber: z.string().describe("The user's WhatsApp number, including country code."),
   whatsappConfig: z.object({
@@ -51,20 +53,27 @@ const sendLoginOtpFlow = ai.defineFlow(
       const allPlayers = await getMasterPlayers();
       let user = allPlayers.find(p => p.whatsappNumber === whatsappNumber);
       let isNewUser = false;
+      const isSuperAdminLogin = whatsappNumber === SUPER_ADMIN_WHATSAPP;
 
       if (!user) {
-        // If no user exists, the first one to sign up becomes the admin.
-        const isAdmin = allPlayers.length === 0;
-
         // Create a new user if not found
-        const newUserPayload: Omit<import('@/lib/types').MasterPlayer, 'id'> = {
-          name: `Player ${whatsappNumber.slice(-4)}`, // Default name
+        let newUserPayload: Omit<import('@/lib/types').MasterPlayer, 'id'> = {
+          name: isSuperAdminLogin ? 'Sundar' : `Player ${whatsappNumber.slice(-4)}`, // Default name
           whatsappNumber: whatsappNumber,
-          isAdmin: isAdmin,
+          isAdmin: isSuperAdminLogin, // Only super admin is admin on creation
         };
         user = await saveMasterPlayer(newUserPayload);
         isNewUser = true;
+      } else if (isSuperAdminLogin && !user.isAdmin) {
+        // If the super admin logs in and isn't an admin, make them one.
+        user.isAdmin = true;
+        await saveMasterPlayer(user);
+      } else if (!isSuperAdminLogin && user.name === 'Sundar' && user.whatsappNumber !== SUPER_ADMIN_WHATSAPP) {
+        // Edge case: demote a user named Sundar who is not the super admin.
+        user.isAdmin = false;
+        await saveMasterPlayer(user);
       }
+
 
       const otp = generateOtp();
       const message = `Your Chip Maestro login code is ${otp}. This code will expire in 10 minutes.`;

@@ -7,6 +7,7 @@ import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
+import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
@@ -634,19 +635,6 @@ export default function ChipMaestroPage() {
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
   ];
   
-  const DbStatusIndicator = () => {
-    if (dbStatus === 'checking') {
-      return <Badge variant="secondary" className="pl-2"><Loader2 className="h-3 w-3 animate-spin mr-1.5" />Checking...</Badge>;
-    }
-    if (dbStatus === 'connected') {
-      return <Badge className="bg-green-500 hover:bg-green-500 text-white pl-2"><Wifi className="h-3 w-3 mr-1.5" />Connected</Badge>;
-    }
-    if (dbStatus === 'error') {
-      return <Badge variant="destructive" className="pl-2"><WifiOff className="h-3 w-3 mr-1.5" />Connection Failed</Badge>;
-    }
-    return null;
-  };
-
   const AdminView = () => (
     <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
     <section className="md:col-span-2 mb-8 md:mb-0">
@@ -771,11 +759,7 @@ export default function ChipMaestroPage() {
         <div>
            <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
-              <Badge variant={isAdmin ? "destructive" : "secondary"}>
-                {isAdmin ? <UserCog className="mr-1.5 h-3 w-3" /> : <UserCheck className="mr-1.5 h-3 w-3" />}
-                {isAdmin ? 'Admin View' : 'Player View'}
-              </Badge>
-              <DbStatusIndicator />
+              <span className="text-lg font-semibold text-muted-foreground">Hi, {currentUser?.name}</span>
            </div>
           <div className="text-sm text-muted-foreground flex items-center gap-4">
               <span>{format(gameDate, "dd/MMM/yy")}</span>
@@ -847,6 +831,7 @@ export default function ChipMaestroPage() {
         masterPlayers={masterPlayers}
         setMasterPlayers={setMasterPlayers}
         currentUser={currentUser}
+        whatsappConfig={whatsappConfig}
         toast={toast}
       />
        <AddPlayerDialog
@@ -1390,19 +1375,26 @@ const countryCodes = [
 ];
 
 const ManagePlayersDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    masterPlayers: MasterPlayer[],
-    setMasterPlayers: (players: MasterPlayer[] | ((prev: MasterPlayer[]) => MasterPlayer[])) => void,
-    currentUser: MasterPlayer | null,
-    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, toast }) => {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    masterPlayers: MasterPlayer[];
+    setMasterPlayers: (players: MasterPlayer[] | ((prev: MasterPlayer[]) => MasterPlayer[])) => void;
+    currentUser: MasterPlayer | null;
+    whatsappConfig: WhatsappConfig;
+    toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
     const [countryCode, setCountryCode] = useState("91");
     const [mobileNumber, setMobileNumber] = useState("");
     const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
+    
+    const [otp, setOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+    const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
 
     const splitPhoneNumber = (fullNumber: string) => {
         if (!fullNumber) return { cc: "91", num: "" };
@@ -1436,6 +1428,9 @@ const ManagePlayersDialog: FC<{
         if (!isOpen) {
             setSelectedPlayers([]);
             setEditingPlayer(null);
+            setPlayerToDelete(null);
+            setOtp("");
+            setSentOtp("");
         }
     }, [isOpen]);
 
@@ -1485,28 +1480,54 @@ const ManagePlayersDialog: FC<{
         }
     }
 
-    const handleSingleRemove = async (id: string) => {
+    const handleDeleteAttempt = async (player: MasterPlayer) => {
+        setPlayerToDelete(player);
+        setIsSendingOtp(true);
         try {
-            await deleteMasterPlayer(id);
-            setMasterPlayers(mp => mp.filter(p => p.id !== id));
+            const result = await sendDeletePlayerOtp({
+                playerToDeleteName: player.name,
+                whatsappConfig: whatsappConfig,
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                toast({ title: "OTP Sent", description: "OTP sent to Super Admin for delete verification." });
+            } else {
+                throw new Error(result.error || "Failed to send OTP.");
+            }
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "OTP Error", description: `Could not send verification OTP. ${e.message}` });
+            setPlayerToDelete(null);
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const handleConfirmDelete = async () => {
+        if (otp !== sentOtp || !playerToDelete) {
+            toast({ variant: "destructive", title: "Invalid OTP", description: "The entered code is incorrect." });
+            return;
+        }
+        
+        setIsVerifyingOtp(true);
+        try {
+            await deleteMasterPlayer(playerToDelete.id);
+            setMasterPlayers(mp => mp.filter(p => p.id !== playerToDelete.id));
             toast({title: "Player Deleted", description: "Player has been removed."});
+            setPlayerToDelete(null);
+            setOtp("");
+            setSentOtp("");
         } catch (error) {
              console.error("Failed to delete player:", error);
              toast({variant: "destructive", title: "Delete Error", description: "Could not delete player from server."});
+        } finally {
+            setIsVerifyingOtp(false);
         }
-    }
+    };
     
     const handleMultiRemove = async () => {
-        const promises = selectedPlayers.map(id => deleteMasterPlayer(id));
-        try {
-            await Promise.all(promises);
-            setMasterPlayers(mp => mp.filter(p => !selectedPlayers.includes(p.id)));
-            setSelectedPlayers([]);
-            toast({title: "Players Deleted", description: `${selectedPlayers.length} player(s) have been removed.`});
-        } catch (error) {
-            console.error("Failed to delete multiple players:", error);
-            toast({variant: "destructive", title: "Delete Error", description: "Could not delete selected players."});
-        }
+        // This feature would also require OTP verification, which is complex for multi-delete.
+        // For now, we recommend deleting one by one for security.
+        toast({ title: "Action Not Supported", description: "Please delete players one by one for security."});
     }
 
     const handleSelectPlayer = (id: string, isSelected: boolean) => {
@@ -1519,13 +1540,15 @@ const ManagePlayersDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="flex flex-col h-[90vh] max-h-[500px]">
+            <DialogContent className="flex flex-col h-[90vh] max-h-[700px]">
                 <DialogHeader>
                     <div className="flex items-center justify-center gap-2">
                         <DialogTitle>Manage Players</DialogTitle>
                         <Badge variant="secondary">{masterPlayers.length}</Badge>
                     </div>
                 </DialogHeader>
+                {!playerToDelete ? (
+                <>
                 <div className="space-y-2 border-b pb-4">
                     <div className="grid grid-cols-2 gap-2">
                         <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} className="col-span-2" />
@@ -1538,7 +1561,7 @@ const ManagePlayersDialog: FC<{
                         <Input placeholder="10-digit mobile" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} />
                     </div>
                     <div className="flex items-center space-x-2 pt-2">
-                        <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id} />
+                        <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id || editingPlayer?.whatsappNumber === '919843350000'} />
                         <Label htmlFor="admin-switch">Make this player an Admin</Label>
                     </div>
                     <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
@@ -1557,13 +1580,16 @@ const ManagePlayersDialog: FC<{
                                             disabled={p.id === currentUser?.id}
                                         />
                                         <div className="grid grid-cols-2 gap-4 flex-1">
-                                            <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">{p.name} {p.isAdmin && <UserCog className="h-3 w-3 text-primary"/>}</div>
+                                            <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">
+                                                {p.name} {p.isAdmin && <UserCog className="h-3 w-3 text-primary"/>}
+                                                {p.whatsappNumber === '919843350000' && <Crown className="h-3 w-3 text-amber-500" />}
+                                            </div>
                                             <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="icon" variant="ghost" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
-                                        <Button size="icon" variant="destructive" onClick={() => handleSingleRemove(p.id)} disabled={p.id === currentUser?.id}><Trash2 className="h-4 w-4" /></Button>
+                                        <Button size="icon" variant="destructive" onClick={() => handleDeleteAttempt(p)} disabled={p.id === currentUser?.id || isSendingOtp}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
                             ))}
@@ -1579,6 +1605,24 @@ const ManagePlayersDialog: FC<{
                     ) : <div></div>}
                     <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                 </DialogFooter>
+                </>
+                ) : (
+                <div className="flex flex-col items-center justify-center p-8 space-y-4">
+                    <AlertCircle className="h-12 w-12 text-destructive" />
+                    <h3 className="text-lg font-semibold text-center">Confirm Deletion of "{playerToDelete.name}"</h3>
+                    <p className="text-sm text-muted-foreground text-center">An OTP has been sent to the Super Admin. Please enter it below to confirm this permanent action.</p>
+                    <div className="w-full space-y-2">
+                         <Label htmlFor="delete-otp">Verification OTP</Label>
+                         <Input id="delete-otp" type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-Digit OTP" className="text-center" />
+                    </div>
+                    <div className="w-full flex flex-col gap-2">
+                        <Button onClick={handleConfirmDelete} disabled={isVerifyingOtp}>
+                            {isVerifyingOtp ? <Loader2 className="animate-spin" /> : "Confirm & Delete Player"}
+                        </Button>
+                        <Button variant="outline" onClick={() => setPlayerToDelete(null)}>Cancel</Button>
+                    </div>
+                </div>
+                )}
             </DialogContent>
         </Dialog>
     )

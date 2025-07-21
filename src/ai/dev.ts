@@ -6,3 +6,4 @@ import '@/ai/flows/send-whatsapp-message.ts';
 import '@/ai/flows/send-buyin-otp.ts';
 import '@/ai/flows/import-game.ts';
 import '@/ai/flows/send-login-otp.ts';
+import '@/ai/flows/send-delete-player-otp.ts';
