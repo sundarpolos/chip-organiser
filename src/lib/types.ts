@@ -1,4 +1,5 @@
 export interface BuyIn {
+  id: string;
   amount: number;
   timestamp: string;
   verified: boolean;

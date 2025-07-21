@@ -225,11 +225,11 @@ export default function ChipMaestroPage() {
                 setCurrentVenue(game.venue);
                 setGameDate(new Date(game.timestamp));
                 setPlayers(game.players.map((p: CalculatedPlayer) => ({
-                    id: p.id,
-                    name: p.name,
-                    whatsappNumber: p.whatsappNumber,
-                    buyIns: p.buyIns,
-                    finalChips: p.finalChips,
+                    ...p, // Spread existing player data
+                    buyIns: (p.buyIns || []).map((b, i) => ({
+                      ...b,
+                      id: b.id || `buyin-legacy-${i}` // Ensure old buyins have an ID
+                    })),
                     permissions: p.permissions || { canEditBuyIns: isAdmin }
                 })));
                 if (game.startTime) setGameStartTime(new Date(game.startTime));
@@ -350,9 +350,14 @@ export default function ChipMaestroPage() {
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
-          buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
+          buyIns: [{ 
+            id: `buyin-${Date.now()}`,
+            amount: 0, 
+            timestamp: new Date().toISOString(), 
+            verified: !isOtpVerificationEnabled 
+          }],
           finalChips: 0,
-          permissions: { canEditBuyIns: true },
+          permissions: { canEditBuyIns: isAdmin },
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -441,7 +446,10 @@ export default function ChipMaestroPage() {
         id: p.id,
         name: p.name,
         whatsappNumber: p.whatsappNumber,
-        buyIns: p.buyIns,
+        buyIns: (p.buyIns || []).map((b, i) => ({
+            ...b,
+            id: b.id || `buyin-legacy-${i}`
+        })),
         finalChips: p.finalChips,
         permissions: p.permissions || { canEditBuyIns: isAdmin },
       })));
@@ -886,9 +894,9 @@ const BuyInRow: FC<{
     player: Player;
     canBeRemoved: boolean;
     isLastRow: boolean;
-    onBuyInChange: (index: number, newAmount: number) => void;
-    onRemoveBuyIn: (index: number) => void;
-    onVerify: (index: number, verified: boolean) => void;
+    onBuyInChange: (buyInId: string, newAmount: number) => void;
+    onRemoveBuyIn: (buyInId: string) => void;
+    onVerify: (buyInId: string, verified: boolean) => void;
     onAddBuyIn: () => void;
     isOtpEnabled: boolean;
     whatsappConfig: WhatsappConfig;
@@ -904,9 +912,9 @@ const BuyInRow: FC<{
     useEffect(() => {
         // If OTP is disabled and the buy-in isn't verified yet, verify it automatically.
         if (!isOtpEnabled && !buyIn.verified && buyIn.amount > 0) {
-            onVerify(index, true);
+            onVerify(buyIn.id, true);
         }
-    }, [isOtpEnabled, buyIn.verified, buyIn.amount, index, onVerify]);
+    }, [isOtpEnabled, buyIn.verified, buyIn.amount, buyIn.id, onVerify]);
 
     const handleSendOtp = async () => {
         if (!player.whatsappNumber) {
@@ -950,7 +958,7 @@ const BuyInRow: FC<{
         setIsVerifying(true);
         if (otp === sentOtp) {
             toast({ title: "Success", description: "Buy-in verified successfully." });
-            onVerify(index, true);
+            onVerify(buyIn.id, true);
             setShowOtpInput(false);
         } else {
             toast({ variant: "destructive", title: "Invalid OTP", description: "The entered code is incorrect." });
@@ -963,9 +971,9 @@ const BuyInRow: FC<{
             setShowOtpInput(false);
             setSentOtp("");
             setOtp("");
-            onVerify(index, false); // Re-verification needed if amount changes
+            onVerify(buyIn.id, false); // Re-verification needed if amount changes
         }
-        onBuyInChange(index, newAmount);
+        onBuyInChange(buyIn.id, newAmount);
     }
     
     return (
@@ -1006,7 +1014,7 @@ const BuyInRow: FC<{
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => onRemoveBuyIn(index)}>Continue</AlertDialogAction>
+                          <AlertDialogAction onClick={() => onRemoveBuyIn(buyIn.id)}>Continue</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
@@ -1041,15 +1049,17 @@ const PlayerCard: FC<{
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
 }> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, colorClass, toast }) => {
   
-  const handleBuyInChange = (index: number, newAmount: number) => {
-    const newBuyIns = [...(player.buyIns || [])]
-    newBuyIns[index] = {...newBuyIns[index], amount: newAmount}
-    onUpdate(player.id, { buyIns: newBuyIns })
+  const handleBuyInChange = (buyInId: string, newAmount: number) => {
+    const newBuyIns = (player.buyIns || []).map(b => 
+        b.id === buyInId ? { ...b, amount: newAmount } : b
+    );
+    onUpdate(player.id, { buyIns: newBuyIns });
   }
   
-  const handleVerifyBuyIn = (index: number, verified: boolean) => {
-    const newBuyIns = [...(player.buyIns || [])];
-    newBuyIns[index] = {...newBuyIns[index], verified };
+  const handleVerifyBuyIn = (buyInId: string, verified: boolean) => {
+    const newBuyIns = (player.buyIns || []).map(b => 
+        b.id === buyInId ? { ...b, verified } : b
+    );
     onUpdate(player.id, { buyIns: newBuyIns });
   };
 
@@ -1059,13 +1069,21 @@ const PlayerCard: FC<{
         toast({ variant: "destructive", title: "Unverified Buy-in", description: "Please verify the current buy-in before adding a new one." });
         return;
     }
-    const newBuyIns = [...(player.buyIns || []), { amount: 0, timestamp: new Date().toISOString(), verified: !isOtpEnabled }]
+    const newBuyIns = [
+        ...(player.buyIns || []), 
+        { 
+            id: `buyin-${Date.now()}-${Math.random()}`,
+            amount: 0, 
+            timestamp: new Date().toISOString(), 
+            verified: !isOtpEnabled 
+        }
+    ];
     onUpdate(player.id, { buyIns: newBuyIns })
   }
   
-  const removeBuyIn = (index: number) => {
+  const removeBuyIn = (buyInId: string) => {
     if ((player.buyIns || []).length > 1) {
-      const newBuyIns = (player.buyIns || []).filter((_, i) => i !== index)
+      const newBuyIns = (player.buyIns || []).filter((b) => b.id !== buyInId)
       onUpdate(player.id, { buyIns: newBuyIns })
     } else {
         toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
@@ -1083,7 +1101,7 @@ const PlayerCard: FC<{
           <div className="space-y-2">
              {(player.buyIns || []).map((buyIn, index) => (
               <BuyInRow 
-                key={index}
+                key={buyIn.id}
                 buyIn={buyIn}
                 index={index}
                 player={player}
@@ -2402,5 +2420,6 @@ const SaveConfirmDialog: FC<{
     
 
     
+
 
 
