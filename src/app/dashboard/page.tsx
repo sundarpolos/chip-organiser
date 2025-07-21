@@ -656,7 +656,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
-                    canEdit={isAdmin || player.permissions.canEditBuyIns}
+                    canEdit={player.permissions?.canEditBuyIns ?? false}
                     colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
@@ -708,7 +708,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={false}
-                    canEdit={isAdmin || currentPlayerInGame.permissions.canEditBuyIns}
+                    canEdit={currentPlayerInGame.permissions?.canEditBuyIns ?? false}
                     colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
                   />
             ) : (
@@ -981,7 +981,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={isAdmin ? false : !canEdit || (buyIn.verified && isOtpEnabled)}
+                    disabled={!isAdmin && (!canEdit || (buyIn.verified && isOtpEnabled))}
                 />
                 {isLastRow && (isAdmin || canEdit) && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -1077,11 +1077,12 @@ const PlayerCard: FC<{
     }
   }
 
+  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+  
   const togglePermissions = (canEdit: boolean) => {
     onUpdate(player.id, { permissions: { canEditBuyIns: canEdit } });
   };
 
-  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
   return (
     <Card className={cn("border-0 shadow-none", colorClass)}>
@@ -1119,8 +1120,18 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
-            disabled={isAdmin ? false : !canEdit}
+            disabled={!isAdmin && !canEdit}
           />
+          {isAdmin && (
+                <div className="flex items-center space-x-2 pt-4">
+                    <Switch
+                        id={`edit-permission-${player.id}`}
+                        checked={canEdit}
+                        onCheckedChange={togglePermissions}
+                    />
+                    <Label htmlFor={`edit-permission-${player.id}`}>Allow player to edit</Label>
+                </div>
+            )}
         </div>
       </CardContent>
       {isAdmin && (
@@ -2407,6 +2418,5 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
-
 
     
