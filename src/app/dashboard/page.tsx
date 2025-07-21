@@ -1059,24 +1059,28 @@ const PlayerCard: FC<{
 
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
-      <CardHeader className="flex-row items-center justify-between">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <span className="font-medium truncate">{player.name || "Unnamed Player"}</span>
-          </div>
-          <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon" disabled={!player.name} className="flex-shrink-0">
-            <ShieldAlert className="h-4 w-4" />
-            <span className="sr-only">Analyze</span>
-          </Button>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-            <p className="text-xl font-bold">{totalBuyIns}</p>
-            {isAdmin && <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}><Trash2 className="h-4 w-4" /></Button>}
-        </div>
-      </CardHeader>
+       <CardHeader className="flex-row items-start justify-between">
+            <CardTitle className="flex items-center gap-2">
+                {player.name || "Unnamed Player"}
+                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+            </CardTitle>
+            {isAdmin && (
+                <div className="flex items-center gap-2">
+                    <Switch
+                        id={`permissions-${player.id}`}
+                        checked={player.permissions.canEditBuyIns}
+                        onCheckedChange={togglePermissions}
+                        aria-label="Toggle edit permissions"
+                    />
+                    <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                        Allow Edit
+                    </Label>
+                </div>
+            )}
+        </CardHeader>
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="hidden md:inline-block text-lg mb-2">Buy-ins</Label>
+          <Label className="text-lg mb-2">Buy-ins</Label>
           <div className="space-y-2">
              {(player.buyIns || []).map((buyIn, index) => (
               <BuyInRow 
@@ -1111,16 +1115,16 @@ const PlayerCard: FC<{
         </div>
       </CardContent>
       {isAdmin && (
-        <CardFooter>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={`permissions-${player.id}`}
-              checked={player.permissions.canEditBuyIns}
-              onCheckedChange={togglePermissions}
-            />
-            <Label htmlFor={`permissions-${player.id}`}>Allow player to edit their own buy-ins</Label>
-          </div>
-        </CardFooter>
+           <CardFooter className="flex justify-between items-center">
+                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="sm">
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    <span>Analyze Buy-ins</span>
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => onRemove(player.id)}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove Player
+                </Button>
+            </CardFooter>
       )}
     </Card>
   )
