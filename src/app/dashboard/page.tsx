@@ -430,58 +430,13 @@ export default function ChipMaestroPage() {
               });
             }
 
-            // Check for unsaved game in localStorage first
-            const localGameStr = localStorage.getItem('activeGame');
-            let gameFound = false;
-            if (localGameStr) {
-                const localGame = JSON.parse(localGameStr);
-                if (isSameDay(new Date(localGame.timestamp), new Date())) {
-                    loadGameIntoState(localGame);
-                    gameFound = true;
-                }
-            }
-
-            // If no local game, check saved history
-            if (!gameFound) {
-                const todayGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), new Date()));
-                if (todayGame) {
-                    let playersToAdd: Player[] = [];
-                    const isUserInGame = todayGame.players.some(p => p.name === currentUser.name);
-
-                    if (!isUserInGame) {
-                        const newPlayer: Player = {
-                            id: `player-${Date.now()}-${currentUser.id}`,
-                            name: currentUser.name,
-                            whatsappNumber: currentUser.whatsappNumber,
-                            buyIns: [{ 
-                                id: `buyin-${Date.now()}-${currentUser.id}`,
-                                amount: 0, 
-                                timestamp: new Date().toISOString(), 
-                                verified: !isOtpVerificationEnabled 
-                            }],
-                            finalChips: 0,
-                        };
-                        playersToAdd.push(newPlayer);
-                        toast({ title: "Game Joined!", description: `You have been automatically added to today's game at ${todayGame.venue}.` });
-                    }
-                    loadGameIntoState(todayGame, playersToAdd);
-                    gameFound = true;
-                }
-            }
-            
-            // If still no game found for today, open load game modal
-            if (!gameFound) {
-                 if (isAdmin) {
-                    setVenueModalOpen(true); // Admins can start a new game
-                } else {
-                    setLoadGameModalOpen(true); // Players see past games
-                }
-            }
+            // Immediately show the load game modal to the user.
+            setLoadGameModalOpen(true);
 
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
             toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
-            if (isAdmin) setVenueModalOpen(true);
+            setLoadGameModalOpen(true); // Still open it on error so user isn't stuck.
         } finally {
             setIsDataReady(true);
         }
@@ -2788,3 +2743,6 @@ ${formattedTransfers}
 
 
 
+
+
+    
