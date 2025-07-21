@@ -1158,14 +1158,6 @@ const PlayerCard: FC<{
 
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
-  const otherPlayerNames = useMemo(() => 
-    allPlayers
-      .filter(p => p.id !== player.id)
-      .map(p => p.name)
-      .filter(Boolean),
-    [allPlayers, player.id]
-  );
-
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between">
@@ -1179,11 +1171,16 @@ const PlayerCard: FC<{
               <SelectValue placeholder="Select Player" />
             </SelectTrigger>
             <SelectContent>
+              {player.name && !masterPlayers.some(mp => mp.name === player.name) && (
+                <SelectItem key="current-player" value={player.name}>
+                  {player.name}
+                </SelectItem>
+              )}
               {masterPlayers.map(mp => (
                 <SelectItem 
                   key={mp.id} 
                   value={mp.name}
-                  disabled={otherPlayerNames.includes(mp.name)}
+                  disabled={allPlayers.some(p => p.name === mp.name && p.id !== player.id)}
                 >
                   {mp.name}
                 </SelectItem>
