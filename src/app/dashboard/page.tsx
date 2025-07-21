@@ -1143,7 +1143,7 @@ const PlayerCard: FC<{
   
   const removeBuyIn = (buyInId: string) => {
     if ((player.buyIns || []).length > 1) {
-      const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId)
+      const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
       onUpdate(player.id, { buyIns: newBuyIns })
     } else {
         toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
@@ -2001,11 +2001,11 @@ const ReportsDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-6xl max-h-[90vh]">
-                <DialogHeader className="mb-4 flex-row items-start justify-between">
+            <DialogContent className="max-w-md md:max-w-6xl max-h-[90vh]">
+                <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="space-y-1">
-                        <DialogTitle className="text-3xl">Game Report: {activeGame.venue}</DialogTitle>
-                        <DialogDescription className="text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                        <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
+                        <DialogDescription className="text-base sm:text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
                          {activeGame.startTime && (
                             <p className="text-sm text-muted-foreground">
                                 Started: {format(new Date(activeGame.startTime), 'p')}
@@ -2013,23 +2013,23 @@ const ReportsDialog: FC<{
                             </p>
                         )}
                     </div>
-                     <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2 flex-wrap">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                             <span className="ml-2">Export PDF</span>
+                             <span className="ml-2 hidden sm:inline">Export PDF</span>
                         </Button>
                         <Button onClick={onSettleUp}>
                             <WhatsappIcon />
-                            <span className="ml-2">Settlement</span>
+                            <span className="ml-2 hidden sm:inline">Settlement</span>
                         </Button>
                         <DialogClose asChild>
-                           <Button variant="outline">Close</Button>
+                           <Button variant="outline" size="icon" className="sm:hidden"><X /></Button>
                         </DialogClose>
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             
                             <Card className="lg:col-span-2"><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
                                  <Table><TableHeader><TableRow>
@@ -2059,13 +2059,13 @@ const ReportsDialog: FC<{
                                  </Table>
                              </CardContent></Card>
 
-                             <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
+                             <Card className="lg:col-span-1"><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
                                 {transfers.length > 0 ? transfers.map((t, i) => (
                                     <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
                                 )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
                             </CardContent></Card>
                             
-                            <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
+                            <Card className="lg:col-span-2"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <BarChart data={barChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
@@ -2093,7 +2093,7 @@ const ReportsDialog: FC<{
                                 </ResponsiveContainer>
                             </CardContent></Card>
 
-                            <Card><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
+                            <Card className="lg:col-span-1"><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
                                 <ChipDistributionChart data={pieChartData} />
                             </CardContent></Card>
                         </div>
@@ -2730,14 +2730,3 @@ ${formattedTransfers}
         </Dialog>
     );
 };
-
-
-
-
-
-    
-
-
-
-
-

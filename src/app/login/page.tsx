@@ -117,7 +117,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center">
             <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
                 <KeyRound className="h-8 w-8 text-primary-foreground" />
