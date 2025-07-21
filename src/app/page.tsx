@@ -77,7 +77,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
 import { cn } from "@/lib/utils"
 import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/game-service"
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/services/player-service"
@@ -1644,7 +1644,13 @@ const ReportsDialog: FC<{
             });
 
             pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-            pdf.save(`${activeGame.venue.replace(/\s/g, '_')}_report.pdf`);
+            
+            const venueName = activeGame.venue.replace(/\s/g, '_');
+            const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
+            const playerCount = activeGame.players.length;
+            const filename = `${venueName}_${gameDate}_${playerCount}-players.pdf`;
+            
+            pdf.save(filename);
             toast({ title: "Success", description: "Report has been exported as a PDF." });
         } catch (error) {
             console.error("Failed to export PDF:", error);
@@ -1748,13 +1754,12 @@ const ReportsDialog: FC<{
 
                             <Card><CardHeader><CardTitle>Buy-in vs. Profit/Loss</CardTitle></CardHeader><CardContent>
                                <ResponsiveContainer width="100%" height={300}>
-                                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                <BarChart data={scatterData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                                     <CartesianGrid />
                                     <XAxis type="number" dataKey="x" name="Total Buy-in" unit=" " label={{ value: 'Total Buy-in', position: 'insideBottom', offset: -15 }}/>
                                     <YAxis type="number" dataKey="y" name="Profit/Loss" unit=" " label={{ value: 'Profit/Loss', angle: -90, position: 'insideLeft' }}/>
-                                    <ZAxis type="number" dataKey="z" range={[100, 1000]} name="magnitude" />
                                     <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ payload }) => {
-                                         if (!payload || payload.length < 2) return null;
+                                         if (!payload || payload.length < 1) return null;
                                          const data = payload[0].payload;
                                          return (
                                             <div className="bg-background border p-2 rounded-md shadow-lg">
@@ -1765,8 +1770,8 @@ const ReportsDialog: FC<{
                                          )
                                     }}/>
                                     <Legend />
-                                    <Scatter name="Players" data={scatterData} fill="#8884d8" />
-                                </ScatterChart>
+                                    <Bar dataKey="y" name="Players" fill="#8884d8" />
+                                </BarChart>
                                </ResponsiveContainer>
                             </CardContent></Card>
 
