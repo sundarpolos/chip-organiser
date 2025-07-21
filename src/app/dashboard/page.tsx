@@ -905,6 +905,7 @@ export default function ChipMaestroPage() {
         onOpenChange={setManagePlayersModalOpen}
         masterPlayers={masterPlayers}
         setMasterPlayers={setMasterPlayers}
+        currentUser={currentUser}
         toast={toast}
       />
       <LoadGameDialog 
@@ -1470,8 +1471,9 @@ const ManagePlayersDialog: FC<{
     onOpenChange: (open: boolean) => void,
     masterPlayers: MasterPlayer[],
     setMasterPlayers: (players: MasterPlayer[] | ((prev: MasterPlayer[]) => MasterPlayer[])) => void,
+    currentUser: MasterPlayer | null,
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, toast }) => {
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, toast }) => {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [name, setName] = useState("");
     const [countryCode, setCountryCode] = useState("91");
@@ -1613,7 +1615,7 @@ const ManagePlayersDialog: FC<{
                         <Input placeholder="10-digit mobile" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} />
                     </div>
                     <div className="flex items-center space-x-2 pt-2">
-                        <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} />
+                        <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id} />
                         <Label htmlFor="admin-switch">Make this player an Admin</Label>
                     </div>
                     <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
@@ -1629,6 +1631,7 @@ const ManagePlayersDialog: FC<{
                                             id={`select-${p.id}`}
                                             checked={selectedPlayers.includes(p.id)}
                                             onCheckedChange={(checked) => handleSelectPlayer(p.id, !!checked)}
+                                            disabled={p.id === currentUser?.id}
                                         />
                                         <div className="grid grid-cols-2 gap-4 flex-1">
                                             <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">{p.name} {p.isAdmin && <UserCog className="h-3 w-3 text-primary"/>}</div>
@@ -1637,7 +1640,7 @@ const ManagePlayersDialog: FC<{
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="icon" variant="ghost" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
-                                        <Button size="icon" variant="destructive" onClick={() => handleSingleRemove(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                                        <Button size="icon" variant="destructive" onClick={() => handleSingleRemove(p.id)} disabled={p.id === currentUser?.id}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
                             ))}
