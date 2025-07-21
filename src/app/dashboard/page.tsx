@@ -1107,49 +1107,49 @@ const PlayerCard: FC<{
       </CardContent>
       {isAdmin && (
            <CardFooter className="flex flex-wrap gap-4 justify-between items-center">
-                <div className="flex gap-2 items-center">
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
-                                    <ShieldAlert className="h-4 w-4" />
-                                    <span className="sr-only">Analyze Buy-ins</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Analyze Buy-ins</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                     <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="sr-only">Remove Player</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Remove Player</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+            <div className="flex items-center gap-4">
+                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+                 <div className="flex items-center gap-2">
+                    <Switch
+                        id={`permissions-${player.id}`}
+                        checked={player.permissions.canEditBuyIns}
+                        onCheckedChange={togglePermissions}
+                        aria-label="Toggle edit permissions"
+                    />
+                    <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                        Allow Edit
+                    </Label>
                 </div>
-                <div className="flex items-center gap-4">
-                    <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
-                     <div className="flex items-center gap-2">
-                        <Switch
-                            id={`permissions-${player.id}`}
-                            checked={player.permissions.canEditBuyIns}
-                            onCheckedChange={togglePermissions}
-                            aria-label="Toggle edit permissions"
-                        />
-                        <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                            Allow Edit
-                        </Label>
-                    </div>
-                </div>
-            </CardFooter>
+            </div>
+            <div className="flex gap-2 items-center">
+                 <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
+                                <ShieldAlert className="h-4 w-4" />
+                                <span className="sr-only">Analyze Buy-ins</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Analyze Buy-ins</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                 <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Remove Player</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Remove Player</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
+        </CardFooter>
       )}
     </Card>
   )
