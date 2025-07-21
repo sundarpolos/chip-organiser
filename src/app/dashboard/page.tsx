@@ -352,7 +352,7 @@ export default function ChipMaestroPage() {
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
           finalChips: 0,
-          permissions: { canEditBuyIns: isAdmin },
+          permissions: { canEditBuyIns: true },
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -655,7 +655,6 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
-                    canEdit={isAdmin || (player.permissions?.canEditBuyIns ?? false)}
                     colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
@@ -707,7 +706,6 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={false}
-                    canEdit={currentPlayerInGame.permissions?.canEditBuyIns ?? false}
                     colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
                   />
             ) : (
@@ -894,10 +892,9 @@ const BuyInRow: FC<{
     onAddBuyIn: () => void;
     isOtpEnabled: boolean;
     whatsappConfig: WhatsappConfig;
-    canEdit: boolean;
     isAdmin: boolean;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, canEdit, isAdmin, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -980,6 +977,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
+                    disabled={!isAdmin}
                 />
                 {isLastRow && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -1039,10 +1037,9 @@ const PlayerCard: FC<{
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
   isAdmin: boolean;
-  canEdit: boolean;
   colorClass: string;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, canEdit, colorClass, toast }) => {
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, colorClass, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -1098,7 +1095,6 @@ const PlayerCard: FC<{
                 onAddBuyIn={addBuyIn}
                 isOtpEnabled={isOtpEnabled}
                 whatsappConfig={whatsappConfig}
-                canEdit={canEdit}
                 isAdmin={isAdmin}
                 toast={toast}
               />
@@ -1113,6 +1109,7 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
+            disabled={!isAdmin}
           />
         </div>
       </CardContent>
@@ -2405,4 +2402,5 @@ const SaveConfirmDialog: FC<{
     
 
     
+
 
