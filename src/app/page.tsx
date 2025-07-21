@@ -82,7 +82,8 @@ import { cn } from "@/lib/utils"
 import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/game-service"
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/services/player-service"
 import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
-import { checkDbConnection } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { getDoc, doc } from "firebase/firestore";
 
 
 const WhatsappIcon = () => (
@@ -103,6 +104,21 @@ const WhatsappIcon = () => (
   );
 
 type DbStatus = 'checking' | 'connected' | 'error';
+
+// Function to check database connectivity moved here
+async function checkDbConnection(): Promise<boolean> {
+    try {
+        // We try to get a document that doesn't exist.
+        // This won't throw an error if the doc is not found, but it will fail
+        // if the connection or credentials are bad.
+        await getDoc(doc(db, "connectivity_test", "test_doc"));
+        console.log("Firestore connection successful.");
+        return true;
+    } catch (error) {
+        console.error("Firestore connection failed:", error);
+        return false;
+    }
+}
 
 export default function ChipMaestroPage() {
   const { toast } = useToast()
@@ -2240,3 +2256,4 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
+
