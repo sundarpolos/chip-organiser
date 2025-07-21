@@ -2492,6 +2492,7 @@ const SettlementDialog: FC<{
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
+    const [progress, setProgress] = useState(0);
 
     const playersWithNumbers = useMemo(() => {
         if (!activeGame) return [];
@@ -2508,6 +2509,7 @@ const SettlementDialog: FC<{
             setSelectedPlayerIds(playersWithNumbers.map(p => p.id));
             setIsSending(false);
             setSendingStatus(null);
+            setProgress(0);
         }
     }, [isOpen, playersWithNumbers]);
 
@@ -2521,29 +2523,34 @@ const SettlementDialog: FC<{
         setSelectedPlayerIds(isChecked ? playersWithNumbers.map(p => p.id) : []);
     };
     
-    const formatTransfersForWhatsapp = (transfers: string[]): string => {
+    const formatTransfersForWhatsapp = (game: GameHistory, transfers: string[]): string => {
+        const venueLine = `*Venue:* ${game.venue}`;
+        const dateLine = `*Date:* ${format(new Date(game.timestamp), "dd MMMM yyyy")}`;
+        
         if (transfers.length === 0) {
-            return "No transfers needed. Everyone is settled up!";
+            return `${venueLine}\n${dateLine}\n\nNo transfers needed. Everyone is settled up!`;
         }
-        // Replace HTML tags with WhatsApp formatting
-        const formatted = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*')).join('\n');
-        return `\`\`\`
+        
+        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*')).join('\n');
+
+        return `${venueLine}\n${dateLine}\n\n\`\`\`
 -----------------------
 |  Payment Transfers  |
 -----------------------
-${formatted}
+${formattedTransfers}
 \`\`\``;
     };
 
     const handleSend = async () => {
-        if (selectedPlayerIds.length === 0) {
+        if (!activeGame || selectedPlayerIds.length === 0) {
             toast({ variant: 'destructive', title: 'No players selected', description: 'Please select at least one player to notify.' });
             return;
         }
 
         setIsSending(true);
+        setProgress(0);
         const playersToSend = playersWithNumbers.filter(p => selectedPlayerIds.includes(p.id));
-        const message = formatTransfersForWhatsapp(transfers);
+        const message = formatTransfersForWhatsapp(activeGame, transfers);
         
         const totalToSend = playersToSend.length;
         let successfulSends = 0;
@@ -2570,10 +2577,12 @@ ${formatted}
                 failedSends++;
                 console.error(`Exception while sending to ${player.name}:`, error);
             }
+            
+            setProgress(((i + 1) / totalToSend) * 100);
 
-            // Wait for 15 seconds before sending the next message, unless it's the last one
+            // Wait for 30 seconds before sending the next message, unless it's the last one
             if (i < totalToSend - 1) {
-                await new Promise(resolve => setTimeout(resolve, 15000));
+                await new Promise(resolve => setTimeout(resolve, 30000));
             }
         }
         
@@ -2597,7 +2606,7 @@ ${formatted}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Send Settlement Details</DialogTitle>
-                    <DialogDescription>Select players to notify via WhatsApp. A 15s delay will be applied between messages.</DialogDescription>
+                    <DialogDescription>Select players to notify via WhatsApp. A 30s delay will be applied between messages.</DialogDescription>
                 </DialogHeader>
                  <div className="space-y-4">
                     <div className="space-y-2">
@@ -2628,10 +2637,15 @@ ${formatted}
                             )}
                         </ScrollArea>
                     </div>
-                    {isSending && sendingStatus && (
-                        <div className="flex items-center gap-2 text-sm text-primary">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <p>{sendingStatus}</p>
+                    {isSending && (
+                        <div className="space-y-2">
+                            <Progress value={progress} />
+                            {sendingStatus && (
+                                <div className="flex items-center gap-2 text-sm text-primary">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <p>{sendingStatus}</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
