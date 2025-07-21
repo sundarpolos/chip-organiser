@@ -369,7 +369,7 @@ export default function ChipMaestroPage() {
         if (availablePlayers.length === 0) {
             newPlayer = {
                 id: `player-${Date.now()}`,
-                name: `Player ${players.length + 1}`,
+                name: ``, // Start with an empty name for new blank players
                 whatsappNumber: "",
                 buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
                 finalChips: 0,
@@ -1158,14 +1158,13 @@ const PlayerCard: FC<{
 
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
-  const availableMasterPlayers = useMemo(() => {
-    const currentInGamePlayerNames = allPlayers
+  const otherPlayerNames = useMemo(() => 
+    allPlayers
       .filter(p => p.id !== player.id)
       .map(p => p.name)
-      .filter(Boolean);
-    return masterPlayers.filter(mp => !currentInGamePlayerNames.includes(mp.name));
-  }, [masterPlayers, allPlayers, player.id]);
-
+      .filter(Boolean),
+    [allPlayers, player.id]
+  );
 
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
@@ -1180,11 +1179,14 @@ const PlayerCard: FC<{
               <SelectValue placeholder="Select Player" />
             </SelectTrigger>
             <SelectContent>
-              {player.name && !availableMasterPlayers.some(p => p.name === player.name) && (
-                <SelectItem value={player.name}>{player.name}</SelectItem>
-              )}
-              {availableMasterPlayers.map(mp => (
-                <SelectItem key={mp.id} value={mp.name}>{mp.name}</SelectItem>
+              {masterPlayers.map(mp => (
+                <SelectItem 
+                  key={mp.id} 
+                  value={mp.name}
+                  disabled={otherPlayerNames.includes(mp.name)}
+                >
+                  {mp.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
