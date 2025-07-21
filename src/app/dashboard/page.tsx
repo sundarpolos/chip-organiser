@@ -125,6 +125,7 @@ export default function ChipMaestroPage() {
   const [gameDate, setGameDate] = useState<Date>(new Date())
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+  const [greeting, setGreeting] = useState('');
 
 
   // Master Data State
@@ -179,6 +180,22 @@ export default function ChipMaestroPage() {
       router.replace('/login');
     }
   }, [router]);
+
+  // Set greeting message
+  useEffect(() => {
+    if (currentUser) {
+      const messages = [
+        `Go get 'em, ${currentUser.name}!`,
+        `Today's your day, ${currentUser.name}!`,
+        `Stack those chips, ${currentUser.name}!`,
+        `Time to crush it, ${currentUser.name}!`,
+        `Let's see that winner's smile, ${currentUser.name}!`
+      ];
+      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+      setGreeting(randomMessage);
+    }
+  }, [currentUser]);
+
 
   // Load data from Firestore on initial render
   useEffect(() => {
@@ -720,17 +737,19 @@ export default function ChipMaestroPage() {
       <header className="flex justify-between items-start mb-6 gap-4">
         <div>
            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold truncate">{currentVenue}</h1>
-              <span className="text-lg font-semibold text-muted-foreground">Hi, {currentUser?.name}</span>
+              <h1 className="text-xl font-semibold truncate">{greeting}</h1>
            </div>
-          <div className="text-sm text-muted-foreground flex items-center gap-4">
-              <span>{format(gameDate, "dd/MMM/yy")}</span>
-              {gameStartTime && (
-                  <div className="flex items-center gap-1">
-                      <TimerIcon className="h-4 w-4" />
-                      <span>{gameDuration}</span>
-                  </div>
-              )}
+          <div className="text-sm text-muted-foreground flex flex-col items-start gap-1 mt-1">
+              <div className="flex items-center gap-4">
+                <span>{format(gameDate, "dd MMMM yyyy")}</span>
+                {gameStartTime && (
+                    <div className="flex items-center gap-1">
+                        <TimerIcon className="h-4 w-4" />
+                        <span>{gameDuration}</span>
+                    </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground/80">{currentVenue}</p>
           </div>
         </div>
         
