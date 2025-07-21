@@ -154,6 +154,7 @@ export default function ChipMaestroPage() {
   const [isWhatsappSettingsModalOpen, setWhatsappSettingsModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -352,47 +353,23 @@ export default function ChipMaestroPage() {
     router.replace('/login');
   };
 
-  const addNewPlayer = (playerToAdd: MasterPlayer | null = null) => {
-    let newPlayer: Player;
+  const addPlayers = (playersToAdd: MasterPlayer[]) => {
+      const newPlayers: Player[] = playersToAdd.map(playerToAdd => ({
+          id: `player-${Date.now()}-${playerToAdd.id}`,
+          name: playerToAdd.name,
+          whatsappNumber: playerToAdd.whatsappNumber,
+          buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
+          finalChips: 0,
+          permissions: { canEditBuyIns: false },
+      }));
+      
+      const updatedPlayers = [...players, ...newPlayers];
+      setPlayers(updatedPlayers);
+      if (activeTab === "" && newPlayers.length > 0) {
+          setActiveTab(newPlayers[0].id);
+      }
+  };
 
-    if (playerToAdd) {
-        newPlayer = {
-            id: `player-${Date.now()}`,
-            name: playerToAdd.name,
-            whatsappNumber: playerToAdd.whatsappNumber,
-            buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
-            finalChips: 0,
-            permissions: { canEditBuyIns: false },
-        };
-    } else {
-        const availablePlayers = masterPlayers.filter(mp => !players.some(p => p.name === mp.name));
-        if (availablePlayers.length === 0) {
-            newPlayer = {
-                id: `player-${Date.now()}`,
-                name: ``, // Start with an empty name for new blank players
-                whatsappNumber: "",
-                buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
-                finalChips: 0,
-                permissions: { canEditBuyIns: false },
-            };
-        } else {
-            const masterPlayer = availablePlayers[0];
-            newPlayer = {
-                id: `player-${Date.now()}`,
-                name: masterPlayer.name,
-                whatsappNumber: masterPlayer.whatsappNumber,
-                buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
-                finalChips: 0,
-                permissions: { canEditBuyIns: false },
-            };
-        }
-    }
-
-    const updatedPlayers = [...players, newPlayer];
-    setPlayers(updatedPlayers);
-    setActiveTab(newPlayer.id);
-};
-  
   const removePlayer = (idToRemove: string) => {
     const updatedPlayers = players.filter(p => p.id !== idToRemove)
     setPlayers(updatedPlayers)
@@ -540,7 +517,7 @@ export default function ChipMaestroPage() {
     setGameEndTime(null);
     setVenueModalOpen(false);
     if (players.length === 0) {
-      addNewPlayer();
+      setAddPlayerModalOpen(true);
     }
   }
 
@@ -737,30 +714,15 @@ export default function ChipMaestroPage() {
           ) : (
              <div className="text-center py-10">
                 <p className="text-muted-foreground mb-4">No players in the game.</p>
-                <Button onClick={() => addNewPlayer()}><Plus className="mr-2 h-4 w-4"/>Add First Player</Button>
+                <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4"/>Add Players</Button>
              </div>
           )}
         </CardContent>
         <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
             <div className="flex gap-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button><Plus className="mr-2 h-4 w-4" />Add Player</Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        {availablePlayersForDropdown.length > 0 ? (
-                            availablePlayersForDropdown.map(p => (
-                                <DropdownMenuItem key={p.id} onClick={() => addNewPlayer(p)}>
-                                    {p.name}
-                                </DropdownMenuItem>
-                            ))
-                        ) : (
-                            <DropdownMenuItem disabled>No available players</DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => addNewPlayer(null)}>Add new blank player</DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <Button onClick={() => setAddPlayerModalOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                </Button>
 
               {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame || dbStatus !== 'connected'}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
             </div>
@@ -906,6 +868,14 @@ export default function ChipMaestroPage() {
         masterPlayers={masterPlayers}
         setMasterPlayers={setMasterPlayers}
         currentUser={currentUser}
+        toast={toast}
+      />
+       <AddPlayerDialog
+        isOpen={isAddPlayerModalOpen}
+        onOpenChange={setAddPlayerModalOpen}
+        masterPlayers={masterPlayers}
+        gamePlayers={players}
+        onAddPlayers={addPlayers}
         toast={toast}
       />
       <LoadGameDialog 
@@ -1659,6 +1629,94 @@ const ManagePlayersDialog: FC<{
         </Dialog>
     )
 }
+
+const AddPlayerDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  masterPlayers: MasterPlayer[];
+  gamePlayers: Player[];
+  onAddPlayers: (players: MasterPlayer[]) => void;
+  toast: (options: { variant?: 'default' | 'destructive' | null; title: string; description: string }) => void;
+}> = ({ isOpen, onOpenChange, masterPlayers, gamePlayers, onAddPlayers, toast }) => {
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+
+  const availablePlayers = useMemo(() => {
+    const gamePlayerNames = gamePlayers.map(p => p.name);
+    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name));
+  }, [masterPlayers, gamePlayers]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedPlayerIds([]);
+    }
+  }, [isOpen]);
+
+  const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedPlayerIds(prev => [...prev, playerId]);
+    } else {
+      setSelectedPlayerIds(prev => prev.filter(id => id !== playerId));
+    }
+  };
+
+  const handleConfirmAdd = () => {
+    if (selectedPlayerIds.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Players Selected',
+        description: 'Please select at least one player to add.',
+      });
+      return;
+    }
+    const playersToAdd = masterPlayers.filter(mp => selectedPlayerIds.includes(mp.id));
+    onAddPlayers(playersToAdd);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Players to Game</DialogTitle>
+          <DialogDescription>Select players from your master list to add to the current game.</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          {availablePlayers.length > 0 ? (
+            <ScrollArea className="h-60 border rounded-md p-2">
+              <div className="space-y-2">
+                {availablePlayers.map(player => (
+                  <div key={player.id} className="flex items-center space-x-3 p-1">
+                    <Checkbox
+                      id={`add-${player.id}`}
+                      checked={selectedPlayerIds.includes(player.id)}
+                      onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                    />
+                    <Label htmlFor={`add-${player.id}`} className="flex-1 cursor-pointer">
+                      {player.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="flex h-40 items-center justify-center text-muted-foreground">
+              <p>All master players are already in the game.</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleConfirmAdd} disabled={selectedPlayerIds.length === 0}>
+            Add {selectedPlayerIds.length > 0 ? selectedPlayerIds.length : ''} Player(s)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 const LoadGameDialog: FC<{
   isOpen: boolean;
