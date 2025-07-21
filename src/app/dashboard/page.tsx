@@ -367,11 +367,10 @@ export default function ChipMaestroPage() {
     }
   }, [currentUser]);
 
-  const loadGameIntoState = useCallback((gameToLoad: GameHistory, newPlayers: Player[] = []) => {
-      const allPlayers = [...gameToLoad.players, ...newPlayers];
+  const loadGameIntoState = useCallback((gameToLoad: GameHistory) => {
       setCurrentVenue(gameToLoad.venue);
       setGameDate(new Date(gameToLoad.timestamp));
-      setPlayers(allPlayers.map(p => ({
+      setPlayers(gameToLoad.players.map(p => ({
         id: p.id,
         name: p.name,
         whatsappNumber: p.whatsappNumber,
@@ -384,12 +383,12 @@ export default function ChipMaestroPage() {
       setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
       setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
 
-      if (allPlayers.length > 0) {
-        const currentUserInGame = allPlayers.find(p => p.name === currentUser?.name);
+      if (gameToLoad.players.length > 0) {
+        const currentUserInGame = gameToLoad.players.find(p => p.name === currentUser?.name);
         if (currentUserInGame) {
           setActiveTab(currentUserInGame.id);
         } else {
-          setActiveTab(allPlayers[0].id);
+          setActiveTab(gameToLoad.players[0].id);
         }
       }
   }, [currentUser]);
@@ -430,7 +429,6 @@ export default function ChipMaestroPage() {
               });
             }
 
-            // Immediately show the load game modal to the user.
             setLoadGameModalOpen(true);
 
         } catch (error) {
@@ -442,14 +440,15 @@ export default function ChipMaestroPage() {
         }
     }
     loadInitialData();
-  }, [toast, currentUser, isAdmin, loadGameIntoState, isOtpVerificationEnabled]);
+  }, [toast, currentUser]);
 
 
   // Persist non-firestore data to localStorage whenever they change
   useEffect(() => {
     if(!isDataReady) return;
     localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
-  }, [isOtpVerificationEnabled, isDataReady])
+    localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig));
+  }, [isOtpVerificationEnabled, whatsappConfig, isDataReady])
 
   // Game timer effect
   useEffect(() => {
