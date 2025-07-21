@@ -21,6 +21,7 @@ export interface MasterPlayer {
   id: string;
   name: string;
   whatsappNumber: string;
+  // isAdmin?: boolean; // Future use for role-based access
 }
 
 export interface MasterVenue {
