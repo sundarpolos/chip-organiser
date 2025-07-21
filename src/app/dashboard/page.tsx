@@ -145,67 +145,73 @@ const AdminView: FC<{
     players, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
     isOtpVerificationEnabled, whatsappConfig, isAdmin, setAddPlayerModalOpen,
     activeGame, setSaveConfirmOpen, setReportsModalOpen, toast
-}) => (
-    <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-        <section className="md:col-span-2 mb-8 md:mb-0">
-            <Card>
-                <CardContent className="pt-6">
-                    {players.length > 0 ? (
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="h-auto flex flex-wrap justify-start -m-1">
-                                {players.map((p, index) => (
-                                    <TabsTrigger
-                                        key={p.id}
-                                        value={p.id}
-                                        className={cn(
-                                            "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
-                                            `${tabColors[index % tabColors.length]}`,
-                                            "data-[state=active]:ring-2 data-[state=active]:ring-ring"
-                                        )}
-                                    >
-                                        {p.name || "New Player"}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                            {players.map((player, index) => (
-                                <TabsContent key={player.id} value={player.id}>
-                                    <PlayerCard
-                                        player={player}
-                                        onUpdate={updatePlayer}
-                                        onRemove={removePlayer}
-                                        onRunAnomalyCheck={handleRunAnomalyDetection}
-                                        isOtpEnabled={isOtpVerificationEnabled}
-                                        whatsappConfig={whatsappConfig}
-                                        isAdmin={isAdmin}
-                                        colorClass={player.id === activeTab ? tabColors[index % tabColors.length] : ''}
-                                        toast={toast}
-                                    />
-                                </TabsContent>
-                            ))}
-                        </Tabs>
-                    ) : (
-                        <div className="text-center py-10">
-                            <p className="text-muted-foreground mb-4">No players in the game.</p>
-                            <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
+}) => {
+    const activePlayer = useMemo(() => players.find(p => p.id === activeTab), [players, activeTab]);
+    const activePlayerIndex = useMemo(() => players.findIndex(p => p.id === activeTab), [players, activeTab]);
+
+    return (
+        <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
+            <section className="md:col-span-2 mb-8 md:mb-0">
+                <Card>
+                    <CardContent className="pt-6">
+                        {players.length > 0 ? (
+                            <div className="w-full">
+                                <div className="p-2 bg-muted/50 rounded-lg flex flex-wrap -m-1">
+                                    {players.map((p, index) => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => setActiveTab(p.id)}
+                                            className={cn(
+                                                "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 rounded-md transition-all",
+                                                activeTab === p.id 
+                                                    ? `${tabColors[index % tabColors.length]} ring-2 ring-ring font-semibold` 
+                                                    : "bg-background hover:bg-muted"
+                                            )}
+                                        >
+                                            {p.name || "New Player"}
+                                        </button>
+                                    ))}
+                                </div>
+                                {activePlayer && (
+                                    <div className={cn("mt-4 p-4 rounded-b-lg -m-4 -mt-0", tabColors[activePlayerIndex % tabColors.length])}>
+                                        <PlayerCard
+                                            player={activePlayer}
+                                            onUpdate={updatePlayer}
+                                            onRemove={removePlayer}
+                                            onRunAnomalyCheck={handleRunAnomalyDetection}
+                                            isOtpEnabled={isOtpVerificationEnabled}
+                                            whatsappConfig={whatsappConfig}
+                                            isAdmin={isAdmin}
+                                            toast={toast}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-muted-foreground mb-4">No players in the game.</p>
+                                <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
+                            </div>
+                        )}
+                    </CardContent>
+                    <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
+                        <div className="flex gap-2">
+                            <Button onClick={() => setAddPlayerModalOpen(true)}>
+                                <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                            </Button>
+                            {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
                         </div>
-                    )}
-                </CardContent>
-                <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
-                    <div className="flex gap-2">
-                        <Button onClick={() => setAddPlayerModalOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4" />Add Player(s)
-                        </Button>
-                        {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
-                    </div>
-                    <div className="flex gap-2">
-                        <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
-                    </div>
-                </CardFooter>
-            </Card>
-        </section>
-        <SummaryView activeGame={activeGame} />
-    </main>
-);
+                        <div className="flex gap-2">
+                            <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                        </div>
+                    </CardFooter>
+                </Card>
+            </section>
+            <SummaryView activeGame={activeGame} />
+        </main>
+    );
+};
+
 
 const PlayerView: FC<{
     currentUser: MasterPlayer;
@@ -228,17 +234,18 @@ const PlayerView: FC<{
         <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
             <section className="md:col-span-2 mb-8 md:mb-0">
                 {currentPlayerInGame ? (
-                    <PlayerCard
-                        player={currentPlayerInGame}
-                        onUpdate={updatePlayer}
-                        onRemove={() => { }} // Players cannot remove themselves
-                        onRunAnomalyCheck={handleRunAnomalyDetection}
-                        toast={toast}
-                        isOtpEnabled={isOtpVerificationEnabled}
-                        whatsappConfig={whatsappConfig}
-                        isAdmin={false}
-                        colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
-                    />
+                     <div className={cn("p-4 rounded-lg", tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length])}>
+                        <PlayerCard
+                            player={currentPlayerInGame}
+                            onUpdate={updatePlayer}
+                            onRemove={() => { }} // Players cannot remove themselves
+                            onRunAnomalyCheck={handleRunAnomalyDetection}
+                            toast={toast}
+                            isOtpEnabled={isOtpVerificationEnabled}
+                            whatsappConfig={whatsappConfig}
+                            isAdmin={false}
+                        />
+                    </div>
                 ) : (
                     <Card>
                         <CardHeader>
@@ -1112,9 +1119,8 @@ const PlayerCard: FC<{
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
   isAdmin: boolean;
-  colorClass: string;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, colorClass, toast }) => {
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
   
   const handleBuyInChange = (buyInId: string, newAmount: number) => {
     const newBuyIns = (player.buyIns || []).map(b => 
@@ -1160,80 +1166,79 @@ const PlayerCard: FC<{
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
   
   return (
-    <Card className={cn("border-0 shadow-none", colorClass)}>
-       
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label className="text-lg mb-2">Buy-ins</Label>
-          <div className="space-y-2">
-             {(player.buyIns || []).map((buyIn, index) => (
-              <BuyInRow 
-                key={buyIn.id}
-                buyIn={buyIn}
-                index={index}
-                player={player}
-                canBeRemoved={(player.buyIns || []).length > 1}
-                isLastRow={index === (player.buyIns || []).length - 1}
-                onBuyInChange={handleBuyInChange}
-                onRemoveBuyIn={removeBuyIn}
-                onVerify={handleVerifyBuyIn}
-                onAddBuyIn={addBuyIn}
-                isOtpEnabled={isOtpEnabled}
-                whatsappConfig={whatsappConfig}
-                isAdmin={isAdmin}
-                toast={toast}
-              />
-            ))}
-          </div>
-        </div>
-        <div>
-          <Label className="text-lg">Final Chips</Label>
-          <Input 
-            type="number" 
-            className="mt-2 h-9" 
-            value={player.finalChips === 0 ? "" : player.finalChips}
-            onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
-            placeholder="Chip Count"
-            disabled={!isAdmin}
-          />
-        </div>
-      </CardContent>
-      {isAdmin && (
-           <CardFooter className="flex flex-wrap gap-4 justify-between items-center">
-            <div className="flex items-center gap-4">
-                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+    <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+            <Label className="text-lg mb-2">Buy-ins</Label>
+            <div className="space-y-2">
+                {(player.buyIns || []).map((buyIn, index) => (
+                <BuyInRow 
+                    key={buyIn.id}
+                    buyIn={buyIn}
+                    index={index}
+                    player={player}
+                    canBeRemoved={(player.buyIns || []).length > 1}
+                    isLastRow={index === (player.buyIns || []).length - 1}
+                    onBuyInChange={handleBuyInChange}
+                    onRemoveBuyIn={removeBuyIn}
+                    onVerify={handleVerifyBuyIn}
+                    onAddBuyIn={addBuyIn}
+                    isOtpEnabled={isOtpEnabled}
+                    whatsappConfig={whatsappConfig}
+                    isAdmin={isAdmin}
+                    toast={toast}
+                />
+                ))}
             </div>
-            <div className="flex gap-2 items-center">
-                 <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
-                                <ShieldAlert className="h-4 w-4" />
-                                <span className="sr-only">Analyze Buy-ins</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Analyze Buy-ins</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-                 <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
-                                <Trash2 className="h-4 w-4" />
-                                <span className="sr-only">Remove Player</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Remove Player</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
             </div>
-        </CardFooter>
-      )}
-    </Card>
+            <div>
+            <Label className="text-lg">Final Chips</Label>
+            <Input 
+                type="number" 
+                className="mt-2 h-9" 
+                value={player.finalChips === 0 ? "" : player.finalChips}
+                onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
+                placeholder="Chip Count"
+                disabled={!isAdmin}
+            />
+            </div>
+        </div>
+        {isAdmin && (
+            <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
+                <div className="flex items-center gap-4">
+                    <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+                </div>
+                <div className="flex gap-2 items-center">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
+                                    <ShieldAlert className="h-4 w-4" />
+                                    <span className="sr-only">Analyze Buy-ins</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Analyze Buy-ins</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Remove Player</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Remove Player</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+            </div>
+        )}
+    </div>
   )
 }
 
@@ -2744,4 +2749,5 @@ ${formattedTransfers}
 
 
     
+
 
