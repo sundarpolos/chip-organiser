@@ -1197,17 +1197,20 @@ const VenueDialog: FC<{
     const handleConfirm = async () => {
         let venueToStart = selectedVenue || newVenue.trim();
         if (!venueToStart || !date) return;
+        
+        // If it's a new venue, save it first.
         if (!masterVenues.some(v => v.name === venueToStart)) {
-            const venue: Omit<MasterVenue, 'id'> = { name: venueToStart };
+            const venueData: Omit<MasterVenue, 'id'> = { name: venueToStart };
             try {
-                const savedVenue = await saveMasterVenue(venue);
+                const savedVenue = await saveMasterVenue(venueData);
                 setMasterVenues(prev => [...prev, savedVenue]);
-                venueToStart = savedVenue.name;
+                venueToStart = savedVenue.name; // Use the saved name
             } catch (error) {
                 toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue before starting." });
                 return;
             }
         }
+        
         onStartGame(venueToStart, date);
     }
     
@@ -1627,7 +1630,7 @@ const ReportsDialog: FC<{
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button onClick={handleExportPdf} disabled={isExporting} variant="outline">
+                        <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                              <span className="ml-2">Export PDF</span>
                         </Button>
