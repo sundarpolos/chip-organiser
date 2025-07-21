@@ -980,7 +980,6 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={!isAdmin}
                 />
                 {isLastRow && (isAdmin || canEdit) && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -1114,7 +1113,6 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
-            disabled={!isAdmin}
           />
         </div>
       </CardContent>
