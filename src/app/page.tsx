@@ -1662,42 +1662,40 @@ const ReportsDialog: FC<{
 
     if (!activeGame) return null;
     
-    // Data processing for charts
-    const pieChartData = activeGame.players
+    const { players } = activeGame;
+
+    const pieChartData = players
         .filter(p => p.finalChips > 0)
         .map(p => ({ name: p.name, value: p.finalChips }));
 
-    const barChartData = activeGame.players.map(p => ({
+    const barChartData = players.map(p => ({
         name: p.name,
         'P/L': p.profitLoss
     }));
-
-    const buyInTimeline = (activeGame.players || [])
+    
+    const buyInTimeline = (players || [])
       .flatMap(p => (p.buyIns || []).map(b => ({...b, playerName: p.name})))
       .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .reduce((acc, buyIn) => {
           const lastTotal = acc.length > 0 ? acc[acc.length - 1].total : 0;
           acc.push({
-              time: format(new Date(buyIn.timestamp), 'p'),
+              time: format(new Date(buyIn.timestamp), 'HH:mm'),
               total: lastTotal + buyIn.amount
           });
           return acc;
       }, [] as {time: string, total: number}[]);
 
-    const scatterData = activeGame.players.map(p => ({
+    const scatterData = players.map(p => ({
         x: p.totalBuyIns,
         y: p.profitLoss,
         z: Math.abs(p.profitLoss) || 1, // for bubble size
         name: p.name
     }));
 
-    const detailedBuyInLog = (activeGame.players || [])
-        .flatMap(p => (p.buyIns || []).filter(b => b.verified).map(b => ({
-            playerName: p.name,
-            amount: b.amount,
-            timestamp: new Date(b.timestamp)
-        })))
-        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const sortedStandings = [...players].sort((a, b) => b.profitLoss - a.profitLoss);
+    const totalBuyIns = players.reduce((sum, p) => sum + p.totalBuyIns, 0);
+    const totalChips = players.reduce((sum, p) => sum + p.finalChips, 0);
+    const totalPL = players.reduce((sum, p) => sum + p.profitLoss, 0);
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -1726,6 +1724,40 @@ const ReportsDialog: FC<{
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            
+                            <Card className="lg:col-span-2"><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
+                                 <Table><TableHeader><TableRow>
+                                     <TableHead>Player</TableHead>
+                                     <TableHead className="text-right">Buy-in</TableHead>
+                                     <TableHead className="text-right">Chip Return</TableHead>
+                                     <TableHead className="text-right">P/L</TableHead>
+                                 </TableRow></TableHeader>
+                                 <TableBody>
+                                     {sortedStandings.map((p) => (
+                                         <TableRow key={p.id}>
+                                             <TableCell className="font-medium">{p.name}</TableCell>
+                                             <TableCell className="text-right">{p.totalBuyIns}</TableCell>
+                                             <TableCell className="text-right">{p.finalChips}</TableCell>
+                                             <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.profitLoss.toFixed(0)}</TableCell>
+                                         </TableRow>
+                                     ))}
+                                 </TableBody>
+                                 <TableFoot>
+                                    <TableRow className="font-bold border-t-2 border-foreground">
+                                        <TableCell>Grand Totals</TableCell>
+                                        <TableCell className="text-right">{totalBuyIns}</TableCell>
+                                        <TableCell className="text-right">{totalChips}</TableCell>
+                                        <TableCell className="text-right">{totalPL.toFixed(0)}</TableCell>
+                                    </TableRow>
+                                 </TableFoot>
+                                 </Table>
+                             </CardContent></Card>
+
+                             <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
+                                {transfers.length > 0 ? transfers.map((t, i) => (
+                                    <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
+                                )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
+                            </CardContent></Card>
                             
                             <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
                                 <ResponsiveContainer width="100%" height={300}>
@@ -1782,20 +1814,6 @@ const ReportsDialog: FC<{
                                </ResponsiveContainer>
                             </CardContent></Card>
 
-                             <Card><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
-                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Buy-in</TableHead><TableHead className="text-right">P/L</TableHead></TableRow></TableHeader>
-                                 <TableBody>
-                                     {activeGame.players.sort((a,b) => b.profitLoss - a.profitLoss).map((p) => (
-                                         <TableRow key={p.id}>
-                                             <TableCell>{p.name}</TableCell>
-                                             <TableCell>{p.totalBuyIns}</TableCell>
-                                             <TableCell className={`text-right ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.profitLoss.toFixed(0)}</TableCell>
-                                         </TableRow>
-                                     ))}
-                                 </TableBody>
-                                 </Table>
-                             </CardContent></Card>
-
                             <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Game Action Timeline</CardTitle><CardDescription>Cumulative buy-ins over time</CardDescription></CardHeader><CardContent>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <LineChart data={buyInTimeline} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
@@ -1809,28 +1827,6 @@ const ReportsDialog: FC<{
                                 </ResponsiveContainer>
                             </CardContent></Card>
 
-                             <Card><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
-                                {transfers.length > 0 ? transfers.map((t, i) => (
-                                    <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
-                                )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
-                            </CardContent></Card>
-
-                            <Card className="md:col-span-2"><CardHeader><CardTitle>Detailed Buy-in Log</CardTitle></CardHeader><CardContent>
-                                <ScrollArea className="h-48">
-                                <Table>
-                                    <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead className="text-right">Time</TableHead></TableRow></TableHeader>
-                                    <TableBody>
-                                        {detailedBuyInLog.map((log, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell>{log.playerName}</TableCell>
-                                                <TableCell>{log.amount}</TableCell>
-                                                <TableCell className="text-right">{format(log.timestamp, "p")}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                                </ScrollArea>
-                            </CardContent></Card>
                         </div>
                     </div>
                 </ScrollArea>
