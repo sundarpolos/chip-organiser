@@ -231,7 +231,7 @@ export default function ChipMaestroPage() {
                     whatsappNumber: p.whatsappNumber,
                     buyIns: p.buyIns,
                     finalChips: p.finalChips,
-                    permissions: p.permissions || { canEditBuyIns: false }
+                    permissions: p.permissions || { canEditBuyIns: isAdmin }
                 })));
                 if (game.startTime) setGameStartTime(new Date(game.startTime));
                 if (game.endTime) setGameEndTime(new Date(game.endTime));
@@ -444,7 +444,7 @@ export default function ChipMaestroPage() {
         whatsappNumber: p.whatsappNumber,
         buyIns: p.buyIns,
         finalChips: p.finalChips,
-        permissions: p.permissions || { canEditBuyIns: false },
+        permissions: p.permissions || { canEditBuyIns: isAdmin },
       })));
       setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
       setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
@@ -1079,11 +1079,6 @@ const PlayerCard: FC<{
 
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
   
-  const togglePermissions = (canEditValue: boolean) => {
-    onUpdate(player.id, { permissions: { canEditBuyIns: canEditValue } });
-  };
-
-
   return (
     <Card className={cn("border-0 shadow-none", colorClass)}>
        
@@ -1122,16 +1117,6 @@ const PlayerCard: FC<{
             placeholder="Chip Count"
             disabled={!isAdmin && !canEdit}
           />
-          {isAdmin && (
-                <div className="flex items-center space-x-2 pt-4">
-                    <Switch
-                        id={`edit-permission-${player.id}`}
-                        checked={canEdit}
-                        onCheckedChange={togglePermissions}
-                    />
-                    <Label htmlFor={`edit-permission-${player.id}`}>Allow player to edit</Label>
-                </div>
-            )}
         </div>
       </CardContent>
       {isAdmin && (
