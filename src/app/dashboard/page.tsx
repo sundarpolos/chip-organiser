@@ -896,8 +896,9 @@ const BuyInRow: FC<{
     isOtpEnabled: boolean;
     whatsappConfig: WhatsappConfig;
     canEdit: boolean;
+    isAdmin: boolean;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, canEdit, toast }) => {
+}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, canEdit, isAdmin, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -980,9 +981,9 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={!canEdit || (buyIn.verified && isOtpEnabled)}
+                    disabled={!isAdmin && (!canEdit || (buyIn.verified && isOtpEnabled))}
                 />
-                {isLastRow && canEdit && (
+                {isLastRow && (isAdmin || canEdit) && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
                         <Plus className="h-4 w-4" />
                         <span className="sr-only">Re-buy</span>
@@ -993,7 +994,7 @@ const BuyInRow: FC<{
                 ) : (
                     showOtpInput && isOtpEnabled ? <div className="w-5" /> : null
                 )}
-                 {canBeRemoved && canEdit && (
+                 {canBeRemoved && (isAdmin || canEdit) && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button size="icon" variant="destructive" className="h-9 w-9">
@@ -1015,7 +1016,7 @@ const BuyInRow: FC<{
                     </AlertDialog>
                 )}
             </div>
-            {canEdit && isOtpEnabled && showOtpInput && !buyIn.verified && (
+            {(isAdmin || canEdit) && isOtpEnabled && showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
                     <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
@@ -1023,7 +1024,7 @@ const BuyInRow: FC<{
                     </Button>
                 </div>
             )}
-            {canEdit && isOtpEnabled && !showOtpInput && !buyIn.verified && (
+            {(isAdmin || canEdit) && isOtpEnabled && !showOtpInput && !buyIn.verified && (
                  <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
                      {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
                  </Button>
@@ -1104,6 +1105,7 @@ const PlayerCard: FC<{
                 isOtpEnabled={isOtpEnabled}
                 whatsappConfig={whatsappConfig}
                 canEdit={canEdit}
+                isAdmin={isAdmin}
                 toast={toast}
               />
             ))}
@@ -1117,7 +1119,7 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
-            disabled={!canEdit}
+            disabled={!isAdmin && !canEdit}
           />
         </div>
       </CardContent>
