@@ -428,7 +428,6 @@ export default function ChipMaestroPage() {
                 senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
               });
             }
-
             setLoadGameModalOpen(true);
 
         } catch (error) {
@@ -764,8 +763,8 @@ export default function ChipMaestroPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <header className="flex justify-between items-start mb-6 gap-4">
-        <div>
+      <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
+        <div className="flex-1">
            <h1 className="text-2xl font-bold truncate">{currentVenue}</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             <span>{format(gameDate, "dd MMMM yyyy")}</span>
@@ -784,7 +783,7 @@ export default function ChipMaestroPage() {
            </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
                 <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
@@ -1052,7 +1051,7 @@ const BuyInRow: FC<{
                     value={buyIn.amount === 0 ? "" : buyIn.amount}
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
-                    className="h-9 text-sm"
+                    className="h-9"
                     disabled={!isAdmin}
                 />
                 {isLastRow && (
@@ -1090,7 +1089,7 @@ const BuyInRow: FC<{
             </div>
             {isOtpEnabled && showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
-                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9 text-sm" />
+                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9" />
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
                         {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm"}
                     </Button>
@@ -1191,7 +1190,7 @@ const PlayerCard: FC<{
           <Label className="text-lg">Final Chips</Label>
           <Input 
             type="number" 
-            className="mt-2 text-sm h-9" 
+            className="mt-2 h-9" 
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
@@ -1619,7 +1618,7 @@ const ManagePlayersDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="flex flex-col h-[90vh] max-h-[700px]">
+            <DialogContent className="max-w-md md:max-w-lg flex flex-col h-[90vh] max-h-[700px]">
                 <DialogHeader>
                     <div className="flex items-center justify-center gap-2">
                         <DialogTitle>Manage Players</DialogTitle>
@@ -2251,7 +2250,7 @@ const WhatsappDialog: FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Send Group WhatsApp Message</DialogTitle>
           <DialogDescription>
@@ -2745,3 +2744,4 @@ ${formattedTransfers}
 
 
     
+
