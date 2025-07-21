@@ -18,7 +18,7 @@ export function calculateInterPlayerTransfers(players: CalculatedPlayer[]): stri
         const receiver = receivers[0];
         const amount = Math.min(payer.amount, receiver.amount);
 
-        transfers.push(`<strong>${payer.name}</strong> pays <strong>${receiver.name}</strong>: ${amount.toFixed(2)}`);
+        transfers.push(`<strong>${payer.name}</strong> pays <strong>${receiver.name}</strong>: ${amount.toFixed(0)}`);
 
         payer.amount -= amount;
         receiver.amount -= amount;

@@ -73,7 +73,8 @@ import {
   LogOut,
   UserCheck,
   UserCog,
-  User
+  User,
+  Send
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -329,6 +330,7 @@ export default function ChipMaestroPage() {
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
+  const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -895,6 +897,10 @@ export default function ChipMaestroPage() {
         isOpen={isReportsModalOpen}
         onOpenChange={setReportsModalOpen}
         activeGame={activeGame}
+        onSettleUp={() => {
+          setReportsModalOpen(false);
+          setSettlementModalOpen(true);
+        }}
       />
       <AnomalyReportDialog
         isOpen={isAnomalyModalOpen}
@@ -927,6 +933,13 @@ export default function ChipMaestroPage() {
         onOpenChange={setSaveConfirmOpen}
         players={activeGame?.players || []}
         onConfirmSave={handleSaveGame}
+      />
+      <SettlementDialog
+        isOpen={isSettlementModalOpen}
+        onOpenChange={setSettlementModalOpen}
+        activeGame={activeGame}
+        whatsappConfig={whatsappConfig}
+        toast={toast}
       />
     </div>
   )
@@ -1256,7 +1269,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                     <h3 className="font-semibold mb-2">Money Transfers</h3>
                     <div className="space-y-1 text-sm">
                         {transfers.length > 0 ? transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t }} />
+                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t.replace(/<(\/)?strong>/g, '*') }} />
                         )) : <p className="text-muted-foreground">No transfers needed.</p>}
                     </div>
                 </div>
@@ -1851,7 +1864,8 @@ const ReportsDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
     activeGame: GameHistory | null,
-}> = ({ isOpen, onOpenChange, activeGame }) => {
+    onSettleUp: () => void,
+}> = ({ isOpen, onOpenChange, activeGame, onSettleUp }) => {
     const reportContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
     const { toast } = useToast();
@@ -1934,6 +1948,10 @@ const ReportsDialog: FC<{
                         <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                              <span className="ml-2">Export PDF</span>
+                        </Button>
+                        <Button onClick={onSettleUp}>
+                            <WhatsappIcon />
+                            <span className="ml-2">Settle Up</span>
                         </Button>
                         <DialogClose asChild>
                            <Button variant="outline">Close</Button>
@@ -2457,6 +2475,172 @@ const SaveConfirmDialog: FC<{
                     <Button onClick={() => onConfirmSave(localPlayers)} disabled={!isBalanced}>
                         <Save className="mr-2 h-4 w-4" />
                         Confirm & Save
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const SettlementDialog: FC<{
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    activeGame: GameHistory | null,
+    whatsappConfig: WhatsappConfig,
+    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
+}> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast }) => {
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [isSending, setIsSending] = useState(false);
+    const [sendingStatus, setSendingStatus] = useState<string | null>(null);
+
+    const playersWithNumbers = useMemo(() => {
+        if (!activeGame) return [];
+        return activeGame.players.filter(p => p.whatsappNumber);
+    }, [activeGame]);
+
+    const transfers = useMemo(() => {
+        if (!activeGame) return [];
+        return calculateInterPlayerTransfers(activeGame.players);
+    }, [activeGame]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedPlayerIds(playersWithNumbers.map(p => p.id));
+            setIsSending(false);
+            setSendingStatus(null);
+        }
+    }, [isOpen, playersWithNumbers]);
+
+    const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
+        setSelectedPlayerIds(prev => 
+            isSelected ? [...prev, playerId] : prev.filter(id => id !== playerId)
+        );
+    };
+
+    const handleSelectAll = (isChecked: boolean) => {
+        setSelectedPlayerIds(isChecked ? playersWithNumbers.map(p => p.id) : []);
+    };
+    
+    const formatTransfersForWhatsapp = (transfers: string[]): string => {
+        if (transfers.length === 0) {
+            return "No transfers needed. Everyone is settled up!";
+        }
+        // Replace HTML tags with WhatsApp formatting
+        const formatted = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*')).join('\n');
+        return `\`\`\`
+-----------------------
+|  Payment Transfers  |
+-----------------------
+${formatted}
+\`\`\``;
+    };
+
+    const handleSend = async () => {
+        if (selectedPlayerIds.length === 0) {
+            toast({ variant: 'destructive', title: 'No players selected', description: 'Please select at least one player to notify.' });
+            return;
+        }
+
+        setIsSending(true);
+        const playersToSend = playersWithNumbers.filter(p => selectedPlayerIds.includes(p.id));
+        const message = formatTransfersForWhatsapp(transfers);
+        
+        const totalToSend = playersToSend.length;
+        let successfulSends = 0;
+        let failedSends = 0;
+
+        for (let i = 0; i < totalToSend; i++) {
+            const player = playersToSend[i];
+            setSendingStatus(`Sending to ${player.name} (${i + 1} of ${totalToSend})...`);
+            
+            try {
+                const result = await sendWhatsappMessage({
+                    to: player.whatsappNumber,
+                    message,
+                    ...whatsappConfig
+                });
+
+                if (result.success) {
+                    successfulSends++;
+                } else {
+                    failedSends++;
+                    console.error(`Failed to send to ${player.name}:`, result.error);
+                }
+            } catch (error) {
+                failedSends++;
+                console.error(`Exception while sending to ${player.name}:`, error);
+            }
+
+            // Wait for 15 seconds before sending the next message, unless it's the last one
+            if (i < totalToSend - 1) {
+                await new Promise(resolve => setTimeout(resolve, 15000));
+            }
+        }
+        
+        setSendingStatus(null);
+        setIsSending(false);
+
+        if (successfulSends > 0) {
+            toast({ title: 'Settlement Sent!', description: `Successfully sent notifications to ${successfulSends} player(s).` });
+        }
+        if (failedSends > 0) {
+            toast({ variant: 'destructive', title: 'Sending Failed', description: `Could not send notifications to ${failedSends} player(s). Check console for details.` });
+        }
+        
+        if (failedSends === 0) {
+            onOpenChange(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Send Settlement Details</DialogTitle>
+                    <DialogDescription>Select players to notify via WhatsApp. A 15s delay will be applied between messages.</DialogDescription>
+                </DialogHeader>
+                 <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox
+                                id="settlement-select-all"
+                                onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                checked={playersWithNumbers.length > 0 && selectedPlayerIds.length === playersWithNumbers.length}
+                                disabled={playersWithNumbers.length === 0 || isSending}
+                            />
+                            <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
+                        </div>
+                        <ScrollArea className="h-40 border rounded-md p-2">
+                            {playersWithNumbers.length > 0 ? (
+                                playersWithNumbers.map(player => (
+                                    <div key={player.id} className="flex items-center space-x-2 p-1">
+                                        <Checkbox 
+                                            id={`settle-${player.id}`} 
+                                            onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                            checked={selectedPlayerIds.includes(player.id)}
+                                            disabled={isSending}
+                                        />
+                                        <Label htmlFor={`settle-${player.id}`} className="flex-1">{player.name} ({player.whatsappNumber})</Label>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers found in this game.</p>
+                            )}
+                        </ScrollArea>
+                    </div>
+                    {isSending && sendingStatus && (
+                        <div className="flex items-center gap-2 text-sm text-primary">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <p>{sendingStatus}</p>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline" disabled={isSending}>Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
+                        {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
                     </Button>
                 </DialogFooter>
             </DialogContent>
