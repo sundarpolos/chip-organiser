@@ -1059,26 +1059,7 @@ const PlayerCard: FC<{
 
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
-       <CardHeader className="flex-row items-start justify-between">
-            <CardTitle className="flex items-center gap-2">
-                {player.name || "Unnamed Player"}
-                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
-            </CardTitle>
-            {isAdmin && (
-                <div className="flex items-center gap-2">
-                    <Switch
-                        id={`permissions-${player.id}`}
-                        checked={player.permissions.canEditBuyIns}
-                        onCheckedChange={togglePermissions}
-                        aria-label="Toggle edit permissions"
-                    />
-                    <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                        Allow Edit
-                    </Label>
-                </div>
-            )}
-        </CardHeader>
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
         <div>
           <Label className="text-lg mb-2">Buy-ins</Label>
           <div className="space-y-2">
@@ -1115,15 +1096,31 @@ const PlayerCard: FC<{
         </div>
       </CardContent>
       {isAdmin && (
-           <CardFooter className="flex justify-between items-center">
-                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="sm">
-                    <ShieldAlert className="mr-2 h-4 w-4" />
-                    <span>Analyze Buy-ins</span>
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => onRemove(player.id)}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove Player
-                </Button>
+           <CardFooter className="flex flex-wrap gap-4 justify-between items-center">
+                <div className="flex gap-4 items-center">
+                     <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="sm">
+                        <ShieldAlert className="mr-2 h-4 w-4" />
+                        <span>Analyze Buy-ins</span>
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => onRemove(player.id)}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove Player
+                    </Button>
+                </div>
+                <div className="flex items-center gap-4">
+                    <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+                     <div className="flex items-center gap-2">
+                        <Switch
+                            id={`permissions-${player.id}`}
+                            checked={player.permissions.canEditBuyIns}
+                            onCheckedChange={togglePermissions}
+                            aria-label="Toggle edit permissions"
+                        />
+                        <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                            Allow Edit
+                        </Label>
+                    </div>
+                </div>
             </CardFooter>
       )}
     </Card>
