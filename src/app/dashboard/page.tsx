@@ -429,35 +429,51 @@ export default function ChipMaestroPage() {
               });
             }
 
-            const todayGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), new Date()));
-
-            if (todayGame) {
-                let playersToAdd: Player[] = [];
-                const isUserInGame = todayGame.players.some(p => p.name === currentUser.name);
-
-                if (!isUserInGame && !isAdmin) {
-                    const newPlayer: Player = {
-                        id: `player-${Date.now()}-${currentUser.id}`,
-                        name: currentUser.name,
-                        whatsappNumber: currentUser.whatsappNumber,
-                        buyIns: [{ 
-                            id: `buyin-${Date.now()}-${currentUser.id}`,
-                            amount: 0, 
-                            timestamp: new Date().toISOString(), 
-                            verified: !isOtpVerificationEnabled 
-                        }],
-                        finalChips: 0,
-                    };
-                    playersToAdd.push(newPlayer);
-                    toast({ title: "Game Joined!", description: `You have been automatically added to today's game at ${todayGame.venue}.` });
+            // Check for unsaved game in localStorage first
+            const localGameStr = localStorage.getItem('activeGame');
+            let gameFound = false;
+            if (localGameStr) {
+                const localGame = JSON.parse(localGameStr);
+                if (isSameDay(new Date(localGame.timestamp), new Date())) {
+                    loadGameIntoState(localGame);
+                    gameFound = true;
                 }
-                loadGameIntoState(todayGame, playersToAdd);
+            }
 
-            } else {
-                if (isAdmin) {
-                    setVenueModalOpen(true);
+            // If no local game, check saved history
+            if (!gameFound) {
+                const todayGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), new Date()));
+                if (todayGame) {
+                    let playersToAdd: Player[] = [];
+                    const isUserInGame = todayGame.players.some(p => p.name === currentUser.name);
+
+                    if (!isUserInGame) {
+                        const newPlayer: Player = {
+                            id: `player-${Date.now()}-${currentUser.id}`,
+                            name: currentUser.name,
+                            whatsappNumber: currentUser.whatsappNumber,
+                            buyIns: [{ 
+                                id: `buyin-${Date.now()}-${currentUser.id}`,
+                                amount: 0, 
+                                timestamp: new Date().toISOString(), 
+                                verified: !isOtpVerificationEnabled 
+                            }],
+                            finalChips: 0,
+                        };
+                        playersToAdd.push(newPlayer);
+                        toast({ title: "Game Joined!", description: `You have been automatically added to today's game at ${todayGame.venue}.` });
+                    }
+                    loadGameIntoState(todayGame, playersToAdd);
+                    gameFound = true;
+                }
+            }
+            
+            // If still no game found for today, open load game modal
+            if (!gameFound) {
+                 if (isAdmin) {
+                    setVenueModalOpen(true); // Admins can start a new game
                 } else {
-                    setLoadGameModalOpen(true);
+                    setLoadGameModalOpen(true); // Players see past games
                 }
             }
 
@@ -2763,3 +2779,5 @@ ${formattedTransfers}
         </Dialog>
     );
 };
+
+
