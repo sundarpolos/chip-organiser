@@ -105,17 +105,6 @@ const WhatsappIcon = () => (
 
 type DbStatus = 'checking' | 'connected' | 'error';
 
-async function checkDbConnection(): Promise<boolean> {
-    try {
-        await getDoc(doc(db, "connectivity_test", "test_doc"));
-        console.log("Firestore connection successful.");
-        return true;
-    } catch (error) {
-        console.error("Firestore connection failed:", error);
-        return false;
-    }
-}
-
 export default function ChipMaestroPage() {
   const { toast } = useToast()
 
@@ -143,9 +132,9 @@ export default function ChipMaestroPage() {
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
-    apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '',
-    apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '',
-    senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
+    apiUrl: '',
+    apiToken: '',
+    senderMobile: ''
   });
 
   // Modal & Dialog State
@@ -168,6 +157,17 @@ export default function ChipMaestroPage() {
 
   // Load data from Firestore on initial render
   useEffect(() => {
+    async function checkDbConnection() {
+        try {
+            await getDoc(doc(db, "connectivity_test", "test_doc"));
+            console.log("Firestore connection successful.");
+            return true;
+        } catch (error) {
+            console.error("Firestore connection failed:", error);
+            return false;
+        }
+    }
+
     async function loadInitialData() {
         setDbStatus('checking');
         const isConnected = await checkDbConnection();
@@ -1691,6 +1691,13 @@ const ReportsDialog: FC<{
         name: p.name
     }));
 
+    const detailedBuyInLog = (activeGame.players || [])
+        .flatMap(p => (p.buyIns || []).filter(b => b.verified).map(b => ({
+            playerName: p.name,
+            amount: b.amount,
+            timestamp: new Date(b.timestamp)
+        })))
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -1718,9 +1725,9 @@ const ReportsDialog: FC<{
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
                     <div ref={reportContentRef} className="p-4 bg-background">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             
-                            <Card className="md:col-span-2"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
+                            <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <BarChart data={barChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
@@ -1775,7 +1782,21 @@ const ReportsDialog: FC<{
                                </ResponsiveContainer>
                             </CardContent></Card>
 
-                            <Card className="md:col-span-2"><CardHeader><CardTitle>Game Action Timeline</CardTitle><CardDescription>Cumulative buy-ins over time</CardDescription></CardHeader><CardContent>
+                             <Card><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
+                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Buy-in</TableHead><TableHead className="text-right">P/L</TableHead></TableRow></TableHeader>
+                                 <TableBody>
+                                     {activeGame.players.sort((a,b) => b.profitLoss - a.profitLoss).map((p) => (
+                                         <TableRow key={p.id}>
+                                             <TableCell>{p.name}</TableCell>
+                                             <TableCell>{p.totalBuyIns}</TableCell>
+                                             <TableCell className={`text-right ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.profitLoss.toFixed(0)}</TableCell>
+                                         </TableRow>
+                                     ))}
+                                 </TableBody>
+                                 </Table>
+                             </CardContent></Card>
+
+                            <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Game Action Timeline</CardTitle><CardDescription>Cumulative buy-ins over time</CardDescription></CardHeader><CardContent>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <LineChart data={buyInTimeline} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" />
@@ -1794,19 +1815,22 @@ const ReportsDialog: FC<{
                                 )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
                             </CardContent></Card>
 
-                             <Card><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
-                                 <Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Buy-in</TableHead><TableHead>P/L</TableHead></TableRow></TableHeader>
-                                 <TableBody>
-                                     {activeGame.players.sort((a,b) => b.profitLoss - a.profitLoss).map((p) => (
-                                         <TableRow key={p.id}>
-                                             <TableCell>{p.name}</TableCell>
-                                             <TableCell>{p.totalBuyIns}</TableCell>
-                                             <TableCell className={p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}>{p.profitLoss.toFixed(0)}</TableCell>
-                                         </TableRow>
-                                     ))}
-                                 </TableBody>
-                                 </Table>
-                             </CardContent></Card>
+                            <Card className="md:col-span-2"><CardHeader><CardTitle>Detailed Buy-in Log</CardTitle></CardHeader><CardContent>
+                                <ScrollArea className="h-48">
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Amount</TableHead><TableHead className="text-right">Time</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {detailedBuyInLog.map((log, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell>{log.playerName}</TableCell>
+                                                <TableCell>{log.amount}</TableCell>
+                                                <TableCell className="text-right">{format(log.timestamp, "p")}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                </ScrollArea>
+                            </CardContent></Card>
                         </div>
                     </div>
                 </ScrollArea>
