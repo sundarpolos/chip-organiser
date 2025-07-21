@@ -1066,9 +1066,7 @@ const PlayerCard: FC<{
 
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
-       <CardHeader>
-            <CardTitle>{player.name || "Unnamed Player"}</CardTitle>
-        </CardHeader>
+       
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="text-lg mb-2">Buy-ins</Label>
