@@ -382,21 +382,6 @@ export default function ChipMaestroPage() {
     setPlayers(players.map(p => p.id === id ? { ...p, ...newValues } : p));
   };
   
-  const handlePlayerNameChange = (id: string, newName: string) => {
-    const isDuplicate = players.some(p => p.name === newName && p.id !== id);
-    if (isDuplicate) {
-        toast({ variant: "destructive", title: "Duplicate Player", description: `${newName} is already in this game.` });
-        return;
-    }
-
-    const masterPlayer = masterPlayers.find(mp => mp.name === newName);
-    const updatedDetails: Partial<Player> = { name: newName };
-    if (masterPlayer) {
-      updatedDetails.whatsappNumber = masterPlayer.whatsappNumber;
-    }
-    updatePlayer(id, updatedDetails);
-  };
-  
   const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
     if (dbStatus !== 'connected') {
         toast({ variant: "destructive", title: "Database Offline", description: "Cannot save game. Please check your connection." });
@@ -696,12 +681,9 @@ export default function ChipMaestroPage() {
                 <TabsContent key={player.id} value={player.id}>
                   <PlayerCard 
                     player={player} 
-                    masterPlayers={masterPlayers} 
                     onUpdate={updatePlayer}
-                    onNameChange={handlePlayerNameChange}
                     onRemove={removePlayer}
                     onRunAnomalyCheck={handleRunAnomalyDetection}
-                    allPlayers={players}
                     toast={toast}
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
@@ -751,12 +733,9 @@ export default function ChipMaestroPage() {
             {currentPlayerInGame ? (
                  <PlayerCard 
                     player={currentPlayerInGame} 
-                    masterPlayers={masterPlayers} 
                     onUpdate={updatePlayer}
-                    onNameChange={() => {}} // Players cannot change names
                     onRemove={() => {}} // Players cannot remove themselves
                     onRunAnomalyCheck={handleRunAnomalyDetection}
-                    allPlayers={players}
                     toast={toast}
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
@@ -1077,19 +1056,16 @@ const BuyInRow: FC<{
 }
 
 const PlayerCard: FC<{
-  player: Player,
-  masterPlayers: MasterPlayer[],
-  allPlayers: Player[],
-  onUpdate: (id: string, newValues: Partial<Player>) => void,
-  onNameChange: (id: string, newName: string) => void,
-  onRemove: (id: string) => void,
-  onRunAnomalyCheck: (player: Player) => void,
+  player: Player;
+  onUpdate: (id: string, newValues: Partial<Player>) => void;
+  onRemove: (id: string) => void;
+  onRunAnomalyCheck: (player: Player) => void;
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
   isAdmin: boolean;
   canEdit: boolean;
-  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ player, masterPlayers, allPlayers, onUpdate, onNameChange, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, canEdit, toast }) => {
+  toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, canEdit, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -1132,31 +1108,9 @@ const PlayerCard: FC<{
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Select
-            value={player.name}
-            onValueChange={(newName) => onNameChange(player.id, newName)}
-            disabled={!isAdmin}
-          >
-            <SelectTrigger className="flex-1 w-full truncate">
-              <SelectValue placeholder="Select Player" />
-            </SelectTrigger>
-            <SelectContent>
-              {player.name && !masterPlayers.some(mp => mp.name === player.name) && (
-                <SelectItem key="current-unlisted-player" value={player.name}>
-                  {player.name}
-                </SelectItem>
-              )}
-              {masterPlayers.map(mp => (
-                <SelectItem 
-                  key={mp.id} 
-                  value={mp.name}
-                  disabled={allPlayers.some(p => p.id !== player.id && p.name === mp.name)}
-                >
-                  {mp.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <span className="font-medium truncate">{player.name || "Unnamed Player"}</span>
+          </div>
           <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon" disabled={!player.name} className="flex-shrink-0">
             <ShieldAlert className="h-4 w-4" />
             <span className="sr-only">Analyze</span>
