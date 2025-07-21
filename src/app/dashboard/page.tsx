@@ -146,36 +146,23 @@ const AdminView: FC<{
     isOtpVerificationEnabled, whatsappConfig, isAdmin, setAddPlayerModalOpen,
     activeGame, setSaveConfirmOpen, setReportsModalOpen, toast
 }) => {
-    const activePlayer = useMemo(() => players.find(p => p.id === activeTab), [players, activeTab]);
-    const activePlayerIndex = useMemo(() => players.findIndex(p => p.id === activeTab), [players, activeTab]);
-
+    
     return (
         <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
             <section className="md:col-span-2 mb-8 md:mb-0">
                 <Card>
                     <CardContent className="pt-6">
                         {players.length > 0 ? (
-                            <div className="w-full">
-                                <div className="p-2 bg-muted/50 rounded-lg flex flex-wrap -m-1">
-                                    {players.map((p, index) => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => setActiveTab(p.id)}
-                                            className={cn(
-                                                "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 rounded-md transition-all",
-                                                activeTab === p.id 
-                                                    ? `${tabColors[index % tabColors.length]} ring-2 ring-ring font-semibold` 
-                                                    : "bg-background hover:bg-muted"
-                                            )}
-                                        >
-                                            {p.name || "New Player"}
-                                        </button>
+                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 h-auto flex-wrap">
+                                    {players.map(p => (
+                                        <TabsTrigger key={p.id} value={p.id}>{p.name || "New Player"}</TabsTrigger>
                                     ))}
-                                </div>
-                                {activePlayer && (
-                                    <div className={cn("mt-4 p-4 rounded-b-lg -m-4 -mt-0", tabColors[activePlayerIndex % tabColors.length])}>
+                                </TabsList>
+                                {players.map((p) => (
+                                    <TabsContent key={p.id} value={p.id} className="mt-4">
                                         <PlayerCard
-                                            player={activePlayer}
+                                            player={p}
                                             onUpdate={updatePlayer}
                                             onRemove={removePlayer}
                                             onRunAnomalyCheck={handleRunAnomalyDetection}
@@ -184,9 +171,9 @@ const AdminView: FC<{
                                             isAdmin={isAdmin}
                                             toast={toast}
                                         />
-                                    </div>
-                                )}
-                            </div>
+                                    </TabsContent>
+                                ))}
+                           </Tabs>
                         ) : (
                             <div className="text-center py-10">
                                 <p className="text-muted-foreground mb-4">No players in the game.</p>
@@ -1156,7 +1143,7 @@ const PlayerCard: FC<{
   
   const removeBuyIn = (buyInId: string) => {
     if ((player.buyIns || []).length > 1) {
-      const newBuyIns = (player.buyIns || []).filter((b) => b.id !== buyInId)
+      const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId)
       onUpdate(player.id, { buyIns: newBuyIns })
     } else {
         toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
@@ -2749,5 +2736,8 @@ ${formattedTransfers}
 
 
     
+
+
+
 
 
