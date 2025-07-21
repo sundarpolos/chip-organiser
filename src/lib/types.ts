@@ -10,6 +10,9 @@ export interface Player {
   whatsappNumber: string;
   buyIns: BuyIn[];
   finalChips: number;
+  permissions: {
+    canEditBuyIns: boolean;
+  };
 }
 
 export interface CalculatedPlayer extends Player {
@@ -21,7 +24,7 @@ export interface MasterPlayer {
   id: string;
   name: string;
   whatsappNumber: string;
-  // isAdmin?: boolean; // Future use for role-based access
+  isAdmin: boolean;
 }
 
 export interface MasterVenue {

@@ -53,10 +53,14 @@ const sendLoginOtpFlow = ai.defineFlow(
       let isNewUser = false;
 
       if (!user) {
+        // If no user exists, the first one to sign up becomes the admin.
+        const isAdmin = allPlayers.length === 0;
+
         // Create a new user if not found
         const newUserPayload: Omit<import('@/lib/types').MasterPlayer, 'id'> = {
           name: `Player ${whatsappNumber.slice(-4)}`, // Default name
           whatsappNumber: whatsappNumber,
+          isAdmin: isAdmin,
         };
         user = await saveMasterPlayer(newUserPayload);
         isNewUser = true;
