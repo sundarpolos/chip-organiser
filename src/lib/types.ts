@@ -11,9 +11,6 @@ export interface Player {
   whatsappNumber: string;
   buyIns: BuyIn[];
   finalChips: number;
-  permissions: {
-    canEditBuyIns: boolean;
-  };
 }
 
 export interface CalculatedPlayer extends Player {

@@ -112,6 +112,177 @@ const WhatsappIcon = () => (
 
 type DbStatus = 'checking' | 'connected' | 'error';
 
+const tabColors = [
+    "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200",
+    "bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200",
+    "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200",
+    "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200",
+    "bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200",
+    "bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-200",
+    "bg-lime-100 dark:bg-lime-900/50 text-lime-800 dark:text-lime-200",
+    "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
+];
+
+const AdminView: FC<{
+    players: Player[];
+    activeTab: string;
+    setActiveTab: (tab: string) => void;
+    updatePlayer: (id: string, newValues: Partial<Player>) => void;
+    removePlayer: (id: string) => void;
+    handleRunAnomalyDetection: (player: Player) => void;
+    isOtpVerificationEnabled: boolean;
+    whatsappConfig: WhatsappConfig;
+    isAdmin: boolean;
+    setAddPlayerModalOpen: (isOpen: boolean) => void;
+    activeGame: GameHistory | null;
+    setSaveConfirmOpen: (isOpen: boolean) => void;
+    setReportsModalOpen: (isOpen: boolean) => void;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({
+    players, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
+    isOtpVerificationEnabled, whatsappConfig, isAdmin, setAddPlayerModalOpen,
+    activeGame, setSaveConfirmOpen, setReportsModalOpen, toast
+}) => (
+    <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
+        <section className="md:col-span-2 mb-8 md:mb-0">
+            <Card>
+                <CardContent className="pt-6">
+                    {players.length > 0 ? (
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="h-auto flex flex-wrap justify-start -m-1">
+                                {players.map((p, index) => (
+                                    <TabsTrigger
+                                        key={p.id}
+                                        value={p.id}
+                                        className={cn(
+                                            "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
+                                            `${tabColors[index % tabColors.length]}`,
+                                            "data-[state=active]:ring-2 data-[state=active]:ring-ring"
+                                        )}
+                                    >
+                                        {p.name || "New Player"}
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                            {players.map((player, index) => (
+                                <TabsContent key={player.id} value={player.id}>
+                                    <PlayerCard
+                                        player={player}
+                                        onUpdate={updatePlayer}
+                                        onRemove={removePlayer}
+                                        onRunAnomalyCheck={handleRunAnomalyDetection}
+                                        isOtpEnabled={isOtpVerificationEnabled}
+                                        whatsappConfig={whatsappConfig}
+                                        isAdmin={isAdmin}
+                                        colorClass={tabColors[index % tabColors.length]}
+                                        toast={toast}
+                                    />
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+                    ) : (
+                        <div className="text-center py-10">
+                            <p className="text-muted-foreground mb-4">No players in the game.</p>
+                            <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
+                        </div>
+                    )}
+                </CardContent>
+                <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
+                    <div className="flex gap-2">
+                        <Button onClick={() => setAddPlayerModalOpen(true)}>
+                            <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                        </Button>
+                        {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                    </div>
+                </CardFooter>
+            </Card>
+        </section>
+        <SummaryView activeGame={activeGame} />
+    </main>
+);
+
+const PlayerView: FC<{
+    currentUser: MasterPlayer;
+    players: Player[];
+    updatePlayer: (id: string, newValues: Partial<Player>) => void;
+    handleRunAnomalyDetection: (player: Player) => void;
+    isOtpVerificationEnabled: boolean;
+    whatsappConfig: WhatsappConfig;
+    toast: ReturnType<typeof useToast>['toast'];
+    activeGame: GameHistory | null;
+}> = ({
+    currentUser, players, updatePlayer, handleRunAnomalyDetection,
+    isOtpVerificationEnabled, whatsappConfig, toast, activeGame
+}) => {
+    const currentPlayerInGame = useMemo(() => {
+        return players.find(p => p.name === currentUser.name)
+    }, [players, currentUser]);
+
+    return (
+        <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
+            <section className="md:col-span-2 mb-8 md:mb-0">
+                {currentPlayerInGame ? (
+                    <PlayerCard
+                        player={currentPlayerInGame}
+                        onUpdate={updatePlayer}
+                        onRemove={() => { }} // Players cannot remove themselves
+                        onRunAnomalyCheck={handleRunAnomalyDetection}
+                        toast={toast}
+                        isOtpEnabled={isOtpVerificationEnabled}
+                        whatsappConfig={whatsappConfig}
+                        isAdmin={false}
+                        colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
+                    />
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Welcome, {currentUser?.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-center py-10">
+                            <p className="text-muted-foreground">You are not part of the current game.</p>
+                            <p className="text-sm text-muted-foreground">Please wait for the admin to add you.</p>
+                        </CardContent>
+                    </Card>
+                )}
+            </section>
+            <SummaryView activeGame={activeGame} />
+        </main>
+    );
+};
+
+const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => {
+    const transfers = useMemo(() => {
+        if (!activeGame) return [];
+        return calculateInterPlayerTransfers(activeGame.players);
+    }, [activeGame]);
+
+    const totalBuyInLog = useMemo(() => {
+        if (!activeGame) return [];
+        return activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({
+            playerName: p.name || "Unnamed",
+            amount: b.amount,
+            timestamp: b.timestamp,
+            verified: b.verified,
+        }))).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    }, [activeGame]);
+
+    const grandTotalBuyIn = useMemo(() => totalBuyInLog?.reduce((sum, item) => sum + (item.verified ? item.amount : 0), 0), [totalBuyInLog]);
+
+    return (
+        <aside className="md:col-span-1">
+            <SummaryCard
+                activeGame={activeGame}
+                transfers={transfers}
+                buyInLog={totalBuyInLog}
+                grandTotal={grandTotalBuyIn}
+            />
+        </aside>
+    );
+};
+
 export default function ChipMaestroPage() {
   const { toast } = useToast()
   const router = useRouter();
@@ -166,10 +337,7 @@ export default function ChipMaestroPage() {
   const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
   const [isAnomalyLoading, setAnomalyLoading] = useState(false);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
-  const currentPlayerInGame = useMemo(() => {
-    if (isAdmin || !currentUser) return null;
-    return players.find(p => p.name === currentUser.name)
-  }, [players, currentUser, isAdmin])
+
 
   // Load user data and check auth
   useEffect(() => {
@@ -228,18 +396,13 @@ export default function ChipMaestroPage() {
                     ...p, // Spread existing player data
                     buyIns: (p.buyIns || []).map((b, i) => ({
                       ...b,
-                      id: b.id || `buyin-legacy-${i}` // Ensure old buyins have an ID
+                      id: b.id || `buyin-legacy-${Date.now()}-${i}`
                     })),
-                    permissions: p.permissions || { canEditBuyIns: isAdmin }
                 })));
                 if (game.startTime) setGameStartTime(new Date(game.startTime));
                 if (game.endTime) setGameEndTime(new Date(game.endTime));
                 if (game.players.length > 0) {
                   setActiveTab(game.players[0].id);
-                } else if (!isAdmin) {
-                  // if player is not in game, don't auto-set tab
-                } else {
-                  setActiveTab(game.players.length > 0 ? game.players[0].id : "");
                 }
             } else if (isAdmin) {
                 setVenueModalOpen(true);
@@ -351,13 +514,12 @@ export default function ChipMaestroPage() {
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [{ 
-            id: `buyin-${Date.now()}`,
+            id: `buyin-${Date.now()}-${playerToAdd.id}`,
             amount: 0, 
             timestamp: new Date().toISOString(), 
             verified: !isOtpVerificationEnabled 
           }],
           finalChips: 0,
-          permissions: { canEditBuyIns: isAdmin },
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -448,10 +610,9 @@ export default function ChipMaestroPage() {
         whatsappNumber: p.whatsappNumber,
         buyIns: (p.buyIns || []).map((b, i) => ({
             ...b,
-            id: b.id || `buyin-legacy-${i}`
+            id: b.id || `buyin-legacy-${Date.now()}-${i}`
         })),
         finalChips: p.finalChips,
-        permissions: p.permissions || { canEditBuyIns: isAdmin },
       })));
       setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
       setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
@@ -563,7 +724,7 @@ export default function ChipMaestroPage() {
     setCurrentVenue(importedGame.venue);
     const newGameDate = new Date(importedGame.timestamp);
     setGameDate(newGameDate);
-    setPlayers(importedGame.players.map(p => ({ ...p, permissions: { canEditBuyIns: true } })));
+    setPlayers(importedGame.players);
     setGameStartTime(newGameDate);
     
     const calculatedPlayers = importedGame.players.map(p => {
@@ -584,30 +745,6 @@ export default function ChipMaestroPage() {
     setImportGameModalOpen(false);
 };
 
-
-  const transfers = useMemo(() => {
-    if (!activeGame) return [];
-    return calculateInterPlayerTransfers(activeGame.players);
-  }, [activeGame]);
-
-  const totalBuyInLog = useMemo(() => {
-    const log = players.flatMap(p => (p.buyIns || []).map(b => ({
-      playerName: p.name || "Unnamed",
-      amount: b.amount,
-      timestamp: b.timestamp,
-      verified: b.verified,
-    }))).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    return log;
-  }, [players]);
-
-  const grandTotalBuyIn = useMemo(() => totalBuyInLog.reduce((sum, item) => sum + (item.verified ? item.amount : 0), 0), [totalBuyInLog]);
-
-  const availablePlayersForDropdown = useMemo(() => {
-      const inGamePlayerNames = players.map(p => p.name);
-      return masterPlayers.filter(mp => !inGamePlayerNames.includes(mp.name));
-  }, [players, masterPlayers]);
-
-
   if (!isDataReady || !currentUser) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -619,126 +756,6 @@ export default function ChipMaestroPage() {
     );
   }
 
-  const tabColors = [
-    "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200",
-    "bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200",
-    "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200",
-    "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200",
-    "bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200",
-    "bg-pink-100 dark:bg-pink-900/50 text-pink-800 dark:text-pink-200",
-    "bg-lime-100 dark:bg-lime-900/50 text-lime-800 dark:text-lime-200",
-    "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
-  ];
-  
-  const AdminView = () => (
-    <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-    <section className="md:col-span-2 mb-8 md:mb-0">
-      <Card>
-        <CardContent className="pt-6">
-          {players.length > 0 ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="h-auto flex flex-wrap justify-start -m-1">
-                {players.map((p, index) => (
-                  <TabsTrigger 
-                    key={p.id} 
-                    value={p.id} 
-                    className={cn(
-                      "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
-                      `${tabColors[index % tabColors.length]}`,
-                      "data-[state=active]:ring-2 data-[state=active]:ring-ring"
-                    )}
-                  >
-                    {p.name || "New Player"}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {players.map((player, index) => (
-                <TabsContent key={player.id} value={player.id}>
-                  <PlayerCard 
-                    player={player} 
-                    onUpdate={updatePlayer}
-                    onRemove={removePlayer}
-                    onRunAnomalyCheck={handleRunAnomalyDetection}
-                    toast={toast}
-                    isOtpEnabled={isOtpVerificationEnabled}
-                    whatsappConfig={whatsappConfig}
-                    isAdmin={isAdmin}
-                    colorClass={tabColors[index % tabColors.length]}
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
-          ) : (
-             <div className="text-center py-10">
-                <p className="text-muted-foreground mb-4">No players in the game.</p>
-                <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4"/>Add Players</Button>
-             </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
-            <div className="flex gap-2">
-                <Button onClick={() => setAddPlayerModalOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />Add Player(s)
-                </Button>
-
-              {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
-            </div>
-            <div className="flex gap-2">
-                <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
-            </div>
-        </CardFooter>
-      </Card>
-    </section>
-    
-    <aside className="md:col-span-1">
-      <SummaryCard 
-        activeGame={activeGame}
-        transfers={transfers}
-        buyInLog={totalBuyInLog}
-        grandTotal={grandTotalBuyIn}
-      />
-    </aside>
-  </main>
-  )
-
-  const PlayerView = () => (
-    <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-        <section className="md:col-span-2 mb-8 md:mb-0">
-            {currentPlayerInGame ? (
-                 <PlayerCard 
-                    player={currentPlayerInGame} 
-                    onUpdate={updatePlayer}
-                    onRemove={() => {}} // Players cannot remove themselves
-                    onRunAnomalyCheck={handleRunAnomalyDetection}
-                    toast={toast}
-                    isOtpEnabled={isOtpVerificationEnabled}
-                    whatsappConfig={whatsappConfig}
-                    isAdmin={false}
-                    colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
-                  />
-            ) : (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Welcome, {currentUser?.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-center py-10">
-                        <p className="text-muted-foreground">You are not part of the current game.</p>
-                        <p className="text-sm text-muted-foreground">Please wait for the admin to add you.</p>
-                    </CardContent>
-                </Card>
-            )}
-        </section>
-        <aside className="md:col-span-1">
-            <SummaryCard 
-                activeGame={activeGame}
-                transfers={transfers}
-                buyInLog={totalBuyInLog}
-                grandTotal={grandTotalBuyIn}
-            />
-        </aside>
-    </main>
-  )
-  
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-start mb-6 gap-4">
@@ -811,7 +828,35 @@ export default function ChipMaestroPage() {
         </div>
       </header>
       
-      {isAdmin ? <AdminView /> : <PlayerView />}
+      {isAdmin ? (
+          <AdminView
+              players={players}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              updatePlayer={updatePlayer}
+              removePlayer={removePlayer}
+              handleRunAnomalyDetection={handleRunAnomalyDetection}
+              isOtpVerificationEnabled={isOtpVerificationEnabled}
+              whatsappConfig={whatsappConfig}
+              isAdmin={isAdmin}
+              setAddPlayerModalOpen={setAddPlayerModalOpen}
+              activeGame={activeGame}
+              setSaveConfirmOpen={setSaveConfirmOpen}
+              setReportsModalOpen={setReportsModalOpen}
+              toast={toast}
+          />
+      ) : (
+          <PlayerView
+              currentUser={currentUser}
+              players={players}
+              updatePlayer={updatePlayer}
+              handleRunAnomalyDetection={handleRunAnomalyDetection}
+              isOtpVerificationEnabled={isOtpVerificationEnabled}
+              whatsappConfig={whatsappConfig}
+              toast={toast}
+              activeGame={activeGame}
+          />
+      )}
 
       <VenueDialog 
         isOpen={isVenueModalOpen}
@@ -850,7 +895,6 @@ export default function ChipMaestroPage() {
         isOpen={isReportsModalOpen}
         onOpenChange={setReportsModalOpen}
         activeGame={activeGame}
-        transfers={transfers}
       />
       <AnomalyReportDialog
         isOpen={isAnomalyModalOpen}
@@ -1807,11 +1851,15 @@ const ReportsDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
     activeGame: GameHistory | null,
-    transfers: string[],
-}> = ({ isOpen, onOpenChange, activeGame, transfers }) => {
+}> = ({ isOpen, onOpenChange, activeGame }) => {
     const reportContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
     const { toast } = useToast();
+    
+    const transfers = useMemo(() => {
+        if (!activeGame) return [];
+        return calculateInterPlayerTransfers(activeGame.players);
+    }, [activeGame]);
     
     const handleExportPdf = async () => {
         if (!activeGame || !reportContentRef.current) return;
@@ -2415,11 +2463,3 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
-    
-
-    
-
-    
-
-
-
