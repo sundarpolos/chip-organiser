@@ -637,7 +637,7 @@ export default function ChipMaestroPage() {
                     value={p.id} 
                     className={cn(
                       "m-1 truncate text-xs p-1.5 md:text-sm md:p-2.5 data-[state=inactive]:border data-[state=inactive]:border-transparent",
-                      `data-[state=inactive]:${tabColors[index % tabColors.length]}`,
+                      `${tabColors[index % tabColors.length]}`,
                       "data-[state=active]:ring-2 data-[state=active]:ring-ring"
                     )}
                   >
@@ -656,7 +656,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
-                    canEdit={isAdmin} // Admins can always edit
+                    canEdit={true} // Admins can always edit
                     colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
@@ -1180,7 +1180,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
             {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-6">
-             {!activeGame || activeGame.players.length === 0 ? (
+             {(!activeGame || activeGame.players.length === 0) ? (
                 <div className="text-center py-10 text-muted-foreground">
                     <p>Add players and buy-ins to see the summary.</p>
                 </div>
@@ -2331,6 +2331,7 @@ const SaveConfirmDialog: FC<{
     };
 
     const { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced } = useMemo(() => {
+        if (!localPlayers) return { totalBuyInsSum: 0, totalFinalChipsSum: 0, totalProfitLossSum: 0, isBalanced: false };
         const totalBuyInsSum = localPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0);
         const totalFinalChipsSum = localPlayers.reduce((sum, p) => sum + p.finalChips, 0);
         const totalProfitLossSum = localPlayers.reduce((sum, p) => sum + p.profitLoss, 0);
@@ -2417,3 +2418,6 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
+
+
+    
