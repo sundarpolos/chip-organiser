@@ -353,7 +353,7 @@ export default function ChipMaestroPage() {
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
           finalChips: 0,
-          permissions: { canEditBuyIns: playerToAdd.isAdmin }, // Inherit from master player
+          permissions: { canEditBuyIns: true }, // Default to true on add
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -656,7 +656,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
-                    canEdit={player.permissions?.canEditBuyIns ?? false}
+                    canEdit={isAdmin || (player.permissions?.canEditBuyIns ?? false)}
                     colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
@@ -1079,8 +1079,8 @@ const PlayerCard: FC<{
 
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
   
-  const togglePermissions = (canEdit: boolean) => {
-    onUpdate(player.id, { permissions: { canEditBuyIns: canEdit } });
+  const togglePermissions = (canEditValue: boolean) => {
+    onUpdate(player.id, { permissions: { canEditBuyIns: canEditValue } });
   };
 
 
@@ -2418,5 +2418,6 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
+    
 
     
