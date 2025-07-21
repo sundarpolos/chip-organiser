@@ -392,6 +392,12 @@ export default function ChipMaestroPage() {
             const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
             if (savedWhatsappConfig) {
               setWhatsappConfig(JSON.parse(savedWhatsappConfig));
+            } else {
+              setWhatsappConfig({
+                apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '',
+                apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '',
+                senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
+              });
             }
 
             const lastActiveGame = localStorage.getItem("activeGame");
@@ -1956,7 +1962,7 @@ const ReportsDialog: FC<{
                         </Button>
                         <Button onClick={onSettleUp}>
                             <WhatsappIcon />
-                            <span className="ml-2">Settle Up</span>
+                            <span className="ml-2">Settlement</span>
                         </Button>
                         <DialogClose asChild>
                            <Button variant="outline">Close</Button>
@@ -2666,3 +2672,4 @@ ${formattedTransfers}
         </Dialog>
     );
 };
+
