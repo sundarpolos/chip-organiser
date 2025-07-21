@@ -497,7 +497,7 @@ export default function ChipMaestroPage() {
   }
   
   const handleStartGameFromVenue = async (venue: string, date: Date) => {
-    if (dbStatus !== 'connected') {
+    if (dbStatus === 'connected' && !masterVenues.some(v => v.name === venue)) {
         const venueData: Omit<MasterVenue, 'id'> = { name: venue };
         const savedVenue = await saveMasterVenue(venueData);
         setMasterVenues(prev => [...prev, savedVenue]);
@@ -2256,4 +2256,3 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     );
 };
-
