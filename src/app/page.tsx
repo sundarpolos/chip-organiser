@@ -1685,13 +1685,6 @@ const ReportsDialog: FC<{
           return acc;
       }, [] as {time: string, total: number}[]);
 
-    const scatterData = players.map(p => ({
-        x: p.totalBuyIns,
-        y: p.profitLoss,
-        z: Math.abs(p.profitLoss) || 1, // for bubble size
-        name: p.name
-    }));
-
     const sortedStandings = [...players].sort((a, b) => b.profitLoss - a.profitLoss);
     const totalBuyIns = players.reduce((sum, p) => sum + p.totalBuyIns, 0);
     const totalChips = players.reduce((sum, p) => sum + p.finalChips, 0);
@@ -1789,29 +1782,6 @@ const ReportsDialog: FC<{
 
                             <Card><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
                                 <ChipDistributionChart data={pieChartData} />
-                            </CardContent></Card>
-
-                            <Card><CardHeader><CardTitle>Buy-in vs. Profit/Loss</CardTitle></CardHeader><CardContent>
-                               <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={scatterData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                                    <CartesianGrid />
-                                    <XAxis type="number" dataKey="x" name="Total Buy-in" unit=" " label={{ value: 'Total Buy-in', position: 'insideBottom', offset: -15 }}/>
-                                    <YAxis type="number" dataKey="y" name="Profit/Loss" unit=" " label={{ value: 'Profit/Loss', angle: -90, position: 'insideLeft' }}/>
-                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ payload }) => {
-                                         if (!payload || payload.length < 1) return null;
-                                         const data = payload[0].payload;
-                                         return (
-                                            <div className="bg-background border p-2 rounded-md shadow-lg">
-                                                <p className="font-bold">{data.name}</p>
-                                                <p>Buy-in: {data.x}</p>
-                                                <p className={data.y >= 0 ? 'text-green-600' : 'text-red-600'}>P/L: {data.y.toFixed(0)}</p>
-                                            </div>
-                                         )
-                                    }}/>
-                                    <Legend />
-                                    <Bar dataKey="y" name="Players" fill="#8884d8" />
-                                </BarChart>
-                               </ResponsiveContainer>
                             </CardContent></Card>
 
                             <Card className="md:col-span-2 lg:col-span-3"><CardHeader><CardTitle>Game Action Timeline</CardTitle><CardDescription>Cumulative buy-ins over time</CardDescription></CardHeader><CardContent>
