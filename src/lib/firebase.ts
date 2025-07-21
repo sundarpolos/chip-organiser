@@ -1,4 +1,4 @@
-'use server';
+
 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, getDoc, doc } from "firebase/firestore";
