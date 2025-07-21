@@ -245,7 +245,7 @@ const PlayerView: FC<{
                         </CardHeader>
                         <CardContent className="text-center py-10">
                             <p className="text-muted-foreground">You are not part of the current game.</p>
-                            <p className="text-sm text-muted-foreground">Please wait for the admin to add you.</p>
+                            <p className="text-sm text-muted-foreground">Please wait for the admin to add you, or load a previous game.</p>
                         </CardContent>
                     </Card>
                 )}
@@ -366,10 +366,38 @@ export default function ChipMaestroPage() {
     }
   }, [currentUser]);
 
+  const loadGameIntoState = useCallback((gameToLoad: GameHistory, newPlayers: Player[] = []) => {
+      const allPlayers = [...gameToLoad.players, ...newPlayers];
+      setCurrentVenue(gameToLoad.venue);
+      setGameDate(new Date(gameToLoad.timestamp));
+      setPlayers(allPlayers.map(p => ({
+        id: p.id,
+        name: p.name,
+        whatsappNumber: p.whatsappNumber,
+        buyIns: (p.buyIns || []).map((b, i) => ({
+            ...b,
+            id: b.id || `buyin-legacy-${Date.now()}-${i}`
+        })),
+        finalChips: p.finalChips,
+      })));
+      setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
+      setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
+
+      if (allPlayers.length > 0) {
+        const currentUserInGame = allPlayers.find(p => p.name === currentUser?.name);
+        if (currentUserInGame) {
+          setActiveTab(currentUserInGame.id);
+        } else {
+          setActiveTab(allPlayers[0].id);
+        }
+      }
+  }, [currentUser]);
+
 
   // Load data from Firestore on initial render
   useEffect(() => {
     async function loadInitialData() {
+        if (!currentUser) return;
         try {
             const [
                 loadedMasterPlayers,
@@ -401,39 +429,48 @@ export default function ChipMaestroPage() {
               });
             }
 
-            const lastActiveGame = localStorage.getItem("activeGame");
-            if (lastActiveGame) {
-                const game = JSON.parse(lastActiveGame);
-                setCurrentVenue(game.venue);
-                setGameDate(new Date(game.timestamp));
-                setPlayers(game.players.map((p: CalculatedPlayer) => ({
-                    ...p, // Spread existing player data
-                    buyIns: (p.buyIns || []).map((b: BuyIn, i: number) => ({
-                      ...b,
-                      id: b.id || `buyin-legacy-${Date.now()}-${i}`
-                    })),
-                })));
-                if (game.startTime) setGameStartTime(new Date(game.startTime));
-                if (game.endTime) setGameEndTime(new Date(game.endTime));
-                if (game.players.length > 0) {
-                  setActiveTab(game.players[0].id);
+            const todayGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), new Date()));
+
+            if (todayGame) {
+                let playersToAdd: Player[] = [];
+                const isUserInGame = todayGame.players.some(p => p.name === currentUser.name);
+
+                if (!isUserInGame && !isAdmin) {
+                    const newPlayer: Player = {
+                        id: `player-${Date.now()}-${currentUser.id}`,
+                        name: currentUser.name,
+                        whatsappNumber: currentUser.whatsappNumber,
+                        buyIns: [{ 
+                            id: `buyin-${Date.now()}-${currentUser.id}`,
+                            amount: 0, 
+                            timestamp: new Date().toISOString(), 
+                            verified: !isOtpVerificationEnabled 
+                        }],
+                        finalChips: 0,
+                    };
+                    playersToAdd.push(newPlayer);
+                    toast({ title: "Game Joined!", description: `You have been automatically added to today's game at ${todayGame.venue}.` });
                 }
-            } else if (isAdmin) {
-                setVenueModalOpen(true);
+                loadGameIntoState(todayGame, playersToAdd);
+
+            } else {
+                if (isAdmin) {
+                    setVenueModalOpen(true);
+                } else {
+                    setLoadGameModalOpen(true);
+                }
             }
 
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
-            toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. The connection is OK, but a query failed." });
-            if (isAdmin) setVenueModalOpen(true); // Open venue dialog to start fresh if data load fails
+            toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
+            if (isAdmin) setVenueModalOpen(true);
         } finally {
             setIsDataReady(true);
         }
     }
-    if (currentUser) {
-        loadInitialData();
-    }
-  }, [toast, currentUser, isAdmin]);
+    loadInitialData();
+  }, [toast, currentUser, isAdmin, loadGameIntoState, isOtpVerificationEnabled]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -616,23 +653,7 @@ export default function ChipMaestroPage() {
   const handleLoadGame = (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad) {
-      setCurrentVenue(gameToLoad.venue);
-      setGameDate(new Date(gameToLoad.timestamp));
-      setPlayers(gameToLoad.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        whatsappNumber: p.whatsappNumber,
-        buyIns: (p.buyIns || []).map((b, i) => ({
-            ...b,
-            id: b.id || `buyin-legacy-${Date.now()}-${i}`
-        })),
-        finalChips: p.finalChips,
-      })));
-      setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
-      setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
-      if (gameToLoad.players.length > 0) {
-        setActiveTab(gameToLoad.players[0].id)
-      }
+      loadGameIntoState(gameToLoad);
       setLoadGameModalOpen(false);
       toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
     }
