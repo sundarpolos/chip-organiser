@@ -72,7 +72,8 @@ import {
   WifiOff,
   LogOut,
   UserCheck,
-  UserCog
+  UserCog,
+  User
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -82,7 +83,8 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ZAxis } from "recharts"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis, ZAxis } from "recharts"
 import { cn } from "@/lib/utils"
 import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/game-service"
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/services/player-service"
@@ -608,15 +610,7 @@ export default function ChipMaestroPage() {
     <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
     <section className="md:col-span-2 mb-8 md:mb-0">
       <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Button onClick={() => setManagePlayersModalOpen(true)}><BookUser className="mr-2 h-4 w-4" />Manage Players</Button>
-              <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {players.length > 0 ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="h-auto flex flex-wrap justify-start -m-1">
@@ -666,7 +660,6 @@ export default function ChipMaestroPage() {
               {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
             </div>
             <div className="flex gap-2">
-                <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
                 <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
             </div>
         </CardFooter>
@@ -742,43 +735,57 @@ export default function ChipMaestroPage() {
         </div>
         
         <div className="flex items-center gap-2">
-            <Button onClick={handleLogout} variant="outline" size="sm">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
+            {isAdmin && <>
+                <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
+                <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
+            </>}
             <ThemeToggle />
-            {isAdmin && <DropdownMenu>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-5 w-5" />
-                  <span className="sr-only">More options</span>
+                  <User className="h-5 w-5" />
+                  <span className="sr-only">User Menu</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                  <MessageCircleCode className="h-4 w-4" />
-                  <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
-                  <Switch
-                      id="otp-verification-toggle"
-                      checked={isOtpVerificationEnabled}
-                      onCheckedChange={setOtpVerificationEnabled}
-                  />
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
-                  <Upload className="h-4 w-4" />
-                  <span className="ml-2">Import Game</span>
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
-                  <WhatsappIcon />
-                  <span className="ml-2">Group Message</span>
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
-                  <Settings className="h-4 w-4" />
-                  <span className="ml-2">WA Settings</span>
+                {isAdmin && (
+                    <>
+                        <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)}>
+                            <BookUser className="h-4 w-4 mr-2" />
+                            Manage Players
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <MessageCircleCode className="h-4 w-4" />
+                          <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
+                          <Switch
+                              id="otp-verification-toggle"
+                              checked={isOtpVerificationEnabled}
+                              onCheckedChange={setOtpVerificationEnabled}
+                          />
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
+                          <Upload className="h-4 w-4" />
+                          <span className="ml-2">Import Game</span>
+                        </DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
+                          <WhatsappIcon />
+                          <span className="ml-2">Group Message</span>
+                        </DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
+                          <Settings className="h-4 w-4" />
+                          <span className="ml-2">WA Settings</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                    </>
+                )}
+                <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>}
+            </DropdownMenu>
         </div>
       </header>
       
@@ -1059,7 +1066,10 @@ const PlayerCard: FC<{
 
   return (
     <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
-      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+       <CardHeader>
+            <CardTitle>{player.name || "Unnamed Player"}</CardTitle>
+        </CardHeader>
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="text-lg mb-2">Buy-ins</Label>
           <div className="space-y-2">
@@ -1097,15 +1107,33 @@ const PlayerCard: FC<{
       </CardContent>
       {isAdmin && (
            <CardFooter className="flex flex-wrap gap-4 justify-between items-center">
-                <div className="flex gap-4 items-center">
-                     <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="sm">
-                        <ShieldAlert className="mr-2 h-4 w-4" />
-                        <span>Analyze Buy-ins</span>
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => onRemove(player.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove Player
-                    </Button>
+                <div className="flex gap-2 items-center">
+                     <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
+                                    <ShieldAlert className="h-4 w-4" />
+                                    <span className="sr-only">Analyze Buy-ins</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Analyze Buy-ins</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                     <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Remove Player</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Remove Player</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
                 <div className="flex items-center gap-4">
                     <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
@@ -1893,7 +1921,7 @@ const ReportsDialog: FC<{
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
                                         <YAxis />
-                                        <Tooltip
+                                        <RechartsTooltip
                                             content={({ payload }) => {
                                                 if (!payload || !payload.length) return null;
                                                 const data = payload[0].payload;
