@@ -11,14 +11,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Log the configuration to the server console for debugging
-console.log("--- Firebase Config Loaded ---");
-console.log("Project ID:", firebaseConfig.projectId);
-console.log("API Key Set:", !!firebaseConfig.apiKey);
-console.log("Auth Domain:", firebaseConfig.authDomain);
-console.log("----------------------------");
-
-
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
