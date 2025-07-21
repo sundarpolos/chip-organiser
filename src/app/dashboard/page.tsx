@@ -645,7 +645,7 @@ export default function ChipMaestroPage() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-              {players.map(player => (
+              {players.map((player, index) => (
                 <TabsContent key={player.id} value={player.id}>
                   <PlayerCard 
                     player={player} 
@@ -657,6 +657,7 @@ export default function ChipMaestroPage() {
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
                     canEdit={isAdmin} // Admins can always edit
+                    colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
               ))}
@@ -708,6 +709,7 @@ export default function ChipMaestroPage() {
                     whatsappConfig={whatsappConfig}
                     isAdmin={false}
                     canEdit={currentPlayerInGame.permissions.canEditBuyIns}
+                    colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
                   />
             ) : (
                 <Card>
@@ -1039,8 +1041,9 @@ const PlayerCard: FC<{
   whatsappConfig: WhatsappConfig;
   isAdmin: boolean;
   canEdit: boolean;
+  colorClass: string;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, canEdit, toast }) => {
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, canEdit, colorClass, toast }) => {
   
   const handleBuyInChange = (index: number, newAmount: number) => {
     const newBuyIns = [...(player.buyIns || [])]
@@ -1080,7 +1083,7 @@ const PlayerCard: FC<{
   const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
 
   return (
-    <Card className="bg-slate-50 dark:bg-slate-900/50 border-0 shadow-none">
+    <Card className={cn("border-0 shadow-none", colorClass)}>
        
       <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
