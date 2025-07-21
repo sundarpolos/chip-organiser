@@ -353,7 +353,7 @@ export default function ChipMaestroPage() {
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [{ amount: 0, timestamp: new Date().toISOString(), verified: !isOtpVerificationEnabled }],
           finalChips: 0,
-          permissions: { canEditBuyIns: false },
+          permissions: { canEditBuyIns: playerToAdd.isAdmin }, // Inherit from master player
       }));
       
       const updatedPlayers = [...players, ...newPlayers];
@@ -656,7 +656,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={isAdmin}
-                    canEdit={true} // Admins can always edit
+                    canEdit={isAdmin || player.permissions.canEditBuyIns}
                     colorClass={tabColors[index % tabColors.length]}
                   />
                 </TabsContent>
@@ -708,7 +708,7 @@ export default function ChipMaestroPage() {
                     isOtpEnabled={isOtpVerificationEnabled}
                     whatsappConfig={whatsappConfig}
                     isAdmin={false}
-                    canEdit={currentPlayerInGame.permissions.canEditBuyIns}
+                    canEdit={isAdmin || currentPlayerInGame.permissions.canEditBuyIns}
                     colorClass={tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length]}
                   />
             ) : (
@@ -981,7 +981,7 @@ const BuyInRow: FC<{
                     onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
                     placeholder="Amount"
                     className="h-9 text-sm"
-                    disabled={!isAdmin && (!canEdit || (buyIn.verified && isOtpEnabled))}
+                    disabled={isAdmin ? false : !canEdit || (buyIn.verified && isOtpEnabled)}
                 />
                 {isLastRow && (isAdmin || canEdit) && (
                     <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
@@ -1119,7 +1119,7 @@ const PlayerCard: FC<{
             value={player.finalChips === 0 ? "" : player.finalChips}
             onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
             placeholder="Chip Count"
-            disabled={!isAdmin && !canEdit}
+            disabled={isAdmin ? false : !canEdit}
           />
         </div>
       </CardContent>
@@ -1127,17 +1127,6 @@ const PlayerCard: FC<{
            <CardFooter className="flex flex-wrap gap-4 justify-between items-center">
             <div className="flex items-center gap-4">
                 <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
-                 <div className="flex items-center gap-2">
-                    <Switch
-                        id={`permissions-${player.id}`}
-                        checked={player.permissions.canEditBuyIns}
-                        onCheckedChange={togglePermissions}
-                        aria-label="Toggle edit permissions"
-                    />
-                    <Label htmlFor={`permissions-${player.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                        Allow Edit
-                    </Label>
-                </div>
             </div>
             <div className="flex gap-2 items-center">
                  <TooltipProvider>
