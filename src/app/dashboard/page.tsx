@@ -150,46 +150,56 @@ const AdminView: FC<{
     activeGame, setSaveConfirmOpen, setReportsModalOpen, toast
 }) => {
     
+    const currentPlayer = useMemo(() => {
+        return players.find(p => p.id === activeTab);
+    }, [players, activeTab]);
+
+    if (players.length === 0) {
+        return (
+             <Card>
+                <CardContent className="pt-6">
+                    <div className="text-center py-10">
+                        <p className="text-muted-foreground mb-4">No players in the game.</p>
+                        <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
         <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
             <section className="md:col-span-2 mb-8 md:mb-0">
                 <Card>
                     <CardContent className="pt-6">
-                        {players.length > 0 ? (
-                           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 h-auto flex-wrap">
-                                    {players.map(p => (
-                                        <TabsTrigger key={p.id} value={p.id}>{p.name || "New Player"}</TabsTrigger>
-                                    ))}
-                                </TabsList>
-                                {players.map((p) => (
-                                    <TabsContent key={p.id} value={p.id} className="mt-4">
-                                        <PlayerCard
-                                            player={p}
-                                            onUpdate={updatePlayer}
-                                            onRemove={removePlayer}
-                                            onRunAnomalyCheck={handleRunAnomalyDetection}
-                                            isOtpEnabled={isOtpVerificationEnabled}
-                                            whatsappConfig={whatsappConfig}
-                                            isAdmin={isAdmin}
-                                            toast={toast}
-                                        />
-                                    </TabsContent>
+                       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 h-auto flex-wrap">
+                                {players.map(p => (
+                                    <TabsTrigger key={p.id} value={p.id}>{p.name || "New Player"}</TabsTrigger>
                                 ))}
-                           </Tabs>
-                        ) : (
-                            <div className="text-center py-10">
-                                <p className="text-muted-foreground mb-4">No players in the game.</p>
-                                <Button onClick={() => setAddPlayerModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
-                            </div>
-                        )}
+                            </TabsList>
+                            {players.map((p) => (
+                                <TabsContent key={p.id} value={p.id} className="mt-4">
+                                    <PlayerCard
+                                        player={p}
+                                        onUpdate={updatePlayer}
+                                        onRemove={removePlayer}
+                                        onRunAnomalyCheck={handleRunAnomalyDetection}
+                                        isOtpEnabled={isOtpVerificationEnabled}
+                                        whatsappConfig={whatsappConfig}
+                                        isAdmin={isAdmin}
+                                        toast={toast}
+                                    />
+                                </TabsContent>
+                            ))}
+                       </Tabs>
                     </CardContent>
                     <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                         <div className="flex gap-2">
-                            <Button onClick={() => setAddPlayerModalOpen(true)}>
+                            <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}>
                                 <Plus className="mr-2 h-4 w-4" />Add Player(s)
                             </Button>
-                            {activeGame && <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame}><Save className="mr-2 h-4 w-4" />Save Game</Button>}
+                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame || !isAdmin}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                         </div>
                         <div className="flex gap-2">
                             <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
@@ -205,46 +215,12 @@ const AdminView: FC<{
 
 const PlayerView: FC<{
     currentUser: MasterPlayer;
-    players: Player[];
-    updatePlayer: (id: string, newValues: Partial<Player>) => void;
-    handleRunAnomalyDetection: (player: Player) => void;
-    isOtpVerificationEnabled: boolean;
-    whatsappConfig: WhatsappConfig;
-    toast: ReturnType<typeof useToast>['toast'];
-    activeGame: GameHistory | null;
     joinableGame: GameHistory | null;
     handleJoinGame: () => void;
     setLoadGameModalOpen: (isOpen: boolean) => void;
 }> = ({
-    currentUser, players, updatePlayer, handleRunAnomalyDetection,
-    isOtpVerificationEnabled, whatsappConfig, toast, activeGame,
-    joinableGame, handleJoinGame, setLoadGameModalOpen
+    currentUser, joinableGame, handleJoinGame, setLoadGameModalOpen
 }) => {
-    const currentPlayerInGame = useMemo(() => {
-        return players.find(p => p.name === currentUser.name)
-    }, [players, currentUser]);
-
-    if (currentPlayerInGame) {
-      return (
-          <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-              <section className="md:col-span-2 mb-8 md:mb-0">
-                  <div className={cn("p-4 rounded-lg", tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length])}>
-                      <PlayerCard
-                          player={currentPlayerInGame}
-                          onUpdate={updatePlayer}
-                          onRemove={() => { }} // Players cannot remove themselves
-                          onRunAnomalyCheck={handleRunAnomalyDetection}
-                          toast={toast}
-                          isOtpEnabled={isOtpVerificationEnabled}
-                          whatsappConfig={whatsappConfig}
-                          isAdmin={false}
-                      />
-                  </div>
-              </section>
-              <SummaryView activeGame={activeGame} />
-          </main>
-      );
-    }
     
     if (joinableGame) {
         return (
@@ -433,6 +409,8 @@ export default function ChipMaestroPage() {
         } else {
           setActiveTab(gameToLoad.players[0].id);
         }
+      } else {
+        setActiveTab("");
       }
   }, [currentUser]);
 
@@ -472,59 +450,19 @@ export default function ChipMaestroPage() {
               });
             }
             
-            // New logic for non-admins
-            if (!currentUser.isAdmin) {
-                const today = new Date();
-
-                // 1. Check for unsaved game in localStorage for today
-                const localGameStr = localStorage.getItem("activeGame");
-                if (localGameStr) {
-                    const localGame: GameHistory = JSON.parse(localGameStr);
-                    if (isSameDay(new Date(localGame.timestamp), today)) {
-                        const isPlayerInGame = localGame.players.some(p => p.name === currentUser.name);
-                        if (isPlayerInGame) {
-                            loadGameIntoState(localGame);
-                        } else {
-                            setJoinableGame(localGame);
-                        }
-                        setHasCheckedForGame(true);
-                        return; // Exit after handling local game
-                    }
-                }
-
-                // 2. Check for saved game from history for today
-                const todaysGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), today));
-                if (todaysGame) {
-                    const isPlayerInGame = todaysGame.players.some(p => p.name === currentUser.name);
-                    if (isPlayerInGame) {
-                        loadGameIntoState(todaysGame);
-                    } else {
-                        setJoinableGame(todaysGame);
-                    }
-                    setHasCheckedForGame(true);
-                    return; // Exit after handling saved game
-                }
-                
-                // 3. No game found for today, flag check as complete
-                setHasCheckedForGame(true);
-            } else {
-                 // Admins always see the load game modal
-                 setLoadGameModalOpen(true);
-            }
-
+            setLoadGameModalOpen(true);
 
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
             toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
-            if (currentUser.isAdmin) {
-                setLoadGameModalOpen(true); // Still open it on error for admins
-            }
+            setLoadGameModalOpen(true);
         } finally {
             setIsDataReady(true);
         }
     }
     loadInitialData();
-  }, [toast, currentUser, loadGameIntoState]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -880,20 +818,24 @@ export default function ChipMaestroPage() {
     );
   }
 
+  const isPlayerInGame = activeGame?.players?.some(p => p.id === currentUser?.id) ?? false;
+  const showDashboard = activeGame && (isAdmin || isPlayerInGame);
+
+
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-           <h1 className="text-2xl font-bold truncate">{currentVenue}</h1>
+           <h1 className="text-2xl font-bold truncate">{currentVenue === "Untitled Game" && players.length === 0 ? "Chip Maestro" : currentVenue}</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
-            <span>{format(gameDate, "dd MMMM yyyy")}</span>
+            {players.length > 0 && <span>{format(gameDate, "dd MMMM yyyy")}</span>}
             {gameStartTime && (
                 <div className="flex items-center gap-1">
                     <TimerIcon className="h-4 w-4" />
                     <span>{gameDuration}</span>
                 </div>
             )}
-            {greeting && (
+            {greeting && players.length > 0 && (
               <>
                 <Separator orientation="vertical" className="h-4" />
                 <p className="font-semibold text-primary">{greeting}</p>
@@ -905,8 +847,8 @@ export default function ChipMaestroPage() {
         <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
-                <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
             </>}
+            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -916,38 +858,35 @@ export default function ChipMaestroPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {isAdmin && (
-                    <>
-                        <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)}>
-                            <BookUser className="h-4 w-4 mr-2" />
-                            Manage Players
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <MessageCircleCode className="h-4 w-4" />
-                          <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
-                          <Switch
-                              id="otp-verification-toggle"
-                              checked={isOtpVerificationEnabled}
-                              onCheckedChange={setOtpVerificationEnabled}
-                          />
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
-                          <Upload className="h-4 w-4" />
-                          <span className="ml-2">Import Game</span>
-                        </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
-                          <WhatsappIcon />
-                          <span className="ml-2">Group Message</span>
-                        </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
-                          <Settings className="h-4 w-4" />
-                          <span className="ml-2">WA Settings</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                    </>
-                )}
+                <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)} disabled={!isAdmin}>
+                    <BookUser className="h-4 w-4 mr-2" />
+                    Manage Players
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isAdmin}>
+                  <MessageCircleCode className="h-4 w-4" />
+                  <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
+                  <Switch
+                      id="otp-verification-toggle"
+                      checked={isOtpVerificationEnabled}
+                      onCheckedChange={setOtpVerificationEnabled}
+                      disabled={!isAdmin}
+                  />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setImportGameModalOpen(true)} disabled={!isAdmin}>
+                  <Upload className="h-4 w-4" />
+                  <span className="ml-2">Import Game</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)} disabled={!isAdmin}>
+                  <WhatsappIcon />
+                  <span className="ml-2">Group Message</span>
+                </DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)} disabled={!isAdmin}>
+                  <Settings className="h-4 w-4" />
+                  <span className="ml-2">WA Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -957,7 +896,7 @@ export default function ChipMaestroPage() {
         </div>
       </header>
       
-      {isAdmin ? (
+      {players.length > 0 ? (
           <AdminView
               players={players}
               activeTab={activeTab}
@@ -977,13 +916,6 @@ export default function ChipMaestroPage() {
       ) : (
           <PlayerView
               currentUser={currentUser}
-              players={players}
-              updatePlayer={updatePlayer}
-              handleRunAnomalyDetection={handleRunAnomalyDetection}
-              isOtpVerificationEnabled={isOtpVerificationEnabled}
-              whatsappConfig={whatsappConfig}
-              toast={toast}
-              activeGame={activeGame}
               joinableGame={joinableGame}
               handleJoinGame={handleJoinGame}
               setLoadGameModalOpen={setLoadGameModalOpen}
@@ -1017,13 +949,18 @@ export default function ChipMaestroPage() {
         toast={toast}
       />
       <LoadGameDialog 
-        isOpen={isLoadGameModalOpen || (!isAdmin && hasCheckedForGame && !joinableGame && players.length === 0)}
-        onOpenChange={setLoadGameModalOpen}
+        isOpen={isLoadGameModalOpen}
+        onOpenChange={(isOpen) => {
+            // Prevent closing the modal if no game is loaded
+            if (!isOpen && players.length === 0) return;
+            setLoadGameModalOpen(isOpen)
+        }}
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
         onDeleteGame={handleDeleteGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
+        canBeClosed={players.length > 0}
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1177,7 +1114,7 @@ const BuyInRow: FC<{
                     disabled={!isAdmin}
                 />
                 {isLastRow && (
-                    <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9">
+                    <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9" disabled={!isAdmin}>
                         <Plus className="h-4 w-4" />
                         <span className="sr-only">Re-buy</span>
                     </Button>
@@ -1190,7 +1127,7 @@ const BuyInRow: FC<{
                  {canBeRemoved && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="destructive" className="h-9 w-9">
+                        <Button size="icon" variant="destructive" className="h-9 w-9" disabled={!isAdmin}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
@@ -1211,14 +1148,14 @@ const BuyInRow: FC<{
             </div>
             {isOtpEnabled && showOtpInput && !buyIn.verified && (
                 <div className="flex items-center gap-2">
-                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9" />
-                    <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
+                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9" disabled={!isAdmin}/>
+                    <Button onClick={handleConfirmOtp} disabled={isVerifying || !isAdmin} className="h-9">
                         {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm"}
                     </Button>
                 </div>
             )}
             {isOtpEnabled && !showOtpInput && !buyIn.verified && (
-                 <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0} className="w-full h-9">
+                 <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0 || !isAdmin} className="w-full h-9">
                      {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
                  </Button>
             )}
@@ -1318,25 +1255,26 @@ const PlayerCard: FC<{
             />
             </div>
         </div>
-        {isAdmin && (
-            <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
-                <div className="flex items-center gap-4">
-                    <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
-                </div>
-                <div className="flex gap-2 items-center">
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
-                                    <ShieldAlert className="h-4 w-4" />
-                                    <span className="sr-only">Analyze Buy-ins</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Analyze Buy-ins</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+        
+        <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
+            <div className="flex items-center gap-4">
+                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+            </div>
+            <div className="flex gap-2 items-center">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
+                                <ShieldAlert className="h-4 w-4" />
+                                <span className="sr-only">Analyze Buy-ins</span>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Analyze Buy-ins</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                {isAdmin && (
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -1350,9 +1288,10 @@ const PlayerCard: FC<{
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
-                </div>
+                )}
             </div>
-        )}
+        </div>
+        
     </div>
   )
 }
@@ -1970,7 +1909,8 @@ const LoadGameDialog: FC<{
   onDeleteGame: (id: string) => void;
   whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame, whatsappConfig, toast }) => {
+  canBeClosed: boolean;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame, whatsappConfig, toast, canBeClosed }) => {
   const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
@@ -2092,11 +2032,13 @@ const LoadGameDialog: FC<{
                 )}
               </ScrollArea>
             </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Close</Button>
-              </DialogClose>
-            </DialogFooter>
+            {canBeClosed && (
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Close</Button>
+                </DialogClose>
+              </DialogFooter>
+            )}
           </>
         )}
       </DialogContent>
