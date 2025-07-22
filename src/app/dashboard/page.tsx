@@ -119,6 +119,8 @@ const WhatsappIcon = () => (
   );
 
 type DbStatus = 'checking' | 'connected' | 'error';
+type BuyInRequest = BuyIn & { playerName: string; playerId: string };
+
 
 const tabColors = [
     "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200",
@@ -348,6 +350,7 @@ export default function ChipMaestroPage() {
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
+  const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
 
   
   // Specific Modal Content State
@@ -502,28 +505,30 @@ export default function ChipMaestroPage() {
     
     // Effect for buy-in request notifications
     useEffect(() => {
-        if (!isAdmin || !activeGame) return;
-
-        const currentRequests = (activeGame.players || [])
-            .flatMap(p => (p.buyIns || []).filter(b => b.status === 'requested').map(b => ({ ...b, playerName: p.name })));
-        
-        const currentRequestIds = currentRequests.map(r => r.id);
-        const prevRequestIds = prevBuyInRequestsRef.current;
-        
-        const newRequests = currentRequests.filter(r => !prevRequestIds.includes(r.id));
-        
-        if (newRequests.length > 0) {
-            newRequests.forEach(req => {
-                toast({
-                    title: "New Buy-in Request",
-                    description: `${req.playerName} has requested a buy-in of ₹${req.amount}.`
-                });
-            });
-        }
-        
-        prevBuyInRequestsRef.current = currentRequestIds;
-
-    }, [activeGame, isAdmin, toast]);
+      if (!isAdmin || !activeGame) return;
+  
+      const currentRequests: BuyInRequest[] = (activeGame.players || [])
+          .flatMap(p => 
+              (p.buyIns || [])
+                  .filter(b => b.status === 'requested')
+                  .map(b => ({ ...b, playerName: p.name, playerId: p.id }))
+          );
+      
+      const currentRequestIds = currentRequests.map(r => r.id);
+      const prevRequestIds = prevBuyInRequestsRef.current;
+      
+      const newRequests = currentRequests.filter(r => !prevRequestIds.includes(r.id));
+      
+      if (newRequests.length > 0) {
+          // Open modal for the first new request found
+          if (!buyInRequestModal) {
+            setBuyInRequestModal(newRequests[0]);
+          }
+      }
+      
+      prevBuyInRequestsRef.current = currentRequestIds;
+  
+  }, [activeGame, isAdmin, buyInRequestModal]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -700,9 +705,14 @@ export default function ChipMaestroPage() {
   const handleLoadGame = async (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad && currentUser) {
-      await loadGameIntoState(gameToLoad);
-      setLoadGameModalOpen(false);
-      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
+      if (isAdmin) {
+        await loadGameIntoState(gameToLoad);
+        setLoadGameModalOpen(false);
+        toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
+      } else {
+        // For non-admins, loading a past game just shows the report
+        setReportsModalOpen(true);
+      }
     }
   };
 
@@ -881,7 +891,7 @@ export default function ChipMaestroPage() {
             {isAdmin && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
-            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" disabled={!isAdmin && !hasCheckedForGame}><History className="mr-2 h-4 w-4" />Load Game</Button>
+            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -953,7 +963,16 @@ export default function ChipMaestroPage() {
                 onJoinGame={handleJoinGame}
                 setLoadGameModalOpen={setLoadGameModalOpen}
             />
-        ) : null}
+        ) : (isAdmin && !activeGame && isDataReady && (
+            <div className="text-center py-20">
+                <h2 className="text-2xl font-semibold mb-2">Welcome, {currentUser.name}!</h2>
+                <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
+                <div className="flex justify-center gap-4">
+                     <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
+                     <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
+                </div>
+            </div>
+        ))}
 
       <VenueDialog 
         isOpen={isVenueModalOpen}
@@ -991,7 +1010,6 @@ export default function ChipMaestroPage() {
         onNewGame={handleNewGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
-        canBeClosed={!!activeGame || isAdmin || (!isAdmin && !!joinableGame)}
         currentUser={currentUser}
       />
       <ReportsDialog 
@@ -1041,6 +1059,22 @@ export default function ChipMaestroPage() {
         activeGame={activeGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
+      />
+      <BuyInRequestModalDialog
+        request={buyInRequestModal}
+        onOpenChange={() => setBuyInRequestModal(null)}
+        onApprove={(playerId, buyInId) => {
+          if (!activeGame) return;
+          const player = activeGame.players.find(p => p.id === playerId);
+          if (!player) return;
+          const buyIn = player.buyIns.find(b => b.id === buyInId);
+          if (!buyIn) return;
+          
+          const buyInRow = document.querySelector(`[data-buyin-id="${buyInId}"]`);
+          const approveButton = buyInRow?.querySelector('button');
+          approveButton?.click();
+          setBuyInRequestModal(null);
+        }}
       />
     </div>
   )
@@ -1194,7 +1228,7 @@ const BuyInRow: FC<{
     }
 
     return (
-        <div className="p-2 rounded-md border bg-slate-100 dark:bg-slate-800 space-y-2">
+        <div className="p-2 rounded-md border bg-slate-100 dark:bg-slate-800 space-y-2" data-buyin-id={buyIn.id}>
             <div className="flex items-center gap-2">
                 <div className="flex-1 font-medium text-lg">₹{buyIn.amount}</div>
                 {getStatusIndicator()}
@@ -1988,9 +2022,8 @@ const LoadGameDialog: FC<{
   onNewGame: () => void;
   whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
-  canBeClosed: boolean;
   currentUser: MasterPlayer | null;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, onNewGame, whatsappConfig, toast, canBeClosed, currentUser }) => {
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, onNewGame, whatsappConfig, toast, currentUser }) => {
   const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
@@ -2127,17 +2160,13 @@ const LoadGameDialog: FC<{
               </ScrollArea>
             </div>
             {isAdmin && (
-              <DialogFooter>
-                 <div className="flex justify-between w-full">
-                    <Button variant="destructive" onClick={() => { onOpenChange(false); onNewGame();}}>
-                       <Plus className="mr-2 h-4 w-4" /> Add New Game
-                    </Button>
-                   {canBeClosed && (
-                     <DialogClose asChild>
-                       <Button variant="outline">Close</Button>
-                     </DialogClose>
-                   )}
-                 </div>
+              <DialogFooter className="mt-4 flex sm:justify-between w-full">
+                 <Button variant="destructive" onClick={() => { onOpenChange(false); onNewGame();}}>
+                    <Plus className="mr-2 h-4 w-4" /> Add New Game
+                 </Button>
+                 <DialogClose asChild>
+                   <Button variant="outline">Close</Button>
+                 </DialogClose>
               </DialogFooter>
              )}
           </>
@@ -2979,6 +3008,38 @@ ${formattedTransfers}
                     </DialogClose>
                     <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
                         {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
+const BuyInRequestModalDialog: FC<{
+    request: BuyInRequest | null,
+    onOpenChange: () => void,
+    onApprove: (playerId: string, buyInId: string) => void,
+}> = ({ request, onOpenChange, onApprove }) => {
+    return (
+        <Dialog open={!!request} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>New Buy-in Request</DialogTitle>
+                </DialogHeader>
+                {request && (
+                    <div className="py-4">
+                        <p className="text-lg">
+                            <span className="font-bold">{request.playerName}</span> has requested a buy-in of <span className="font-bold text-primary">₹{request.amount}</span>.
+                        </p>
+                    </div>
+                )}
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </DialogClose>
+                    <Button onClick={() => request && onApprove(request.playerId, request.id)}>
+                        Approve & Send OTP
                     </Button>
                 </DialogFooter>
             </DialogContent>
