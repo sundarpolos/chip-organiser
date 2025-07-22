@@ -309,6 +309,70 @@ const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => 
     );
 };
 
+const EditableVenue: FC<{
+    venue: string;
+    masterVenues: MasterVenue[];
+    onVenueChange: (newVenue: string) => void;
+    isAdmin: boolean;
+}> = ({ venue, masterVenues, onVenueChange, isAdmin }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentVenue, setCurrentVenue] = useState(venue);
+
+    useEffect(() => {
+        setCurrentVenue(venue);
+    }, [venue]);
+
+    const handleSave = () => {
+        if (currentVenue.trim()) {
+            onVenueChange(currentVenue.trim());
+            setIsEditing(false);
+        }
+    };
+
+    const handleCancel = () => {
+        setCurrentVenue(venue);
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <div className="flex items-center gap-2">
+                <Input
+                    value={currentVenue}
+                    onChange={(e) => setCurrentVenue(e.target.value)}
+                    className="h-9"
+                />
+                <Select onValueChange={(value) => setCurrentVenue(value)}>
+                    <SelectTrigger className="w-[180px] h-9">
+                        <SelectValue placeholder="Or select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {masterVenues.map((v) => (
+                            <SelectItem key={v.id} value={v.name}>
+                                {v.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button onClick={handleSave} size="sm">Save</Button>
+                <Button onClick={handleCancel} variant="ghost" size="sm">Cancel</Button>
+            </div>
+        );
+    }
+
+    return (
+        <h1 className="text-2xl font-bold truncate flex items-center gap-2">
+            {venue}
+            {isAdmin && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditing(true)}>
+                    <Pencil className="h-4 w-4" />
+                </Button>
+            )}
+        </h1>
+    );
+};
+
+
 export default function ChipMaestroPage() {
   const { toast } = useToast()
   const router = useRouter();
@@ -767,6 +831,21 @@ export default function ChipMaestroPage() {
     setAddPlayerModalOpen(true);
   }
 
+  const handleVenueChange = async (newVenue: string) => {
+    if (!activeGame || newVenue === activeGame.venue) return;
+
+    if (!masterVenues.some(v => v.name === newVenue)) {
+        const venueData: Omit<MasterVenue, 'id'> = { name: newVenue };
+        const savedVenue = await saveMasterVenue(venueData);
+        setMasterVenues(prev => [...prev, savedVenue]);
+    }
+
+    const updatedGame = { ...activeGame, venue: newVenue };
+    await saveGameHistory(updatedGame);
+    setActiveGame(updatedGame);
+    toast({ title: "Venue Updated", description: `The game venue has been changed to ${newVenue}.` });
+  };
+
   const handleRunAnomalyDetection = async (player: Player) => {
     setAnomalyPlayer(player);
     setAnomalyModalOpen(true);
@@ -866,7 +945,16 @@ export default function ChipMaestroPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-           <h1 className="text-2xl font-bold truncate">{activeGame ? activeGame.venue : "Chip Maestro"}</h1>
+           {activeGame ? (
+              <EditableVenue
+                venue={activeGame.venue}
+                masterVenues={masterVenues}
+                onVenueChange={handleVenueChange}
+                isAdmin={isAdmin}
+              />
+            ) : (
+              <h1 className="text-2xl font-bold truncate">Chip Maestro</h1>
+            )}
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && activeGame.players.length > 0 && (
                 <Badge variant="destructive" className="flex items-center gap-1">
@@ -2154,8 +2242,8 @@ const LoadGameDialog: FC<{
                                         Join Table
                                     </Button>
                                 ) : (
-                                    <Button onClick={() => onLoadGame(g.id)} size="sm">
-                                        Load
+                                    <Button onClick={() => onLoadGame(g.id)} size="sm" variant="outline" className="flex items-center gap-2">
+                                        <Pencil className="h-4 w-4" /> Edit
                                     </Button>
                                 )}
                                 {isAdmin && (
