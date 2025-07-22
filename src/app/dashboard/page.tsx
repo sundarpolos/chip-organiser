@@ -1078,6 +1078,40 @@ const BuyInRequestPopover: FC<{
     )
 }
 
+const AddDirectBuyInPopover: FC<{
+    onAddDirectBuyIn: (amount: number) => void;
+}> = ({ onAddDirectBuyIn }) => {
+    const [amount, setAmount] = useState<number | string>("");
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant="secondary"><Plus className="mr-2" />Add Direct Buy-in</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto">
+                <div className="space-y-2">
+                    <Label htmlFor="direct-buyin-amount">Amount</Label>
+                    <Input id="direct-buyin-amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} placeholder="e.g. 500" />
+                    <Button
+                        onClick={() => {
+                            if (Number(amount) > 0) {
+                                onAddDirectBuyIn(Number(amount));
+                                setAmount("");
+                                // Trigger popover close
+                                document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
+                            }
+                        }}
+                        disabled={!amount || Number(amount) <= 0}
+                        className="w-full"
+                    >
+                        Add & Verify
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
+
 const BuyInRow: FC<{
     buyIn: BuyIn;
     player: Player;
@@ -1213,7 +1247,8 @@ const PlayerCard: FC<{
   currentUser: MasterPlayer | null;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
 }> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, currentUser, toast }) => {
-  
+  const isCurrentUser = player.name === currentUser?.name;
+
   const handleUpdateBuyIn = (buyInId: string, newValues: Partial<BuyIn>) => {
     const newBuyIns = (player.buyIns || []).map(b => 
         b.id === buyInId ? { ...b, ...newValues } : b
@@ -1233,19 +1268,26 @@ const PlayerCard: FC<{
     toast({ title: "Request Sent", description: `Your request for ₹${amount} has been sent to the admin.`})
   }
   
+  const handleAddDirectBuyIn = (amount: number) => {
+    const newBuyIn: BuyIn = {
+        id: `buyin-${Date.now()}-${Math.random()}`,
+        amount, 
+        timestamp: new Date().toISOString(), 
+        status: 'verified'
+    }
+    const newBuyIns = [...(player.buyIns || []), newBuyIn];
+    onUpdate(player.id, { buyIns: newBuyIns });
+    toast({ title: "Buy-in Added", description: `A direct buy-in of ₹${amount} has been added for ${player.name}.`})
+  }
+
   const removeBuyIn = (buyInId: string) => {
     const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
-    if(newBuyIns.length > 0){
-        onUpdate(player.id, { buyIns: newBuyIns });
-    } else {
-        toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
-    }
+    onUpdate(player.id, { buyIns: newBuyIns });
   }
 
   const totalBuyIns = useMemo(() => {
     return (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
   }, [player.buyIns]);
-  const isCurrentUser = player.name === currentUser?.name;
 
   return (
     <div>
@@ -1266,9 +1308,14 @@ const PlayerCard: FC<{
                         toast={toast}
                     />
                     ))}
-                    {isCurrentUser && !isAdmin && (
-                       <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
-                    )}
+                    <div className="flex gap-2">
+                        {isCurrentUser && !isAdmin && (
+                           <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                        )}
+                        {isAdmin && (
+                            <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
+                        )}
+                    </div>
                 </div>
             </div>
             <div>
