@@ -992,18 +992,14 @@ export default function ChipMaestroPage() {
       />
       <LoadGameDialog 
         isOpen={isLoadGameModalOpen}
-        onOpenChange={(isOpen) => {
-            if (!isOpen && !activeGame && isAdmin) return;
-             if (!isOpen && !isAdmin && !activeGame && !joinableGame) return;
-            setLoadGameModalOpen(isOpen)
-        }}
+        onOpenChange={setLoadGameModalOpen}
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
         onJoinGame={handleJoinGame}
         onDeleteGame={handleDeleteGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
-        canBeClosed={!!activeGame || (!isAdmin && (!!joinableGame || !!activeGame))}
+        canBeClosed={!!activeGame || isAdmin || (!isAdmin && !!joinableGame)}
         currentUser={currentUser}
       />
       <ReportsDialog 
