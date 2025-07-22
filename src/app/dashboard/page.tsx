@@ -82,6 +82,7 @@ import {
   LogIn,
   Hourglass,
   Check,
+  Info,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -711,8 +712,8 @@ export default function ChipMaestroPage() {
         setLoadGameModalOpen(false);
         toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
       } else {
-        // For non-admins, loading a past game just shows the report
-        setReportsModalOpen(true);
+        await loadGameIntoState(gameToLoad);
+        setLoadGameModalOpen(false);
       }
     }
   };
@@ -2654,6 +2655,22 @@ const ImportGameDialog: FC<{
 }> = ({ isOpen, onOpenChange, onImport, toast }) => {
   const [gameLog, setGameLog] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [showFormat, setShowFormat] = useState(false);
+
+  const exampleLog = `Poker game at "The Den" - 2024-07-25 19:30
+
+Player: Alice
+Buy In: 1000
+Buy In: 500
+Chip Return: 2500
+
+Player: Bob
+Buy In: 1000
+Chip Return: 500
+
+Player: Charlie
+Buy In: 2000
+Chip Return: 0`;
 
   const handleImport = async () => {
     if (!gameLog.trim()) {
@@ -2680,10 +2697,26 @@ const ImportGameDialog: FC<{
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import Game from Text</DialogTitle>
-          <DialogDescription>
-            Paste your raw game log below. The AI will parse the players, buy-ins, and final chip counts.
-          </DialogDescription>
+          <div className="flex justify-between items-center">
+             <DialogDescription>
+                Paste your raw game log below. The AI will parse the players, buy-ins, and final chip counts.
+            </DialogDescription>
+            <Button variant="outline" size="sm" onClick={() => setShowFormat(!showFormat)}>
+                <Info className="mr-2 h-4 w-4" />
+                {showFormat ? "Hide Format" : "Show Format"}
+            </Button>
+          </div>
         </DialogHeader>
+        {showFormat && (
+            <Alert>
+                <AlertTitle>Example Log Format</AlertTitle>
+                <AlertDescription>
+                    <pre className="mt-2 w-full rounded-md bg-muted p-4 text-sm whitespace-pre-wrap">
+                        <code>{exampleLog}</code>
+                    </pre>
+                </AlertDescription>
+            </Alert>
+        )}
         <div className="py-4">
           <Textarea
             placeholder="Paste your game log here..."
