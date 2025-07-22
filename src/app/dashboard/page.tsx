@@ -1368,7 +1368,7 @@ const PlayerCard: FC<{
         
         <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
             <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="text-base font-semibold px-3 py-1.5">Total Verified Buy-in: ₹{totalBuyIns}</Badge>
+                <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
             </div>
             <div className="flex gap-2 items-center">
                 <TooltipProvider>
