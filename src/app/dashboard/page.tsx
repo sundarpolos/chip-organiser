@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
+import Link from "next/link"
 import { useRouter } from 'next/navigation';
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
@@ -908,6 +909,12 @@ export default function ChipMaestroPage() {
                     Manage Players
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild disabled={!isAdmin}>
+                   <Link href="/reports">
+                      <Database className="h-4 w-4" />
+                      <span className="ml-2">Bulk Reports</span>
+                   </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isAdmin}>
                   <MessageCircleCode className="h-4 w-4" />
                   <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
