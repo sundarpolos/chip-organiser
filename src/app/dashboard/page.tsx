@@ -96,7 +96,7 @@ import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/g
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/services/player-service"
 import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
 import { db } from "@/lib/firebase";
-import { getDoc, doc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 
 const WhatsappIcon = () => (
@@ -130,7 +130,7 @@ const tabColors = [
 ];
 
 const AdminView: FC<{
-    players: Player[];
+    activeGame: GameHistory;
     activeTab: string;
     setActiveTab: (tab: string) => void;
     updatePlayer: (id: string, newValues: Partial<Player>) => void;
@@ -140,20 +140,17 @@ const AdminView: FC<{
     whatsappConfig: WhatsappConfig;
     isAdmin: boolean;
     setAddPlayerModalOpen: (isOpen: boolean) => void;
-    activeGame: GameHistory | null;
     setSaveConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
-    players, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
+    activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
     isOtpVerificationEnabled, whatsappConfig, isAdmin, setAddPlayerModalOpen,
-    activeGame, setSaveConfirmOpen, setReportsModalOpen, toast
+    setSaveConfirmOpen, setReportsModalOpen, toast
 }) => {
     
-    const currentPlayer = useMemo(() => {
-        return players.find(p => p.id === activeTab);
-    }, [players, activeTab]);
-
+    const players = activeGame.players || [];
+    
     if (players.length === 0) {
         return (
              <Card>
@@ -199,10 +196,10 @@ const AdminView: FC<{
                             <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}>
                                 <Plus className="mr-2 h-4 w-4" />Add Player(s)
                             </Button>
-                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!activeGame || !isAdmin}><Save className="mr-2 h-4 w-4" />Save Game</Button>
+                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!isAdmin}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                         </div>
                         <div className="flex gap-2">
-                            <Button onClick={() => setReportsModalOpen(true)} variant="outline" disabled={!activeGame}><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                            <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                         </div>
                     </CardFooter>
                 </Card>
@@ -215,40 +212,11 @@ const AdminView: FC<{
 
 const PlayerView: FC<{
     currentUser: MasterPlayer;
-    joinableGame: GameHistory | null;
-    handleJoinGame: () => void;
     setLoadGameModalOpen: (isOpen: boolean) => void;
 }> = ({
-    currentUser, joinableGame, handleJoinGame, setLoadGameModalOpen
+    currentUser, setLoadGameModalOpen
 }) => {
     
-    if (joinableGame) {
-        return (
-            <div className="flex items-center justify-center h-[60vh]">
-                <Card className="w-full max-w-md text-center">
-                    <CardHeader>
-                        <CardTitle>A Game is Live!</CardTitle>
-                        <CardDescription>A game is currently in session for today at <br/><strong className="text-foreground">{joinableGame.venue}</strong>.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <p className="text-sm text-muted-foreground">
-                            Started on {format(new Date(joinableGame.timestamp), "PPP")}
-                        </p>
-                    </CardContent>
-                    <CardFooter className="flex-col gap-4">
-                        <Button onClick={handleJoinGame} size="lg" className="w-full">
-                            <LogIn className="mr-2 h-5 w-5"/>
-                            Join Game
-                        </Button>
-                         <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" className="w-full">
-                            Load a Different Game
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </div>
-        )
-    }
-
     return (
         <div className="flex items-center justify-center h-[60vh]">
             <Card className="w-full max-w-md text-center">
@@ -272,14 +240,26 @@ const PlayerView: FC<{
 
 
 const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => {
-    const transfers = useMemo(() => {
-        if (!activeGame) return [];
-        return calculateInterPlayerTransfers(activeGame.players);
+    const calculatedPlayers = useMemo(() => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        });
     }, [activeGame]);
+
+    const transfers = useMemo(() => {
+        if (!calculatedPlayers) return [];
+        return calculateInterPlayerTransfers(calculatedPlayers);
+    }, [calculatedPlayers]);
 
     const totalBuyInLog = useMemo(() => {
         if (!activeGame) return [];
-        return activeGame.players.flatMap(p => (p.buyIns || []).map(b => ({
+        return (activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({
             playerName: p.name || "Unnamed",
             amount: b.amount,
             timestamp: b.timestamp,
@@ -293,6 +273,7 @@ const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => 
         <aside className="md:col-span-1">
             <SummaryCard
                 activeGame={activeGame}
+                calculatedPlayers={calculatedPlayers}
                 transfers={transfers}
                 buyInLog={totalBuyInLog}
                 grandTotal={grandTotalBuyIn}
@@ -307,11 +288,8 @@ export default function ChipMaestroPage() {
 
 
   // Core State
-  const [players, setPlayers] = useState<Player[]>([])
   const [activeTab, setActiveTab] = useState<string>("")
-  const [currentVenue, setCurrentVenue] = useState<string>("Untitled Game")
   const [isDataReady, setIsDataReady] = useState(false)
-  const [gameDate, setGameDate] = useState<Date>(new Date())
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [greeting, setGreeting] = useState('');
@@ -324,14 +302,7 @@ export default function ChipMaestroPage() {
   // Game History & Results State
   const [gameHistory, setGameHistory] = useState<GameHistory[]>([])
   const [activeGame, setActiveGame] = useState<GameHistory | null>(null)
-  const [gameStartTime, setGameStartTime] = useState<Date | null>(null)
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
-  const [gameEndTime, setGameEndTime] = useState<Date | null>(null);
-
-  // Non-admin join flow state
-  const [joinableGame, setJoinableGame] = useState<GameHistory | null>(null);
-  const [hasCheckedForGame, setHasCheckedForGame] = useState(false);
-
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
@@ -386,32 +357,18 @@ export default function ChipMaestroPage() {
     }
   }, [currentUser]);
 
-  const loadGameIntoState = useCallback((gameToLoad: GameHistory) => {
-      setCurrentVenue(gameToLoad.venue);
-      setGameDate(new Date(gameToLoad.timestamp));
-      setPlayers(gameToLoad.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        whatsappNumber: p.whatsappNumber,
-        buyIns: (p.buyIns || []).map((b, i) => ({
-            ...b,
-            id: b.id || `buyin-legacy-${Date.now()}-${i}`
-        })),
-        finalChips: p.finalChips,
-      })));
-      setGameStartTime(gameToLoad.startTime ? new Date(gameToLoad.startTime) : null);
-      setGameEndTime(gameToLoad.endTime ? new Date(gameToLoad.endTime) : null);
-
-      if (gameToLoad.players.length > 0) {
-        const currentUserInGame = gameToLoad.players.find(p => p.name === currentUser?.name);
-        if (currentUserInGame) {
-          setActiveTab(currentUserInGame.id);
+  const loadGameIntoState = useCallback(async (gameToLoad: GameHistory) => {
+        setActiveGame(gameToLoad);
+        if (gameToLoad.players.length > 0) {
+          const currentUserInGame = gameToLoad.players.find(p => p.name === currentUser?.name);
+          if (currentUserInGame) {
+            setActiveTab(currentUserInGame.id);
+          } else {
+            setActiveTab(gameToLoad.players[0].id);
+          }
         } else {
-          setActiveTab(gameToLoad.players[0].id);
+          setActiveTab("");
         }
-      } else {
-        setActiveTab("");
-      }
   }, [currentUser]);
 
 
@@ -463,6 +420,30 @@ export default function ChipMaestroPage() {
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
+  
+    // Real-time listener for active game
+    useEffect(() => {
+        if (!activeGame?.id) return;
+
+        const unsub = onSnapshot(doc(db, "gameHistory", activeGame.id), (doc) => {
+            if (doc.exists()) {
+                const gameData = { id: doc.id, ...doc.data() } as GameHistory;
+                setActiveGame(gameData);
+                
+                // If current user was just added, set them as the active tab
+                const currentUserInGame = gameData.players.find(p => p.name === currentUser?.name);
+                if (currentUserInGame && !activeGame.players.some(p => p.id === currentUserInGame.id)) {
+                    setActiveTab(currentUserInGame.id);
+                }
+            } else {
+                // Game was deleted by another user
+                toast({ title: "Game Ended", description: "The game you were in has been deleted."});
+                setActiveGame(null);
+            }
+        });
+
+        return () => unsub();
+    }, [activeGame?.id, currentUser?.name, toast]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -474,18 +455,22 @@ export default function ChipMaestroPage() {
 
   // Game timer effect
   useEffect(() => {
-    if (!gameStartTime || gameEndTime) {
-      if (gameStartTime && gameEndTime) {
+      if (!activeGame?.startTime) {
+          setGameDuration("00:00:00");
+          return;
+      }
+      
+      const gameStartTime = new Date(activeGame.startTime);
+      const gameEndTime = activeGame.endTime ? new Date(activeGame.endTime) : null;
+
+      if (gameEndTime) {
           const duration = intervalToDuration({ start: gameStartTime, end: gameEndTime });
           const paddedHours = String(duration.hours || 0).padStart(2, '0');
           const paddedMinutes = String(duration.minutes || 0).padStart(2, '0');
           const paddedSeconds = String(duration.seconds || 0).padStart(2, '0');
           setGameDuration(`${paddedHours}:${paddedMinutes}:${paddedSeconds}`);
-      } else {
-          setGameDuration("00:00:00");
+          return;
       }
-      return;
-    }
 
     const timerInterval = setInterval(() => {
       const duration = intervalToDuration({ start: gameStartTime, end: new Date() });
@@ -496,63 +481,18 @@ export default function ChipMaestroPage() {
     }, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [gameStartTime, gameEndTime]);
-
-
-  // This effect rebuilds the activeGame object whenever the core game state changes.
-  useEffect(() => {
-    if (!isDataReady) return;
-
-    if (players.length === 0 && currentVenue === "Untitled Game") {
-        setActiveGame(null);
-        return;
-    }
-
-    const calculatedPlayers: CalculatedPlayer[] = players.map(p => {
-        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
-        return {
-            ...p,
-            totalBuyIns,
-            profitLoss: p.finalChips - totalBuyIns,
-        }
-    });
-
-    const now = new Date();
-    const finalTimestamp = set(gameDate, { 
-      hours: now.getHours(), 
-      minutes: now.getMinutes(), 
-      seconds: now.getSeconds() 
-    }).toISOString();
-
-    const currentGame: GameHistory = {
-        id: activeGame?.id || `game-${Date.now()}`,
-        venue: currentVenue,
-        timestamp: finalTimestamp,
-        players: calculatedPlayers,
-        startTime: gameStartTime?.toISOString(),
-        endTime: gameEndTime?.toISOString(),
-        duration: gameStartTime ? ((gameEndTime || new Date()).getTime() - gameStartTime.getTime()) : undefined
-    }
-    setActiveGame(currentGame);
-  }, [players, currentVenue, gameDate, isDataReady, activeGame?.id, gameStartTime, gameEndTime]);
-
-  // This effect saves the activeGame to localStorage whenever it's updated.
-  useEffect(() => {
-      if (!isDataReady) return;
-      if (activeGame) {
-          localStorage.setItem("activeGame", JSON.stringify(activeGame));
-      } else {
-          localStorage.removeItem("activeGame");
-      }
-  }, [activeGame, isDataReady]);
+  }, [activeGame?.startTime, activeGame?.endTime]);
+  
 
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
-    localStorage.removeItem('activeGame');
+    setActiveGame(null);
     router.replace('/login');
   };
 
-  const addPlayers = (playersToAdd: MasterPlayer[]) => {
+  const addPlayers = async (playersToAdd: MasterPlayer[]) => {
+      if (!activeGame) return;
+
       const newPlayers: Player[] = playersToAdd.map(playerToAdd => ({
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
@@ -566,61 +506,39 @@ export default function ChipMaestroPage() {
           finalChips: 0,
       }));
       
-      const updatedPlayers = [...players, ...newPlayers];
-      setPlayers(updatedPlayers);
+      const updatedGame = {
+          ...activeGame,
+          players: [...activeGame.players, ...newPlayers]
+      };
+      
+      await saveGameHistory(updatedGame);
+      
       if (activeTab === "" && newPlayers.length > 0) {
           setActiveTab(newPlayers[0].id);
       }
   };
 
-  const handleJoinGame = () => {
-    if (!joinableGame || !currentUser) return;
-    
-    // Add current user to the game
-    const playerToAdd: MasterPlayer = {
-        id: currentUser.id,
-        name: currentUser.name,
-        whatsappNumber: currentUser.whatsappNumber,
-        isAdmin: currentUser.isAdmin
-    }
-    
-    const newPlayer: Player = {
-        id: `player-${Date.now()}-${playerToAdd.id}`,
-        name: playerToAdd.name,
-        whatsappNumber: playerToAdd.whatsappNumber,
-        buyIns: [{ 
-          id: `buyin-${Date.now()}-${playerToAdd.id}`,
-          amount: 0, 
-          timestamp: new Date().toISOString(), 
-          verified: !isOtpVerificationEnabled 
-        }],
-        finalChips: 0,
-    };
-    
-    const gameToJoin: GameHistory = {
-        ...joinableGame,
-        players: [...joinableGame.players, newPlayer]
-    }
 
-    loadGameIntoState(gameToJoin);
-    setJoinableGame(null); // Clear the joinable game state
-  };
+  const removePlayer = async (idToRemove: string) => {
+    if (!activeGame) return;
+    const updatedPlayers = activeGame.players.filter(p => p.id !== idToRemove);
+    await saveGameHistory({ ...activeGame, players: updatedPlayers });
 
-
-  const removePlayer = (idToRemove: string) => {
-    const updatedPlayers = players.filter(p => p.id !== idToRemove)
-    setPlayers(updatedPlayers)
     if (activeTab === idToRemove) {
       setActiveTab(updatedPlayers.length > 0 ? updatedPlayers[0].id : "")
     }
   }
   
-  const updatePlayer = (id: string, newValues: Partial<Player>) => {
-    setPlayers(players.map(p => p.id === id ? { ...p, ...newValues } : p));
+  const updatePlayer = async (id: string, newValues: Partial<Player>) => {
+    if (!activeGame) return;
+    const updatedPlayers = activeGame.players.map(p => p.id === id ? { ...p, ...newValues } : p);
+    // Debounce this in a real app, but for now, save on every change.
+    await saveGameHistory({ ...activeGame, players: updatedPlayers });
   };
   
   const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
-    
+    if (!activeGame) return;
+
     if (finalPlayers.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
         return;
@@ -637,22 +555,12 @@ export default function ChipMaestroPage() {
     }
     
     const now = new Date();
-    const finalTimestamp = set(gameDate, { 
-        hours: now.getHours(), 
-        minutes: now.getMinutes(), 
-        seconds: now.getSeconds() 
-    }).toISOString();
-
-    setGameEndTime(now);
     
     const finalGame: GameHistory = {
-        id: activeGame?.id || `game-${Date.now()}`,
-        venue: currentVenue,
-        timestamp: finalTimestamp,
+        ...activeGame,
         players: finalPlayers,
-        startTime: gameStartTime?.toISOString(),
         endTime: now.toISOString(),
-        duration: gameStartTime ? (now.getTime() - gameStartTime.getTime()) : undefined
+        duration: activeGame.startTime ? (now.getTime() - new Date(activeGame.startTime).getTime()) : undefined
     }
 
     try {
@@ -677,17 +585,52 @@ export default function ChipMaestroPage() {
     }
   };
   
-  const handleLoadGame = (gameId: string) => {
+  const handleLoadGame = async (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
-    if (gameToLoad) {
-      loadGameIntoState(gameToLoad);
-      setLoadGameModalOpen(false);
-      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
+    if (gameToLoad && currentUser) {
+      const isPlayerInGame = gameToLoad.players.some(p => p.name === currentUser.name);
+
+      if (isPlayerInGame || isAdmin) {
+        await loadGameIntoState(gameToLoad);
+        setLoadGameModalOpen(false);
+        toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
+      } else {
+        // Player is not in the game, add them.
+         const playerToAdd: MasterPlayer = {
+            id: currentUser.id,
+            name: currentUser.name,
+            whatsappNumber: currentUser.whatsappNumber,
+            isAdmin: currentUser.isAdmin
+        }
+        
+        const newPlayer: Player = {
+            id: `player-${Date.now()}-${playerToAdd.id}`,
+            name: playerToAdd.name,
+            whatsappNumber: playerToAdd.whatsappNumber,
+            buyIns: [{ 
+              id: `buyin-${Date.now()}-${playerToAdd.id}`,
+              amount: 0, 
+              timestamp: new Date().toISOString(), 
+              verified: !isOtpVerificationEnabled 
+            }],
+            finalChips: 0,
+        };
+        const gameToJoin: GameHistory = {
+            ...gameToLoad,
+            players: [...gameToLoad.players, newPlayer]
+        }
+        await saveGameHistory(gameToJoin); // This will trigger the onSnapshot listener to update the state
+        setLoadGameModalOpen(false);
+        toast({ title: "Joined Game", description: `You have joined the game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
+      }
     }
   };
 
   const handleDeleteGame = async (gameId: string) => {
     try {
+        if(activeGame?.id === gameId) {
+            setActiveGame(null);
+        }
         await deleteGameHistory(gameId);
         const updatedHistory = gameHistory.filter(g => g.id !== gameId);
         setGameHistory(updatedHistory);
@@ -699,12 +642,7 @@ export default function ChipMaestroPage() {
   };
   
   const handleNewGame = () => {
-    setPlayers([]);
     setActiveGame(null);
-    setGameDate(new Date());
-    setGameStartTime(null);
-    setGameEndTime(null);
-    setActiveTab("");
     setVenueModalOpen(true);
   }
   
@@ -715,14 +653,25 @@ export default function ChipMaestroPage() {
         setMasterVenues(prev => [...prev, savedVenue]);
     }
     
-    setCurrentVenue(venue);
-    setGameDate(date);
-    setGameStartTime(new Date());
-    setGameEndTime(null);
-    setVenueModalOpen(false);
-    if (players.length === 0) {
-      setAddPlayerModalOpen(true);
+    const now = new Date();
+    const finalTimestamp = set(date, { 
+      hours: now.getHours(), 
+      minutes: now.getMinutes(), 
+      seconds: now.getSeconds() 
+    }).toISOString();
+
+    const newGame: GameHistory = {
+        id: `game-${Date.now()}`,
+        venue: venue,
+        timestamp: finalTimestamp,
+        players: [],
+        startTime: now.toISOString(),
     }
+    await saveGameHistory(newGame);
+    setActiveGame(newGame);
+    
+    setVenueModalOpen(false);
+    setAddPlayerModalOpen(true);
   }
 
   const handleRunAnomalyDetection = async (player: Player) => {
@@ -783,11 +732,7 @@ export default function ChipMaestroPage() {
         toast({variant: "destructive", title: "Player Save Error", description: "Could not save new players to the database."});
     }
 
-    setCurrentVenue(importedGame.venue);
     const newGameDate = new Date(importedGame.timestamp);
-    setGameDate(newGameDate);
-    setPlayers(importedGame.players);
-    setGameStartTime(newGameDate);
     
     const calculatedPlayers = importedGame.players.map(p => {
         const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
@@ -798,11 +743,17 @@ export default function ChipMaestroPage() {
         }
     });
 
-    if (importedGame.players.length > 0) {
-        setActiveTab(importedGame.players[0].id);
-    }
-    
-    await handleSaveGame(calculatedPlayers);
+    const newGame: GameHistory = {
+        id: `game-import-${Date.now()}`,
+        venue: importedGame.venue,
+        timestamp: newGameDate.toISOString(),
+        players: calculatedPlayers,
+        startTime: newGameDate.toISOString(),
+        endTime: new Date().toISOString(),
+    };
+
+    await saveGameHistory(newGame);
+    await loadGameIntoState(newGame);
 
     setImportGameModalOpen(false);
 };
@@ -818,24 +769,20 @@ export default function ChipMaestroPage() {
     );
   }
 
-  const isPlayerInGame = activeGame?.players?.some(p => p.id === currentUser?.id) ?? false;
-  const showDashboard = activeGame && (isAdmin || isPlayerInGame);
-
-
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-           <h1 className="text-2xl font-bold truncate">{currentVenue === "Untitled Game" && players.length === 0 ? "Chip Maestro" : currentVenue}</h1>
+           <h1 className="text-2xl font-bold truncate">{activeGame ? activeGame.venue : "Chip Maestro"}</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
-            {players.length > 0 && <span>{format(gameDate, "dd MMMM yyyy")}</span>}
-            {gameStartTime && (
+            {activeGame && <span>{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</span>}
+            {activeGame?.startTime && (
                 <div className="flex items-center gap-1">
                     <TimerIcon className="h-4 w-4" />
                     <span>{gameDuration}</span>
                 </div>
             )}
-            {greeting && players.length > 0 && (
+            {greeting && activeGame && (
               <>
                 <Separator orientation="vertical" className="h-4" />
                 <p className="font-semibold text-primary">{greeting}</p>
@@ -896,9 +843,9 @@ export default function ChipMaestroPage() {
         </div>
       </header>
       
-      {players.length > 0 ? (
+      {activeGame ? (
           <AdminView
-              players={players}
+              activeGame={activeGame}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               updatePlayer={updatePlayer}
@@ -908,7 +855,6 @@ export default function ChipMaestroPage() {
               whatsappConfig={whatsappConfig}
               isAdmin={isAdmin}
               setAddPlayerModalOpen={setAddPlayerModalOpen}
-              activeGame={activeGame}
               setSaveConfirmOpen={setSaveConfirmOpen}
               setReportsModalOpen={setReportsModalOpen}
               toast={toast}
@@ -916,8 +862,6 @@ export default function ChipMaestroPage() {
       ) : (
           <PlayerView
               currentUser={currentUser}
-              joinableGame={joinableGame}
-              handleJoinGame={handleJoinGame}
               setLoadGameModalOpen={setLoadGameModalOpen}
           />
       )}
@@ -929,7 +873,7 @@ export default function ChipMaestroPage() {
         onStartGame={handleStartGameFromVenue}
         setMasterVenues={setMasterVenues}
         toast={toast}
-        initialDate={gameDate}
+        initialDate={new Date()}
       />
       <ManagePlayersDialog 
         isOpen={isManagePlayersModalOpen}
@@ -944,15 +888,14 @@ export default function ChipMaestroPage() {
         isOpen={isAddPlayerModalOpen}
         onOpenChange={setAddPlayerModalOpen}
         masterPlayers={masterPlayers}
-        gamePlayers={players}
+        gamePlayers={activeGame?.players || []}
         onAddPlayers={addPlayers}
         toast={toast}
       />
       <LoadGameDialog 
         isOpen={isLoadGameModalOpen}
         onOpenChange={(isOpen) => {
-            // Prevent closing the modal if no game is loaded
-            if (!isOpen && players.length === 0) return;
+            if (!isOpen && !activeGame) return;
             setLoadGameModalOpen(isOpen)
         }}
         gameHistory={gameHistory}
@@ -960,7 +903,7 @@ export default function ChipMaestroPage() {
         onDeleteGame={handleDeleteGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
-        canBeClosed={players.length > 0}
+        canBeClosed={!!activeGame}
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1000,7 +943,7 @@ export default function ChipMaestroPage() {
       <SaveConfirmDialog
         isOpen={isSaveConfirmOpen}
         onOpenChange={setSaveConfirmOpen}
-        players={activeGame?.players || []}
+        activeGame={activeGame}
         onConfirmSave={handleSaveGame}
       />
       <SettlementDialog
@@ -1296,14 +1239,14 @@ const PlayerCard: FC<{
   )
 }
 
-const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyInLog: any[], grandTotal: number}> = ({ activeGame, transfers, buyInLog, grandTotal }) => (
+const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: CalculatedPlayer[], transfers: string[], buyInLog: any[], grandTotal: number}> = ({ activeGame, calculatedPlayers, transfers, buyInLog, grandTotal }) => (
     <Card>
         <CardHeader>
             <CardTitle>Game Summary</CardTitle>
             {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-6">
-             {(!activeGame || activeGame.players.length === 0) ? (
+             {(!activeGame || calculatedPlayers.length === 0) ? (
                 <div className="text-center py-10 text-muted-foreground">
                     <p>Add players and buy-ins to see the summary.</p>
                 </div>
@@ -1321,7 +1264,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, transfers: string[], buyI
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {activeGame.players.map(p => (
+                            {calculatedPlayers.map(p => (
                                 <TableRow key={p.id}>
                                     <TableCell className="p-2 font-medium">{p.name || "Unnamed"}</TableCell>
                                     <TableCell className="p-2 text-right">{p.totalBuyIns}</TableCell>
@@ -2056,11 +1999,23 @@ const ReportsDialog: FC<{
     const reportContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
     const { toast } = useToast();
+
+    const calculatedPlayers = useMemo(() => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        });
+    }, [activeGame]);
     
     const transfers = useMemo(() => {
-        if (!activeGame) return [];
-        return calculateInterPlayerTransfers(activeGame.players);
-    }, [activeGame]);
+        if (!calculatedPlayers) return [];
+        return calculateInterPlayerTransfers(calculatedPlayers);
+    }, [calculatedPlayers]);
     
     const handleExportPdf = async () => {
         if (!activeGame || !reportContentRef.current) return;
@@ -2106,15 +2061,15 @@ const ReportsDialog: FC<{
         .filter(p => p.finalChips > 0)
         .map(p => ({ name: p.name, value: p.finalChips }));
 
-    const barChartData = players.map(p => ({
+    const barChartData = calculatedPlayers.map(p => ({
         name: p.name,
         'P/L': p.profitLoss
     }));
 
-    const sortedStandings = [...players].sort((a, b) => b.profitLoss - a.profitLoss);
-    const totalBuyIns = players.reduce((sum, p) => sum + p.totalBuyIns, 0);
-    const totalChips = players.reduce((sum, p) => sum + p.finalChips, 0);
-    const totalPL = players.reduce((sum, p) => sum + p.profitLoss, 0);
+    const sortedStandings = [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
+    const totalBuyIns = calculatedPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0);
+    const totalChips = calculatedPlayers.reduce((sum, p) => sum + p.finalChips, 0);
+    const totalPL = calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0);
     
 
     return (
@@ -2558,17 +2513,29 @@ const ImportGameDialog: FC<{
 const SaveConfirmDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
-    players: CalculatedPlayer[],
+    activeGame: GameHistory | null,
     onConfirmSave: (finalPlayers: CalculatedPlayer[]) => void,
-}> = ({ isOpen, onOpenChange, players, onConfirmSave }) => {
+}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave }) => {
     const [localPlayers, setLocalPlayers] = useState<CalculatedPlayer[]>([]);
+
+    const calculatedPlayers = useMemo(() => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        });
+    }, [activeGame]);
 
     useEffect(() => {
         if (isOpen) {
             // Deep copy to prevent modifying original state directly
-            setLocalPlayers(JSON.parse(JSON.stringify(players)));
+            setLocalPlayers(JSON.parse(JSON.stringify(calculatedPlayers)));
         }
-    }, [isOpen, players]);
+    }, [isOpen, calculatedPlayers]);
     
     const handleFinalChipsChange = (playerId: string, newFinalChips: number) => {
         setLocalPlayers(currentPlayers => 
@@ -2589,7 +2556,7 @@ const SaveConfirmDialog: FC<{
         return { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced };
     }, [localPlayers]);
     
-    if (!players || players.length === 0) return null;
+    if (!activeGame || activeGame.players.length === 0) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -2685,11 +2652,23 @@ const SettlementDialog: FC<{
         if (!activeGame) return [];
         return activeGame.players.filter(p => p.whatsappNumber);
     }, [activeGame]);
+    
+    const calculatedPlayers = useMemo(() => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        });
+    }, [activeGame]);
 
     const transfers = useMemo(() => {
-        if (!activeGame) return [];
-        return calculateInterPlayerTransfers(activeGame.players);
-    }, [activeGame]);
+        if (!calculatedPlayers) return [];
+        return calculateInterPlayerTransfers(calculatedPlayers);
+    }, [calculatedPlayers]);
 
     useEffect(() => {
         if (isOpen) {
@@ -2848,3 +2827,4 @@ ${formattedTransfers}
         </Dialog>
     );
 };
+
