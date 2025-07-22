@@ -1368,7 +1368,7 @@ const PlayerCard: FC<{
         
         <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
             <div className="flex items-center gap-4">
-                <Badge variant="secondary">Total Verified Buy-in: ₹{totalBuyIns}</Badge>
+                <Badge variant="secondary" className="text-base font-semibold px-3 py-1.5">Total Verified Buy-in: ₹{totalBuyIns}</Badge>
             </div>
             <div className="flex gap-2 items-center">
                 <TooltipProvider>
@@ -1385,19 +1385,26 @@ const PlayerCard: FC<{
                     </Tooltip>
                 </TooltipProvider>
                 {isAdmin && (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="destructive" size="icon" onClick={() => onRemove(player.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="sr-only">Remove Player</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Remove Player</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                     <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon">
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Remove Player</span>
+                          </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure you want to remove {player.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This action cannot be undone. This will permanently remove the player and all their data from this game.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => onRemove(player.id)}>Remove Player</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                 )}
             </div>
         </div>
