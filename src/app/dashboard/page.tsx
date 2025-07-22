@@ -866,6 +866,12 @@ export default function ChipMaestroPage() {
         <div className="flex-1">
            <h1 className="text-2xl font-bold truncate">{activeGame ? activeGame.venue : "Chip Maestro"}</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
+            {activeGame && activeGame.players.length > 0 && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {activeGame.players.length}
+                </Badge>
+             )}
             {activeGame && <span>{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</span>}
             {activeGame?.startTime && (
                 <div className="flex items-center gap-1">
@@ -873,12 +879,6 @@ export default function ChipMaestroPage() {
                     <span>{gameDuration}</span>
                 </div>
             )}
-             {activeGame && activeGame.players.length > 0 && (
-                <Badge variant="destructive" className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {activeGame.players.length}
-                </Badge>
-             )}
             {greeting && activeGame && (
               <>
                 <Separator orientation="vertical" className="h-4" />
