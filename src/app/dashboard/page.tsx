@@ -988,6 +988,7 @@ export default function ChipMaestroPage() {
         onLoadGame={handleLoadGame}
         onJoinGame={handleJoinGame}
         onDeleteGame={handleDeleteGame}
+        onNewGame={handleNewGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
         canBeClosed={!!activeGame || isAdmin || (!isAdmin && !!joinableGame)}
@@ -1309,12 +1310,11 @@ const PlayerCard: FC<{
                     />
                     ))}
                     <div className="flex gap-2">
-                        {isCurrentUser && !isAdmin && (
+                         {isCurrentUser && !isAdmin ? (
                            <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
-                        )}
-                        {isAdmin && (
+                        ) : isAdmin ? (
                             <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
-                        )}
+                        ): null}
                     </div>
                 </div>
             </div>
@@ -1985,11 +1985,12 @@ const LoadGameDialog: FC<{
   onLoadGame: (id: string) => void;
   onJoinGame: (id: string) => void;
   onDeleteGame: (id: string) => void;
+  onNewGame: () => void;
   whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
   canBeClosed: boolean;
   currentUser: MasterPlayer | null;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, whatsappConfig, toast, canBeClosed, currentUser }) => {
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, onNewGame, whatsappConfig, toast, canBeClosed, currentUser }) => {
   const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
@@ -2099,9 +2100,9 @@ const LoadGameDialog: FC<{
                               <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
                             </div>
                             <div className="flex gap-2">
-                                {!isAdmin && isGameActive ? (
+                                {isGameActive ? (
                                     <Button onClick={() => onJoinGame(g.id)} size="sm">
-                                        {isPlayerInGame ? 'Re-Join' : 'Join'}
+                                        Join Table
                                     </Button>
                                 ) : (
                                     <Button onClick={() => onLoadGame(g.id)} size="sm">
@@ -2125,13 +2126,20 @@ const LoadGameDialog: FC<{
                 )}
               </ScrollArea>
             </div>
-            {canBeClosed && (
+            {isAdmin && (
               <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Close</Button>
-                </DialogClose>
+                 <div className="flex justify-between w-full">
+                    <Button variant="destructive" onClick={() => { onOpenChange(false); onNewGame();}}>
+                       <Plus className="mr-2 h-4 w-4" /> Add New Game
+                    </Button>
+                   {canBeClosed && (
+                     <DialogClose asChild>
+                       <Button variant="outline">Close</Button>
+                     </DialogClose>
+                   )}
+                 </div>
               </DialogFooter>
-            )}
+             )}
           </>
         )}
       </DialogContent>
