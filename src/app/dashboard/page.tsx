@@ -78,7 +78,8 @@ import {
   User,
   Send,
   UserMinus,
-  UserPlus
+  UserPlus,
+  LogIn
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -211,46 +212,88 @@ const PlayerView: FC<{
     whatsappConfig: WhatsappConfig;
     toast: ReturnType<typeof useToast>['toast'];
     activeGame: GameHistory | null;
+    joinableGame: GameHistory | null;
+    handleJoinGame: () => void;
+    setLoadGameModalOpen: (isOpen: boolean) => void;
 }> = ({
     currentUser, players, updatePlayer, handleRunAnomalyDetection,
-    isOtpVerificationEnabled, whatsappConfig, toast, activeGame
+    isOtpVerificationEnabled, whatsappConfig, toast, activeGame,
+    joinableGame, handleJoinGame, setLoadGameModalOpen
 }) => {
     const currentPlayerInGame = useMemo(() => {
         return players.find(p => p.name === currentUser.name)
     }, [players, currentUser]);
 
+    if (currentPlayerInGame) {
+      return (
+          <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
+              <section className="md:col-span-2 mb-8 md:mb-0">
+                  <div className={cn("p-4 rounded-lg", tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length])}>
+                      <PlayerCard
+                          player={currentPlayerInGame}
+                          onUpdate={updatePlayer}
+                          onRemove={() => { }} // Players cannot remove themselves
+                          onRunAnomalyCheck={handleRunAnomalyDetection}
+                          toast={toast}
+                          isOtpEnabled={isOtpVerificationEnabled}
+                          whatsappConfig={whatsappConfig}
+                          isAdmin={false}
+                      />
+                  </div>
+              </section>
+              <SummaryView activeGame={activeGame} />
+          </main>
+      );
+    }
+    
+    if (joinableGame) {
+        return (
+            <div className="flex items-center justify-center h-[60vh]">
+                <Card className="w-full max-w-md text-center">
+                    <CardHeader>
+                        <CardTitle>A Game is Live!</CardTitle>
+                        <CardDescription>A game is currently in session for today at <br/><strong className="text-foreground">{joinableGame.venue}</strong>.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <p className="text-sm text-muted-foreground">
+                            Started on {format(new Date(joinableGame.timestamp), "PPP")}
+                        </p>
+                    </CardContent>
+                    <CardFooter className="flex-col gap-4">
+                        <Button onClick={handleJoinGame} size="lg" className="w-full">
+                            <LogIn className="mr-2 h-5 w-5"/>
+                            Join Game
+                        </Button>
+                         <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" className="w-full">
+                            Load a Different Game
+                        </Button>
+                    </CardFooter>
+                </Card>
+            </div>
+        )
+    }
+
     return (
-        <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-            <section className="md:col-span-2 mb-8 md:mb-0">
-                {currentPlayerInGame ? (
-                     <div className={cn("p-4 rounded-lg", tabColors[players.findIndex(p => p.id === currentPlayerInGame.id) % tabColors.length])}>
-                        <PlayerCard
-                            player={currentPlayerInGame}
-                            onUpdate={updatePlayer}
-                            onRemove={() => { }} // Players cannot remove themselves
-                            onRunAnomalyCheck={handleRunAnomalyDetection}
-                            toast={toast}
-                            isOtpEnabled={isOtpVerificationEnabled}
-                            whatsappConfig={whatsappConfig}
-                            isAdmin={false}
-                        />
-                    </div>
-                ) : (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Welcome, {currentUser?.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-center py-10">
-                            <p className="text-muted-foreground">You are not part of the current game.</p>
-                            <p className="text-sm text-muted-foreground">Please wait for the admin to add you, or load a previous game.</p>
-                        </CardContent>
-                    </Card>
-                )}
-            </section>
-            <SummaryView activeGame={activeGame} />
-        </main>
-    );
+        <div className="flex items-center justify-center h-[60vh]">
+            <Card className="w-full max-w-md text-center">
+                <CardHeader>
+                    <CardTitle>Welcome, {currentUser?.name}</CardTitle>
+                    <CardDescription>There are no games running right now.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground">You can view past games or wait for an admin to start a new one.</p>
+                </CardContent>
+                <CardFooter>
+                    <Button onClick={() => setLoadGameModalOpen(true)} className="w-full">
+                        <History className="mr-2 h-4 w-4" />
+                        Load Previous Game
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    )
 };
+
 
 const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => {
     const transfers = useMemo(() => {
@@ -308,6 +351,10 @@ export default function ChipMaestroPage() {
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null)
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
   const [gameEndTime, setGameEndTime] = useState<Date | null>(null);
+
+  // Non-admin join flow state
+  const [joinableGame, setJoinableGame] = useState<GameHistory | null>(null);
+  const [hasCheckedForGame, setHasCheckedForGame] = useState(false);
 
 
   // App Settings
@@ -424,18 +471,60 @@ export default function ChipMaestroPage() {
                 senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
               });
             }
-            setLoadGameModalOpen(true);
+            
+            // New logic for non-admins
+            if (!currentUser.isAdmin) {
+                const today = new Date();
+
+                // 1. Check for unsaved game in localStorage for today
+                const localGameStr = localStorage.getItem("activeGame");
+                if (localGameStr) {
+                    const localGame: GameHistory = JSON.parse(localGameStr);
+                    if (isSameDay(new Date(localGame.timestamp), today)) {
+                        const isPlayerInGame = localGame.players.some(p => p.name === currentUser.name);
+                        if (isPlayerInGame) {
+                            loadGameIntoState(localGame);
+                        } else {
+                            setJoinableGame(localGame);
+                        }
+                        setHasCheckedForGame(true);
+                        return; // Exit after handling local game
+                    }
+                }
+
+                // 2. Check for saved game from history for today
+                const todaysGame = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), today));
+                if (todaysGame) {
+                    const isPlayerInGame = todaysGame.players.some(p => p.name === currentUser.name);
+                    if (isPlayerInGame) {
+                        loadGameIntoState(todaysGame);
+                    } else {
+                        setJoinableGame(todaysGame);
+                    }
+                    setHasCheckedForGame(true);
+                    return; // Exit after handling saved game
+                }
+                
+                // 3. No game found for today, flag check as complete
+                setHasCheckedForGame(true);
+            } else {
+                 // Admins always see the load game modal
+                 setLoadGameModalOpen(true);
+            }
+
 
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
             toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
-            setLoadGameModalOpen(true); // Still open it on error so user isn't stuck.
+            if (currentUser.isAdmin) {
+                setLoadGameModalOpen(true); // Still open it on error for admins
+            }
         } finally {
             setIsDataReady(true);
         }
     }
     loadInitialData();
-  }, [toast, currentUser]);
+  }, [toast, currentUser, loadGameIntoState]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -545,6 +634,40 @@ export default function ChipMaestroPage() {
           setActiveTab(newPlayers[0].id);
       }
   };
+
+  const handleJoinGame = () => {
+    if (!joinableGame || !currentUser) return;
+    
+    // Add current user to the game
+    const playerToAdd: MasterPlayer = {
+        id: currentUser.id,
+        name: currentUser.name,
+        whatsappNumber: currentUser.whatsappNumber,
+        isAdmin: currentUser.isAdmin
+    }
+    
+    const newPlayer: Player = {
+        id: `player-${Date.now()}-${playerToAdd.id}`,
+        name: playerToAdd.name,
+        whatsappNumber: playerToAdd.whatsappNumber,
+        buyIns: [{ 
+          id: `buyin-${Date.now()}-${playerToAdd.id}`,
+          amount: 0, 
+          timestamp: new Date().toISOString(), 
+          verified: !isOtpVerificationEnabled 
+        }],
+        finalChips: 0,
+    };
+    
+    const gameToJoin: GameHistory = {
+        ...joinableGame,
+        players: [...joinableGame.players, newPlayer]
+    }
+
+    loadGameIntoState(gameToJoin);
+    setJoinableGame(null); // Clear the joinable game state
+  };
+
 
   const removePlayer = (idToRemove: string) => {
     const updatedPlayers = players.filter(p => p.id !== idToRemove)
@@ -861,6 +984,9 @@ export default function ChipMaestroPage() {
               whatsappConfig={whatsappConfig}
               toast={toast}
               activeGame={activeGame}
+              joinableGame={joinableGame}
+              handleJoinGame={handleJoinGame}
+              setLoadGameModalOpen={setLoadGameModalOpen}
           />
       )}
 
@@ -891,7 +1017,7 @@ export default function ChipMaestroPage() {
         toast={toast}
       />
       <LoadGameDialog 
-        isOpen={isLoadGameModalOpen}
+        isOpen={isLoadGameModalOpen || (!isAdmin && hasCheckedForGame && !joinableGame && players.length === 0)}
         onOpenChange={setLoadGameModalOpen}
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
@@ -1146,7 +1272,7 @@ const PlayerCard: FC<{
   const removeBuyIn = (buyInId: string) => {
     if ((player.buyIns || []).length > 1) {
       const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
-      onUpdate(player.id, { buyIns: newBuyIns })
+      onUpdate(player.id, { buyIns: newBuyIns });
     } else {
         toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
     }
@@ -2051,7 +2177,7 @@ const ReportsDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-6xl max-h-[90vh]">
+            <DialogContent className="max-w-md md:max-w-6xl w-full md:w-[90vw] max-h-[90vh]">
                 <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="space-y-1">
                         <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
