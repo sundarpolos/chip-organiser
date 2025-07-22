@@ -154,7 +154,7 @@ const AdminView: FC<{
     
     const players = activeGame.players || [];
     
-    if (players.length === 0) {
+    if (players.length === 0 && isAdmin) {
         return (
              <Card>
                 <CardContent className="pt-6">
@@ -388,13 +388,15 @@ export default function ChipMaestroPage() {
           const currentUserInGame = gameToLoad.players.find(p => p.name === currentUser?.name);
           if (currentUserInGame) {
             setActiveTab(currentUserInGame.id);
-          } else {
+          } else if (isAdmin) {
             setActiveTab(gameToLoad.players[0].id);
+          } else {
+             setActiveTab("");
           }
         } else {
           setActiveTab("");
         }
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
 
 
   // Load data from Firestore on initial render
@@ -444,25 +446,23 @@ export default function ChipMaestroPage() {
                     } else {
                         setJoinableGame(activeGameForToday);
                     }
-                } else {
-                    setLoadGameModalOpen(true);
                 }
-                setHasCheckedForGame(true);
-            } else {
+            }
+            if(isAdmin) {
                 setLoadGameModalOpen(true);
             }
-
+            
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
             toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
-            setLoadGameModalOpen(true); // Open it anyway so user is not stuck
         } finally {
             setIsDataReady(true);
+            setHasCheckedForGame(true);
         }
     }
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
+  }, [currentUser, isAdmin]);
   
     // Real-time listener for active game
     useEffect(() => {
@@ -471,26 +471,30 @@ export default function ChipMaestroPage() {
         const unsub = onSnapshot(doc(db, "gameHistory", activeGame.id), (doc) => {
             if (doc.exists()) {
                 const gameData = { id: doc.id, ...doc.data() } as GameHistory;
+                const previousPlayerCount = activeGame?.players?.length ?? 0;
                 
                 // Audio notification for new player
-                if (activeGame && gameData.players.length > activeGame.players.length) {
+                if (gameData.players.length > previousPlayerCount) {
                     const audio = document.getElementById('notification-sound') as HTMLAudioElement;
                     if (audio) {
                         audio.play().catch(e => console.error("Error playing sound:", e));
                     }
                 }
 
+                // Preserve active tab if it still exists
+                const activeTabExists = gameData.players.some(p => p.id === activeTab);
+                
                 setActiveGame(gameData);
                 
-                // If current user was just added, set them as the active tab
-                const currentUserInGame = gameData.players.find(p => p.name === currentUser?.name);
-                const activeTabExists = gameData.players.some(p => p.id === activeTab);
-
-                if (currentUserInGame && !activeTabExists) {
-                    setActiveTab(currentUserInGame.id);
-                } else if (!activeTabExists && gameData.players.length > 0) {
-                    // Fallback if current active tab player is removed
-                    setActiveTab(gameData.players[0].id)
+                if (!activeTabExists) {
+                    const currentUserInGame = gameData.players.find(p => p.name === currentUser?.name);
+                    if (currentUserInGame) {
+                       setActiveTab(currentUserInGame.id);
+                    } else if (gameData.players.length > 0) {
+                       setActiveTab(gameData.players[0].id)
+                    } else {
+                       setActiveTab("")
+                    }
                 }
             } else {
                 // Game was deleted by another user
@@ -500,7 +504,7 @@ export default function ChipMaestroPage() {
         });
 
         return () => unsub();
-    }, [activeGame?.id, activeGame, currentUser?.name, activeTab, toast]);
+    }, [activeGame?.id, activeTab, currentUser?.name, toast]);
 
     const prevBuyInRequestsRef = useRef<string[]>([]);
     
@@ -571,6 +575,7 @@ export default function ChipMaestroPage() {
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
     setActiveGame(null);
+    setJoinableGame(null);
     router.replace('/login');
   };
 
@@ -667,6 +672,15 @@ export default function ChipMaestroPage() {
     const handleJoinGame = async (gameId: string) => {
         const gameToJoin = gameHistory.find(g => g.id === gameId);
         if (gameToJoin && currentUser) {
+            
+            const isAlreadyInGame = gameToJoin.players.some(p => p.name === currentUser.name);
+            if(isAlreadyInGame) {
+                await loadGameIntoState(gameToJoin);
+                setJoinableGame(null);
+                setLoadGameModalOpen(false);
+                return;
+            }
+
             const playerToAdd: MasterPlayer = {
                 id: currentUser.id,
                 name: currentUser.name,
@@ -687,6 +701,7 @@ export default function ChipMaestroPage() {
             };
             await saveGameHistory(updatedGame); // This will trigger the onSnapshot listener
             setJoinableGame(null); // Clear the joinable game state
+            setLoadGameModalOpen(false);
         }
     };
     
@@ -940,7 +955,7 @@ export default function ChipMaestroPage() {
                 setReportsModalOpen={setReportsModalOpen}
                 toast={toast}
             />
-        ) : !isAdmin && (joinableGame || hasCheckedForGame) ? (
+        ) : !isAdmin && hasCheckedForGame ? (
             <PlayerView
                 currentUser={currentUser}
                 joinableGame={joinableGame}
@@ -979,15 +994,17 @@ export default function ChipMaestroPage() {
         isOpen={isLoadGameModalOpen}
         onOpenChange={(isOpen) => {
             if (!isOpen && !activeGame && isAdmin) return;
-             if (!isOpen && !isAdmin && !joinableGame) return;
+             if (!isOpen && !isAdmin && !activeGame && !joinableGame) return;
             setLoadGameModalOpen(isOpen)
         }}
         gameHistory={gameHistory}
         onLoadGame={handleLoadGame}
+        onJoinGame={handleJoinGame}
         onDeleteGame={handleDeleteGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
-        canBeClosed={!!activeGame || (!isAdmin && !!joinableGame) }
+        canBeClosed={!!activeGame || (!isAdmin && (!!joinableGame || !!activeGame))}
+        currentUser={currentUser}
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1231,10 +1248,16 @@ const PlayerCard: FC<{
   
   const removeBuyIn = (buyInId: string) => {
     const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
-    onUpdate(player.id, { buyIns: newBuyIns });
+    if(newBuyIns.length > 0){
+        onUpdate(player.id, { buyIns: newBuyIns });
+    } else {
+        toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
+    }
   }
 
-  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+  const totalBuyIns = useMemo(() => {
+    return (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+  }, [player.buyIns]);
   const isCurrentUser = player.name === currentUser?.name;
 
   return (
@@ -1256,7 +1279,7 @@ const PlayerCard: FC<{
                         toast={toast}
                     />
                     ))}
-                    {isCurrentUser && !isAdmin && (
+                    {isCurrentUser && (
                        <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
                     )}
                 </div>
@@ -1926,16 +1949,19 @@ const LoadGameDialog: FC<{
   onOpenChange: (open: boolean) => void;
   gameHistory: GameHistory[];
   onLoadGame: (id: string) => void;
+  onJoinGame: (id: string) => void;
   onDeleteGame: (id: string) => void;
   whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
   canBeClosed: boolean;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onDeleteGame, whatsappConfig, toast, canBeClosed }) => {
+  currentUser: MasterPlayer | null;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, whatsappConfig, toast, canBeClosed, currentUser }) => {
   const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const isAdmin = currentUser?.isAdmin;
 
   useEffect(() => {
     if (!isOpen) {
@@ -2028,22 +2054,35 @@ const LoadGameDialog: FC<{
               <ScrollArea className="h-72">
                 {sortedHistory.length > 0 ? (
                   <div className="space-y-2 pr-4">
-                    {sortedHistory.map(g => (
-                      <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
-                        <div>
-                          <p className="font-semibold">{g.venue}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button onClick={() => onLoadGame(g.id)} size="sm">
-                                Load
-                            </Button>
-                            <Button onClick={() => handleDeleteAttempt(g)} variant="destructive" size="icon" className="h-9 w-9" disabled={isSendingOtp}>
-                                {isSendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                            </Button>
-                        </div>
-                      </div>
-                    ))}
+                    {sortedHistory.map(g => {
+                        const isGameActive = !!g.startTime && !g.endTime;
+                        const isPlayerInGame = g.players.some(p => p.name === currentUser?.name);
+
+                        return (
+                          <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
+                            <div>
+                              <p className="font-semibold">{g.venue}</p>
+                              <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                {!isAdmin && isGameActive ? (
+                                    <Button onClick={() => onJoinGame(g.id)} size="sm">
+                                        {isPlayerInGame ? 'Re-Join' : 'Join'}
+                                    </Button>
+                                ) : (
+                                    <Button onClick={() => onLoadGame(g.id)} size="sm">
+                                        Load
+                                    </Button>
+                                )}
+                                {isAdmin && (
+                                    <Button onClick={() => handleDeleteAttempt(g)} variant="destructive" size="icon" className="h-9 w-9" disabled={isSendingOtp}>
+                                        {isSendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    </Button>
+                                )}
+                            </div>
+                          </div>
+                        )
+                    })}
                   </div>
                 ) : (
                   <div className="flex h-full items-center justify-center">
@@ -2904,4 +2943,3 @@ ${formattedTransfers}
         </Dialog>
     );
 };
-
