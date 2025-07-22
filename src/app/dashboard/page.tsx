@@ -216,9 +216,11 @@ const AdminView: FC<{
 
 const PlayerView: FC<{
     currentUser: MasterPlayer;
+    joinableGame: GameHistory | null;
+    onJoinGame: (gameId: string) => void;
     setLoadGameModalOpen: (isOpen: boolean) => void;
 }> = ({
-    currentUser, setLoadGameModalOpen
+    currentUser, joinableGame, onJoinGame, setLoadGameModalOpen
 }) => {
     
     return (
@@ -226,16 +228,33 @@ const PlayerView: FC<{
             <Card className="w-full max-w-md text-center">
                 <CardHeader>
                     <CardTitle>Welcome, {currentUser?.name}</CardTitle>
-                    <CardDescription>There are no games running right now.</CardDescription>
+                    {joinableGame ? (
+                         <CardDescription>A game is currently active!</CardDescription>
+                    ) : (
+                        <CardDescription>There are no games running right now.</CardDescription>
+                    )}
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">You can view past games or wait for an admin to start a new one.</p>
+                 <CardContent>
+                    {joinableGame ? (
+                       <div className="space-y-2">
+                           <p className="font-semibold">{joinableGame.venue}</p>
+                           <p className="text-sm text-muted-foreground">{format(new Date(joinableGame.timestamp), "PPP")}</p>
+                       </div>
+                    ) : (
+                        <p className="text-muted-foreground">You can view past games or wait for an admin to start a new one.</p>
+                    )}
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={() => setLoadGameModalOpen(true)} className="w-full">
-                        <History className="mr-2 h-4 w-4" />
-                        Load Previous Game
-                    </Button>
+                    {joinableGame ? (
+                        <Button onClick={() => onJoinGame(joinableGame.id)} className="w-full">
+                            <LogIn className="mr-2 h-4 w-4" /> Join Game
+                        </Button>
+                    ) : (
+                        <Button onClick={() => setLoadGameModalOpen(true)} className="w-full">
+                            <History className="mr-2 h-4 w-4" />
+                            Load Previous Game
+                        </Button>
+                    )}
                 </CardFooter>
             </Card>
         </div>
@@ -307,6 +326,8 @@ export default function ChipMaestroPage() {
   const [gameHistory, setGameHistory] = useState<GameHistory[]>([])
   const [activeGame, setActiveGame] = useState<GameHistory | null>(null)
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
+  const [joinableGame, setJoinableGame] = useState<GameHistory | null>(null);
+  const [hasCheckedForGame, setHasCheckedForGame] = useState(false);
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
@@ -411,12 +432,30 @@ export default function ChipMaestroPage() {
               });
             }
             
-            setLoadGameModalOpen(true);
+            // Check for active games for non-admins
+            if (!isAdmin) {
+                const today = new Date();
+                const activeGameForToday = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), today) && !g.endTime);
+                
+                if (activeGameForToday) {
+                    const isPlayerInGame = activeGameForToday.players.some(p => p.name === currentUser.name);
+                    if (isPlayerInGame) {
+                        loadGameIntoState(activeGameForToday);
+                    } else {
+                        setJoinableGame(activeGameForToday);
+                    }
+                } else {
+                    setLoadGameModalOpen(true);
+                }
+                setHasCheckedForGame(true);
+            } else {
+                setLoadGameModalOpen(true);
+            }
 
         } catch (error) {
             console.error("Failed to load data from Firestore", error);
             toast({ variant: "destructive", title: "Data Loading Error", description: "Could not load data from the cloud. Please check your connection." });
-            setLoadGameModalOpen(true);
+            setLoadGameModalOpen(true); // Open it anyway so user is not stuck
         } finally {
             setIsDataReady(true);
         }
@@ -462,6 +501,33 @@ export default function ChipMaestroPage() {
 
         return () => unsub();
     }, [activeGame?.id, activeGame, currentUser?.name, activeTab, toast]);
+
+    const prevBuyInRequestsRef = useRef<string[]>([]);
+    
+    // Effect for buy-in request notifications
+    useEffect(() => {
+        if (!isAdmin || !activeGame) return;
+
+        const currentRequests = (activeGame.players || [])
+            .flatMap(p => (p.buyIns || []).filter(b => b.status === 'requested').map(b => ({ ...b, playerName: p.name })));
+        
+        const currentRequestIds = currentRequests.map(r => r.id);
+        const prevRequestIds = prevBuyInRequestsRef.current;
+        
+        const newRequests = currentRequests.filter(r => !prevRequestIds.includes(r.id));
+        
+        if (newRequests.length > 0) {
+            newRequests.forEach(req => {
+                toast({
+                    title: "New Buy-in Request",
+                    description: `${req.playerName} has requested a buy-in of ₹${req.amount}.`
+                });
+            });
+        }
+        
+        prevBuyInRequestsRef.current = currentRequestIds;
+
+    }, [activeGame, isAdmin, toast]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -598,39 +664,38 @@ export default function ChipMaestroPage() {
     }
   };
   
+    const handleJoinGame = async (gameId: string) => {
+        const gameToJoin = gameHistory.find(g => g.id === gameId);
+        if (gameToJoin && currentUser) {
+            const playerToAdd: MasterPlayer = {
+                id: currentUser.id,
+                name: currentUser.name,
+                whatsappNumber: currentUser.whatsappNumber,
+                isAdmin: currentUser.isAdmin
+            };
+            
+            const newPlayer: Player = {
+                id: `player-${Date.now()}-${playerToAdd.id}`,
+                name: playerToAdd.name,
+                whatsappNumber: playerToAdd.whatsappNumber,
+                buyIns: [],
+                finalChips: 0,
+            };
+            const updatedGame: GameHistory = {
+                ...gameToJoin,
+                players: [...gameToJoin.players, newPlayer]
+            };
+            await saveGameHistory(updatedGame); // This will trigger the onSnapshot listener
+            setJoinableGame(null); // Clear the joinable game state
+        }
+    };
+    
   const handleLoadGame = async (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad && currentUser) {
-      const isPlayerInGame = gameToLoad.players.some(p => p.name === currentUser.name);
-
-      if (isPlayerInGame || isAdmin) {
-        await loadGameIntoState(gameToLoad);
-        setLoadGameModalOpen(false);
-        toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
-      } else {
-        // Player is not in the game, add them.
-         const playerToAdd: MasterPlayer = {
-            id: currentUser.id,
-            name: currentUser.name,
-            whatsappNumber: currentUser.whatsappNumber,
-            isAdmin: currentUser.isAdmin
-        }
-        
-        const newPlayer: Player = {
-            id: `player-${Date.now()}-${playerToAdd.id}`,
-            name: playerToAdd.name,
-            whatsappNumber: playerToAdd.whatsappNumber,
-            buyIns: [],
-            finalChips: 0,
-        };
-        const gameToJoin: GameHistory = {
-            ...gameToLoad,
-            players: [...gameToLoad.players, newPlayer]
-        }
-        await saveGameHistory(gameToJoin); // This will trigger the onSnapshot listener to update the state
-        setLoadGameModalOpen(false);
-        toast({ title: "Joined Game", description: `You have joined the game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
-      }
+      await loadGameIntoState(gameToLoad);
+      setLoadGameModalOpen(false);
+      toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
     }
   };
 
@@ -810,7 +875,7 @@ export default function ChipMaestroPage() {
             {isAdmin && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
-            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
+            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" disabled={!isAdmin && !hasCheckedForGame}><History className="mr-2 h-4 w-4" />Load Game</Button>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -858,29 +923,31 @@ export default function ChipMaestroPage() {
         </div>
       </header>
       
-      {activeGame ? (
-          <AdminView
-              activeGame={activeGame}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              updatePlayer={updatePlayer}
-              removePlayer={removePlayer}
-              handleRunAnomalyDetection={handleRunAnomalyDetection}
-              isOtpVerificationEnabled={isOtpVerificationEnabled}
-              whatsappConfig={whatsappConfig}
-              isAdmin={isAdmin}
-              currentUser={currentUser}
-              setAddPlayerModalOpen={setAddPlayerModalOpen}
-              setSaveConfirmOpen={setSaveConfirmOpen}
-              setReportsModalOpen={setReportsModalOpen}
-              toast={toast}
-          />
-      ) : (
-          <PlayerView
-              currentUser={currentUser}
-              setLoadGameModalOpen={setLoadGameModalOpen}
-          />
-      )}
+        {activeGame ? (
+            <AdminView
+                activeGame={activeGame}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                updatePlayer={updatePlayer}
+                removePlayer={removePlayer}
+                handleRunAnomalyDetection={handleRunAnomalyDetection}
+                isOtpVerificationEnabled={isOtpVerificationEnabled}
+                whatsappConfig={whatsappConfig}
+                isAdmin={isAdmin}
+                currentUser={currentUser}
+                setAddPlayerModalOpen={setAddPlayerModalOpen}
+                setSaveConfirmOpen={setSaveConfirmOpen}
+                setReportsModalOpen={setReportsModalOpen}
+                toast={toast}
+            />
+        ) : !isAdmin && (joinableGame || hasCheckedForGame) ? (
+            <PlayerView
+                currentUser={currentUser}
+                joinableGame={joinableGame}
+                onJoinGame={handleJoinGame}
+                setLoadGameModalOpen={setLoadGameModalOpen}
+            />
+        ) : null}
 
       <VenueDialog 
         isOpen={isVenueModalOpen}
@@ -911,7 +978,8 @@ export default function ChipMaestroPage() {
       <LoadGameDialog 
         isOpen={isLoadGameModalOpen}
         onOpenChange={(isOpen) => {
-            if (!isOpen && !activeGame) return;
+            if (!isOpen && !activeGame && isAdmin) return;
+             if (!isOpen && !isAdmin && !joinableGame) return;
             setLoadGameModalOpen(isOpen)
         }}
         gameHistory={gameHistory}
@@ -919,7 +987,7 @@ export default function ChipMaestroPage() {
         onDeleteGame={handleDeleteGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
-        canBeClosed={!!activeGame}
+        canBeClosed={!!activeGame || (!isAdmin && !!joinableGame) }
       />
       <ReportsDialog 
         isOpen={isReportsModalOpen}
@@ -1188,7 +1256,7 @@ const PlayerCard: FC<{
                         toast={toast}
                     />
                     ))}
-                    {!isAdmin && isCurrentUser && (
+                    {isCurrentUser && !isAdmin && (
                        <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
                     )}
                 </div>
@@ -2836,3 +2904,4 @@ ${formattedTransfers}
         </Dialog>
     );
 };
+
