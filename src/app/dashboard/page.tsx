@@ -472,14 +472,6 @@ export default function ChipMaestroPage() {
             if (doc.exists()) {
                 const gameData = { id: doc.id, ...doc.data() } as GameHistory;
                 const previousPlayerCount = activeGame?.players?.length ?? 0;
-                
-                // Audio notification for new player
-                if (gameData.players.length > previousPlayerCount) {
-                    const audio = document.getElementById('notification-sound') as HTMLAudioElement;
-                    if (audio) {
-                        audio.play().catch(e => console.error("Error playing sound:", e));
-                    }
-                }
 
                 // Preserve active tab if it still exists
                 const activeTabExists = gameData.players.some(p => p.id === activeTab);
@@ -859,7 +851,6 @@ export default function ChipMaestroPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-       <audio id="notification-sound" src="/notification.mp3" preload="auto"></audio>
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
            <h1 className="text-2xl font-bold truncate">{activeGame ? activeGame.venue : "Chip Maestro"}</h1>
@@ -1275,7 +1266,7 @@ const PlayerCard: FC<{
                         toast={toast}
                     />
                     ))}
-                    {isCurrentUser && (
+                    {isCurrentUser && !isAdmin && (
                        <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
                     )}
                 </div>
