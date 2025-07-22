@@ -782,6 +782,12 @@ export default function ChipMaestroPage() {
                     <span>{gameDuration}</span>
                 </div>
             )}
+             {activeGame && activeGame.players.length > 0 && (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {activeGame.players.length}
+                </Badge>
+             )}
             {greeting && activeGame && (
               <>
                 <Separator orientation="vertical" className="h-4" />
@@ -1207,7 +1213,7 @@ const PlayerCard: FC<{
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name} size="icon">
+                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name || !isAdmin} size="icon">
                                 <ShieldAlert className="h-4 w-4" />
                                 <span className="sr-only">Analyze Buy-ins</span>
                             </Button>
@@ -1281,7 +1287,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: Calcul
                     <h3 className="font-semibold mb-2">Money Transfers</h3>
                     <div className="space-y-1 text-sm">
                         {transfers.length > 0 ? transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t.replace(/<(\/)?strong>/g, '*') }} />
+                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<span class="font-bold">$1</span>') }} />
                         )) : <p className="text-muted-foreground">No transfers needed.</p>}
                     </div>
                 </div>
