@@ -696,7 +696,8 @@ export default function ChipMaestroPage() {
                 ...gameToJoin,
                 players: [...gameToJoin.players, newPlayer]
             };
-            await saveGameHistory(updatedGame); // This will trigger the onSnapshot listener
+            await saveGameHistory(updatedGame);
+            await loadGameIntoState(updatedGame);
             setJoinableGame(null); // Clear the joinable game state
             setLoadGameModalOpen(false);
         }
