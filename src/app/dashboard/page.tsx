@@ -79,7 +79,9 @@ import {
   Send,
   UserMinus,
   UserPlus,
-  LogIn
+  LogIn,
+  Hourglass,
+  Check,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -89,7 +91,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Switch } from "@/components/ui/switch"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis, ZAxis } from "recharts"
 import { cn } from "@/lib/utils"
 import { getGameHistory, saveGameHistory, deleteGameHistory } from "@/services/game-service"
@@ -139,13 +141,14 @@ const AdminView: FC<{
     isOtpVerificationEnabled: boolean;
     whatsappConfig: WhatsappConfig;
     isAdmin: boolean;
+    currentUser: MasterPlayer | null;
     setAddPlayerModalOpen: (isOpen: boolean) => void;
     setSaveConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
     activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
-    isOtpVerificationEnabled, whatsappConfig, isAdmin, setAddPlayerModalOpen,
+    isOtpVerificationEnabled, whatsappConfig, isAdmin, currentUser, setAddPlayerModalOpen,
     setSaveConfirmOpen, setReportsModalOpen, toast
 }) => {
     
@@ -185,6 +188,7 @@ const AdminView: FC<{
                                         isOtpEnabled={isOtpVerificationEnabled}
                                         whatsappConfig={whatsappConfig}
                                         isAdmin={isAdmin}
+                                        currentUser={currentUser}
                                         toast={toast}
                                     />
                                 </TabsContent>
@@ -193,7 +197,7 @@ const AdminView: FC<{
                     </CardContent>
                     <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                         <div className="flex gap-2">
-                            <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}>
+                             <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}>
                                 <Plus className="mr-2 h-4 w-4" />Add Player(s)
                             </Button>
                             <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!isAdmin}><Save className="mr-2 h-4 w-4" />Save Game</Button>
@@ -243,7 +247,7 @@ const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => 
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
             return {
                 ...p,
                 totalBuyIns,
@@ -263,11 +267,11 @@ const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => 
             playerName: p.name || "Unnamed",
             amount: b.amount,
             timestamp: b.timestamp,
-            verified: b.verified,
+            status: b.status,
         }))).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     }, [activeGame]);
 
-    const grandTotalBuyIn = useMemo(() => totalBuyInLog?.reduce((sum, item) => sum + (item.verified ? item.amount : 0), 0), [totalBuyInLog]);
+    const grandTotalBuyIn = useMemo(() => totalBuyInLog?.reduce((sum, item) => sum + (item.status === 'verified' ? item.amount : 0), 0), [totalBuyInLog]);
 
     return (
         <aside className="md:col-span-1">
@@ -428,12 +432,26 @@ export default function ChipMaestroPage() {
         const unsub = onSnapshot(doc(db, "gameHistory", activeGame.id), (doc) => {
             if (doc.exists()) {
                 const gameData = { id: doc.id, ...doc.data() } as GameHistory;
+                
+                // Audio notification for new player
+                if (activeGame && gameData.players.length > activeGame.players.length) {
+                    const audio = document.getElementById('notification-sound') as HTMLAudioElement;
+                    if (audio) {
+                        audio.play().catch(e => console.error("Error playing sound:", e));
+                    }
+                }
+
                 setActiveGame(gameData);
                 
                 // If current user was just added, set them as the active tab
                 const currentUserInGame = gameData.players.find(p => p.name === currentUser?.name);
-                if (currentUserInGame && !activeGame.players.some(p => p.id === currentUserInGame.id)) {
+                const activeTabExists = gameData.players.some(p => p.id === activeTab);
+
+                if (currentUserInGame && !activeTabExists) {
                     setActiveTab(currentUserInGame.id);
+                } else if (!activeTabExists && gameData.players.length > 0) {
+                    // Fallback if current active tab player is removed
+                    setActiveTab(gameData.players[0].id)
                 }
             } else {
                 // Game was deleted by another user
@@ -443,7 +461,7 @@ export default function ChipMaestroPage() {
         });
 
         return () => unsub();
-    }, [activeGame?.id, currentUser?.name, toast]);
+    }, [activeGame?.id, activeGame, currentUser?.name, activeTab, toast]);
 
 
   // Persist non-firestore data to localStorage whenever they change
@@ -497,12 +515,7 @@ export default function ChipMaestroPage() {
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
-          buyIns: [{ 
-            id: `buyin-${Date.now()}-${playerToAdd.id}`,
-            amount: 0, 
-            timestamp: new Date().toISOString(), 
-            verified: !isOtpVerificationEnabled 
-          }],
+          buyIns: [],
           finalChips: 0,
       }));
       
@@ -549,7 +562,7 @@ export default function ChipMaestroPage() {
         return;
     }
 
-    if (finalPlayers.some(p => (p.buyIns || []).some(b => !b.verified && b.amount > 0))) {
+    if (finalPlayers.some(p => (p.buyIns || []).some(b => b.status !== 'verified' && b.amount > 0))) {
       toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
       return;
     }
@@ -607,12 +620,7 @@ export default function ChipMaestroPage() {
             id: `player-${Date.now()}-${playerToAdd.id}`,
             name: playerToAdd.name,
             whatsappNumber: playerToAdd.whatsappNumber,
-            buyIns: [{ 
-              id: `buyin-${Date.now()}-${playerToAdd.id}`,
-              amount: 0, 
-              timestamp: new Date().toISOString(), 
-              verified: !isOtpVerificationEnabled 
-            }],
+            buyIns: [],
             finalChips: 0,
         };
         const gameToJoin: GameHistory = {
@@ -735,7 +743,7 @@ export default function ChipMaestroPage() {
     const newGameDate = new Date(importedGame.timestamp);
     
     const calculatedPlayers = importedGame.players.map(p => {
-        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
         return {
             ...p,
             totalBuyIns,
@@ -771,6 +779,7 @@ export default function ChipMaestroPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
+       <audio id="notification-sound" src="/notification.mp3" preload="auto"></audio>
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
            <h1 className="text-2xl font-bold truncate">{activeGame ? activeGame.venue : "Chip Maestro"}</h1>
@@ -860,6 +869,7 @@ export default function ChipMaestroPage() {
               isOtpVerificationEnabled={isOtpVerificationEnabled}
               whatsappConfig={whatsappConfig}
               isAdmin={isAdmin}
+              currentUser={currentUser}
               setAddPlayerModalOpen={setAddPlayerModalOpen}
               setSaveConfirmOpen={setSaveConfirmOpen}
               setReportsModalOpen={setReportsModalOpen}
@@ -963,49 +973,72 @@ export default function ChipMaestroPage() {
   )
 }
 
+const BuyInRequestPopover: FC<{
+    onBuyInRequest: (amount: number) => void;
+}> = ({ onBuyInRequest }) => {
+    const [amount, setAmount] = useState<number | string>("");
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button><Plus className="mr-2" />Request Buy-in</Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto">
+                <div className="space-y-2">
+                    <Label htmlFor="buyin-request-amount">Amount</Label>
+                    <Input id="buyin-request-amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} placeholder="e.g. 500" />
+                    <Button
+                        onClick={() => {
+                            if (Number(amount) > 0) {
+                                onBuyInRequest(Number(amount));
+                                setAmount("");
+                                // Trigger popover close
+                                document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
+                            }
+                        }}
+                        disabled={!amount || Number(amount) <= 0}
+                        className="w-full"
+                    >
+                        Submit Request
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
 const BuyInRow: FC<{
     buyIn: BuyIn;
-    index: number;
     player: Player;
-    canBeRemoved: boolean;
-    isLastRow: boolean;
-    onBuyInChange: (buyInId: string, newAmount: number) => void;
+    onUpdateBuyIn: (buyInId: string, newValues: Partial<BuyIn>) => void;
     onRemoveBuyIn: (buyInId: string) => void;
-    onVerify: (buyInId: string, verified: boolean) => void;
-    onAddBuyIn: () => void;
     isOtpEnabled: boolean;
     whatsappConfig: WhatsappConfig;
     isAdmin: boolean;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, index, player, canBeRemoved, isLastRow, onBuyInChange, onRemoveBuyIn, onVerify, onAddBuyIn, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
+}> = ({ buyIn, player, onUpdateBuyIn, onRemoveBuyIn, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
-    const [showOtpInput, setShowOtpInput] = useState(false);
-
+    
     useEffect(() => {
-        // If OTP is disabled and the buy-in isn't verified yet, verify it automatically.
-        if (!isOtpEnabled && !buyIn.verified && buyIn.amount > 0) {
-            onVerify(buyIn.id, true);
+        // Automatically verify if OTP is globally disabled
+        if (!isOtpEnabled && buyIn.status !== 'verified') {
+            onUpdateBuyIn(buyIn.id, { status: 'verified' });
         }
-    }, [isOtpEnabled, buyIn.verified, buyIn.amount, buyIn.id, onVerify]);
+    }, [isOtpEnabled, buyIn.status, buyIn.id, onUpdateBuyIn]);
 
     const handleSendOtp = async () => {
         if (!player.whatsappNumber) {
             toast({ variant: "destructive", title: "Missing Number", description: "Player's WhatsApp number is required to send OTP." });
             return;
         }
-        if (buyIn.amount <= 0) {
-            toast({ variant: "destructive", title: "Invalid Amount", description: "Buy-in amount must be greater than zero." });
-            return;
-        }
 
         setIsSending(true);
         try {
-            const verifiedBuyIns = (player.buyIns || []).filter(b => b.verified);
+            const verifiedBuyIns = (player.buyIns || []).filter(b => b.status === 'verified');
             const totalVerifiedAmount = verifiedBuyIns.reduce((sum, b) => sum + b.amount, 0);
-            
+
             const result = await sendBuyInOtp({
                 playerName: player.name,
                 whatsappNumber: player.whatsappNumber,
@@ -1018,7 +1051,7 @@ const BuyInRow: FC<{
             if (result.success && result.otp) {
                 toast({ title: "OTP Sent", description: "Verification code sent to player's WhatsApp." });
                 setSentOtp(result.otp);
-                setShowOtpInput(true);
+                onUpdateBuyIn(buyIn.id, { status: 'approved' });
             } else {
                 throw new Error(result.error || "Failed to send OTP.");
             }
@@ -1028,64 +1061,47 @@ const BuyInRow: FC<{
             setIsSending(false);
         }
     };
-
+    
     const handleConfirmOtp = () => {
         setIsVerifying(true);
         if (otp === sentOtp) {
             toast({ title: "Success", description: "Buy-in verified successfully." });
-            onVerify(buyIn.id, true);
-            setShowOtpInput(false);
+            onUpdateBuyIn(buyIn.id, { status: 'verified' });
         } else {
             toast({ variant: "destructive", title: "Invalid OTP", description: "The entered code is incorrect." });
         }
         setIsVerifying(false);
     };
 
-    const handleAmountChange = (newAmount: number) => {
-        if(buyIn.verified) {
-            setShowOtpInput(false);
-            setSentOtp("");
-            setOtp("");
-            onVerify(buyIn.id, false); // Re-verification needed if amount changes
+    const getStatusIndicator = () => {
+        switch (buyIn.status) {
+            case 'requested':
+                return <TooltipProvider><Tooltip><TooltipTrigger asChild><button><Hourglass className="h-5 w-5 text-amber-500" /></button></TooltipTrigger><TooltipContent><p>Requested</p></TooltipContent></Tooltip></TooltipProvider>
+            case 'approved':
+                return <TooltipProvider><Tooltip><TooltipTrigger asChild><button><Send className="h-5 w-5 text-sky-500" /></button></TooltipTrigger><TooltipContent><p>OTP Sent</p></TooltipContent></Tooltip></TooltipProvider>
+            case 'verified':
+                return <TooltipProvider><Tooltip><TooltipTrigger asChild><button><CheckCircle2 className="h-5 w-5 text-green-600" /></button></TooltipTrigger><TooltipContent><p>Verified</p></TooltipContent></Tooltip></TooltipProvider>
+            default:
+                return null;
         }
-        onBuyInChange(buyIn.id, newAmount);
     }
-    
+
     return (
-        <div className="p-2 rounded-md border bg-white dark:bg-slate-800 space-y-2">
+        <div className="p-2 rounded-md border bg-slate-100 dark:bg-slate-800 space-y-2">
             <div className="flex items-center gap-2">
-                <Input
-                    type="number"
-                    value={buyIn.amount === 0 ? "" : buyIn.amount}
-                    onChange={e => handleAmountChange(parseInt(e.target.value) || 0)}
-                    placeholder="Amount"
-                    className="h-9"
-                    disabled={!isAdmin}
-                />
-                {isLastRow && (
-                    <Button onClick={onAddBuyIn} variant="outline" size="icon" className="h-9 w-9" disabled={!isAdmin}>
-                        <Plus className="h-4 w-4" />
-                        <span className="sr-only">Re-buy</span>
-                    </Button>
-                )}
-                {buyIn.verified ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                ) : (
-                    showOtpInput && isOtpEnabled ? <div className="w-5" /> : null
-                )}
-                 {canBeRemoved && (
+                <div className="flex-1 font-medium text-lg">₹{buyIn.amount}</div>
+                {getStatusIndicator()}
+                 {isAdmin && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="destructive" className="h-9 w-9" disabled={!isAdmin}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete this buy-in. This action cannot be undone.
-                          </AlertDialogDescription>
+                          <AlertDialogDescription>This will permanently delete this buy-in of ₹{buyIn.amount} for {player.name}.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1095,18 +1111,20 @@ const BuyInRow: FC<{
                     </AlertDialog>
                 )}
             </div>
-            {isOtpEnabled && showOtpInput && !buyIn.verified && (
+            
+            {isAdmin && isOtpEnabled && buyIn.status === 'requested' && (
+                <Button onClick={handleSendOtp} disabled={isSending} className="w-full h-9">
+                    {isSending ? <Loader2 className="animate-spin" /> : <>Approve & Send OTP</>}
+                </Button>
+            )}
+
+             {isAdmin && isOtpEnabled && buyIn.status === 'approved' && (
                 <div className="flex items-center gap-2">
-                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9" disabled={!isAdmin}/>
-                    <Button onClick={handleConfirmOtp} disabled={isVerifying || !isAdmin} className="h-9">
+                    <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9"/>
+                    <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
                         {isVerifying ? <Loader2 className="animate-spin" /> : "Confirm"}
                     </Button>
                 </div>
-            )}
-            {isOtpEnabled && !showOtpInput && !buyIn.verified && (
-                 <Button onClick={handleSendOtp} disabled={isSending || buyIn.amount <= 0 || !isAdmin} className="w-full h-9">
-                     {isSending ? <Loader2 className="animate-spin" /> : "Verify Buy-in"}
-                 </Button>
             )}
         </div>
     )
@@ -1120,77 +1138,60 @@ const PlayerCard: FC<{
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
   isAdmin: boolean;
+  currentUser: MasterPlayer | null;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, currentUser, toast }) => {
   
-  const handleBuyInChange = (buyInId: string, newAmount: number) => {
+  const handleUpdateBuyIn = (buyInId: string, newValues: Partial<BuyIn>) => {
     const newBuyIns = (player.buyIns || []).map(b => 
-        b.id === buyInId ? { ...b, amount: newAmount } : b
+        b.id === buyInId ? { ...b, ...newValues } : b
     );
     onUpdate(player.id, { buyIns: newBuyIns });
   }
-  
-  const handleVerifyBuyIn = (buyInId: string, verified: boolean) => {
-    const newBuyIns = (player.buyIns || []).map(b => 
-        b.id === buyInId ? { ...b, verified } : b
-    );
-    onUpdate(player.id, { buyIns: newBuyIns });
-  };
 
-
-  const addBuyIn = () => {
-    if ((player.buyIns || []).some(b => !b.verified && b.amount > 0)) {
-        toast({ variant: "destructive", title: "Unverified Buy-in", description: "Please verify the current buy-in before adding a new one." });
-        return;
+  const handleBuyInRequest = (amount: number) => {
+    const newBuyIn: BuyIn = {
+        id: `buyin-${Date.now()}-${Math.random()}`,
+        amount, 
+        timestamp: new Date().toISOString(), 
+        status: isOtpEnabled ? 'requested' : 'verified'
     }
-    const newBuyIns = [
-        ...(player.buyIns || []), 
-        { 
-            id: `buyin-${Date.now()}-${Math.random()}`,
-            amount: 0, 
-            timestamp: new Date().toISOString(), 
-            verified: !isOtpEnabled 
-        }
-    ];
-    onUpdate(player.id, { buyIns: newBuyIns })
+    const newBuyIns = [...(player.buyIns || []), newBuyIn];
+    onUpdate(player.id, { buyIns: newBuyIns });
+    toast({ title: "Request Sent", description: `Your request for ₹${amount} has been sent to the admin.`})
   }
   
   const removeBuyIn = (buyInId: string) => {
-    if ((player.buyIns || []).length > 1) {
-      const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
-      onUpdate(player.id, { buyIns: newBuyIns });
-    } else {
-        toast({variant: "destructive", title: "Cannot Remove", description: "At least one buy-in is required."})
-    }
+    const newBuyIns = (player.buyIns || []).filter(b => b.id !== buyInId);
+    onUpdate(player.id, { buyIns: newBuyIns });
   }
 
-  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
-  
+  const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+  const isCurrentUser = player.name === currentUser?.name;
+
   return (
     <div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-            <Label className="text-lg mb-2">Buy-ins</Label>
-            <div className="space-y-2">
-                {(player.buyIns || []).map((buyIn, index) => (
-                <BuyInRow 
-                    key={buyIn.id}
-                    buyIn={buyIn}
-                    index={index}
-                    player={player}
-                    canBeRemoved={(player.buyIns || []).length > 1}
-                    isLastRow={index === (player.buyIns || []).length - 1}
-                    onBuyInChange={handleBuyInChange}
-                    onRemoveBuyIn={removeBuyIn}
-                    onVerify={handleVerifyBuyIn}
-                    onAddBuyIn={addBuyIn}
-                    isOtpEnabled={isOtpEnabled}
-                    whatsappConfig={whatsappConfig}
-                    isAdmin={isAdmin}
-                    toast={toast}
-                />
-                ))}
-            </div>
+                <Label className="text-lg mb-2">Buy-ins</Label>
+                <div className="space-y-2">
+                    {(player.buyIns || []).map((buyIn) => (
+                    <BuyInRow 
+                        key={buyIn.id}
+                        buyIn={buyIn}
+                        player={player}
+                        onUpdateBuyIn={handleUpdateBuyIn}
+                        onRemoveBuyIn={removeBuyIn}
+                        isOtpEnabled={isOtpEnabled}
+                        whatsappConfig={whatsappConfig}
+                        isAdmin={isAdmin}
+                        toast={toast}
+                    />
+                    ))}
+                    {!isAdmin && isCurrentUser && (
+                       <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                    )}
+                </div>
             </div>
             <div>
             <Label className="text-lg">Final Chips</Label>
@@ -1207,7 +1208,7 @@ const PlayerCard: FC<{
         
         <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
             <div className="flex items-center gap-4">
-                <Badge variant="secondary">Total Buy-in: {totalBuyIns}</Badge>
+                <Badge variant="secondary">Total Verified Buy-in: ₹{totalBuyIns}</Badge>
             </div>
             <div className="flex gap-2 items-center">
                 <TooltipProvider>
@@ -1299,8 +1300,10 @@ const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: Calcul
                            {buyInLog.map((log, i) => (
                             <TableRow key={i}>
                                 <TableCell>{log.playerName}</TableCell>
-                                <TableCell>{log.amount}</TableCell>
-                                <TableCell className="text-right text-muted-foreground">{format(new Date(log.timestamp), "p")}</TableCell>
+                                <TableCell>₹{log.amount}</TableCell>
+                                <TableCell className="text-right">
+                                     <Badge variant={log.status === 'verified' ? 'default' : (log.status === 'approved' ? 'secondary' : 'outline')} className={cn(log.status === 'verified' && 'bg-green-600')}>{log.status}</Badge>
+                                </TableCell>
                             </TableRow>
                            ))}
                         </TableBody>
@@ -1310,7 +1313,7 @@ const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: Calcul
                         <TableFoot>
                             <TableRow>
                                 <TableCell colSpan={2} className="font-bold">Grand Total</TableCell>
-                                <TableCell className="text-right font-bold">{grandTotal}</TableCell>
+                                <TableCell className="text-right font-bold">₹{grandTotal}</TableCell>
                             </TableRow>
                         </TableFoot>
                     </Table>
@@ -2009,7 +2012,7 @@ const ReportsDialog: FC<{
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
             return {
                 ...p,
                 totalBuyIns,
@@ -2527,7 +2530,7 @@ const SaveConfirmDialog: FC<{
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
             return {
                 ...p,
                 totalBuyIns,
@@ -2662,7 +2665,7 @@ const SettlementDialog: FC<{
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.verified ? bi.amount : 0), 0);
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
             return {
                 ...p,
                 totalBuyIns,
@@ -2833,4 +2836,3 @@ ${formattedTransfers}
         </Dialog>
     );
 };
-

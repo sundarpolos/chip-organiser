@@ -2,7 +2,7 @@ export interface BuyIn {
   id: string;
   amount: number;
   timestamp: string;
-  verified: boolean;
+  status: 'requested' | 'approved' | 'verified';
 }
 
 export interface Player {
