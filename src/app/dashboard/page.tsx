@@ -76,7 +76,9 @@ import {
   UserCheck,
   UserCog,
   User,
-  Send
+  Send,
+  UserMinus,
+  UserPlus
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -1457,7 +1459,7 @@ const ManagePlayersDialog: FC<{
     const [name, setName] = useState("");
     const [countryCode, setCountryCode] = useState("91");
     const [mobileNumber, setMobileNumber] = useState("");
-    const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
     
     const [otp, setOtp] = useState("");
@@ -1465,6 +1467,7 @@ const ManagePlayersDialog: FC<{
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const splitPhoneNumber = (fullNumber: string) => {
         if (!fullNumber) return { cc: "91", num: "" };
@@ -1496,7 +1499,7 @@ const ManagePlayersDialog: FC<{
     
     useEffect(() => {
         if (!isOpen) {
-            setSelectedPlayers([]);
+            setSelectedPlayerIds([]);
             setEditingPlayer(null);
             setPlayerToDelete(null);
             setOtp("");
@@ -1531,6 +1534,7 @@ const ManagePlayersDialog: FC<{
             }
         }
         
+        setIsUpdating(true);
         try {
             if (editingPlayer) {
                 const updatedPlayer: MasterPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber, isAdmin };
@@ -1547,6 +1551,8 @@ const ManagePlayersDialog: FC<{
         } catch (error) {
             console.error("Failed to save player:", error);
             toast({variant: "destructive", title: "Save Error", description: "Could not save player to server."});
+        } finally {
+            setIsUpdating(false);
         }
     }
 
@@ -1594,17 +1600,53 @@ const ManagePlayersDialog: FC<{
         }
     };
     
-    const handleMultiRemove = async () => {
-        // This feature would also require OTP verification, which is complex for multi-delete.
-        // For now, we recommend deleting one by one for security.
-        toast({ title: "Action Not Supported", description: "Please delete players one by one for security."});
-    }
+    const handleMultiAdminChange = async (makeAdmin: boolean) => {
+        if (selectedPlayerIds.length === 0) return;
+
+        setIsUpdating(true);
+        const updates: Promise<MasterPlayer>[] = [];
+        const updatedPlayerList = [...masterPlayers];
+
+        selectedPlayerIds.forEach(playerId => {
+            const playerIndex = updatedPlayerList.findIndex(p => p.id === playerId);
+            if (playerIndex > -1) {
+                const player = updatedPlayerList[playerIndex];
+                // Prevent changing super admin or self
+                if (player.whatsappNumber === '919843350000' || player.id === currentUser?.id) {
+                    return;
+                }
+                const updatedPlayer = { ...player, isAdmin: makeAdmin };
+                updatedPlayerList[playerIndex] = updatedPlayer;
+                updates.push(saveMasterPlayer(updatedPlayer));
+            }
+        });
+
+        try {
+            await Promise.all(updates);
+            setMasterPlayers(updatedPlayerList);
+            toast({
+                title: 'Permissions Updated',
+                description: `Successfully updated ${updates.length} player(s).`,
+            });
+        } catch (error) {
+            console.error('Failed to update multiple players:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Update Error',
+                description: 'Could not update player permissions.',
+            });
+        } finally {
+            setIsUpdating(false);
+            setSelectedPlayerIds([]);
+        }
+    };
+
 
     const handleSelectPlayer = (id: string, isSelected: boolean) => {
         if (isSelected) {
-            setSelectedPlayers(prev => [...prev, id]);
+            setSelectedPlayerIds(prev => [...prev, id]);
         } else {
-            setSelectedPlayers(prev => prev.filter(playerId => playerId !== id));
+            setSelectedPlayerIds(prev => prev.filter(playerId => playerId !== id));
         }
     }
 
@@ -1634,7 +1676,7 @@ const ManagePlayersDialog: FC<{
                         <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id || editingPlayer?.whatsappNumber === '919843350000'} />
                         <Label htmlFor="admin-switch">Make this player an Admin</Label>
                     </div>
-                    <Button onClick={handleSave} className="w-full">{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
+                    <Button onClick={handleSave} className="w-full" disabled={isUpdating}>{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
                     {editingPlayer && <Button variant="ghost" className="w-full" onClick={() => setEditingPlayer(null)}>Cancel Edit</Button>}
                 </div>
                 <div className="flex-1 min-h-0">
@@ -1645,9 +1687,9 @@ const ManagePlayersDialog: FC<{
                                     <div className="flex items-center gap-3 flex-1 mr-4">
                                         <Checkbox 
                                             id={`select-${p.id}`}
-                                            checked={selectedPlayers.includes(p.id)}
+                                            checked={selectedPlayerIds.includes(p.id)}
                                             onCheckedChange={(checked) => handleSelectPlayer(p.id, !!checked)}
-                                            disabled={p.id === currentUser?.id}
+                                            disabled={p.id === currentUser?.id || p.whatsappNumber === '919843350000'}
                                         />
                                         <div className="grid grid-cols-2 gap-4 flex-1">
                                             <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">
@@ -1659,21 +1701,29 @@ const ManagePlayersDialog: FC<{
                                     </div>
                                     <div className="flex gap-2">
                                         <Button size="icon" variant="ghost" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
-                                        <Button size="icon" variant="destructive" onClick={() => handleDeleteAttempt(p)} disabled={p.id === currentUser?.id || isSendingOtp}><Trash2 className="h-4 w-4" /></Button>
+                                        <Button size="icon" variant="destructive" onClick={() => handleDeleteAttempt(p)} disabled={p.id === currentUser?.id || p.whatsappNumber === '919843350000' || isSendingOtp}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </ScrollArea>
                 </div>
-                <DialogFooter className="pt-4 border-t flex justify-between">
-                    {selectedPlayers.length > 0 ? (
-                        <Button variant="destructive" onClick={handleMultiRemove}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Selected ({selectedPlayers.length})
-                        </Button>
-                    ) : <div></div>}
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                <DialogFooter className="pt-4 border-t">
+                     {selectedPlayerIds.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 justify-between w-full">
+                             <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleMultiAdminChange(true)} disabled={isUpdating}>
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    Make Admin ({selectedPlayerIds.length})
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={() => handleMultiAdminChange(false)} disabled={isUpdating}>
+                                    <UserMinus className="mr-2 h-4 w-4" />
+                                    Remove Admin
+                                </Button>
+                            </div>
+                           <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                        </div>
+                    ) :  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>}
                 </DialogFooter>
                 </>
                 ) : (
