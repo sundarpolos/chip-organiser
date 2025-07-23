@@ -1552,699 +1552,6 @@ const PlayerCard: FC<{
   )
 }
 
-const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: CalculatedPlayer[], transfers: string[], buyInLog: any[], grandTotal: number}> = ({ activeGame, calculatedPlayers, transfers, buyInLog, grandTotal }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle>Game Summary</CardTitle>
-            {activeGame && <CardDescription>{format(new Date(activeGame.timestamp), "dd/MMM/yy")}</CardDescription>}
-        </CardHeader>
-        <CardContent className="space-y-6">
-             {(!activeGame || calculatedPlayers.length === 0) ? (
-                <div className="text-center py-10 text-muted-foreground">
-                    <p>Add players and buy-ins to see the summary.</p>
-                </div>
-            ) : (
-            <>
-                <div>
-                    <h3 className="font-semibold mb-2">Player Summary</h3>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="p-2">Player</TableHead>
-                                <TableHead className="p-2 text-right">Buy-in</TableHead>
-                                <TableHead className="p-2 text-right">Chips</TableHead>
-                                <TableHead className="p-2 text-right">P/L</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {calculatedPlayers.map(p => (
-                                <TableRow key={p.id}>
-                                    <TableCell className="p-2 font-medium">{p.name || "Unnamed"}</TableCell>
-                                    <TableCell className="p-2 text-right">{p.totalBuyIns}</TableCell>
-                                    <TableCell className="p-2 text-right">{p.finalChips}</TableCell>
-                                    <TableCell className={`p-2 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {p.profitLoss.toFixed(0)}
-                                    </TableCell>
-                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-                <div>
-                    <h3 className="font-semibold mb-2">Money Transfers</h3>
-                    <div className="space-y-1 text-sm">
-                        {transfers.length > 0 ? transfers.map((t, i) => (
-                            <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<span class="font-bold">$1</span>') }} />
-                        )) : <p className="text-muted-foreground">No transfers needed.</p>}
-                    </div>
-                </div>
-                <div>
-                    <h3 className="font-semibold mb-2">Buy-in Log</h3>
-                    <ScrollArea className="h-40">
-                    <Table>
-                        <TableBody>
-                           {buyInLog.map((log, i) => (
-                            <TableRow key={i}>
-                                <TableCell>{log.playerName}</TableCell>
-                                <TableCell>₹{log.amount}</TableCell>
-                                <TableCell className="text-right">
-                                    <Badge variant={log.status === 'verified' ? 'default' : (log.status === 'approved' ? 'secondary' : 'outline')} className={cn(log.status === 'verified' && 'bg-green-600')}>
-                                      {format(new Date(log.timestamp), 'HH:mm')}
-                                    </Badge>
-                                </TableCell>
-                            </TableRow>
-                           ))}
-                        </TableBody>
-                    </Table>
-                    </ScrollArea>
-                    <Table>
-                        <TableFoot>
-                            <TableRow>
-                                <TableCell colSpan={2} className="font-bold">Grand Total</TableCell>
-                                <TableCell className="text-right font-bold">₹{grandTotal}</TableCell>
-                            </TableRow>
-                        </TableFoot>
-                    </Table>
-                </div>
-            </>
-            )}
-        </CardContent>
-    </Card>
-)
-
-const VenueDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    masterVenues: MasterVenue[],
-    onStartGame: (venue: string, date: Date) => void,
-    setMasterVenues: (venues: MasterVenue[] | ((prev: MasterVenue[]) => MasterVenue[])) => void,
-    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-    initialDate: Date
-}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, setMasterVenues, toast, initialDate }) => {
-    const [newVenue, setNewVenue] = useState("");
-    const [selectedVenue, setSelectedVenue] = useState("");
-    const [date, setDate] = useState<Date | undefined>(initialDate);
-
-    useEffect(() => {
-      if(isOpen) {
-        setDate(initialDate)
-        setNewVenue("")
-        setSelectedVenue("")
-      }
-    }, [isOpen, initialDate])
-
-    const handleSaveNewVenue = async () => {
-        if (!newVenue.trim()) return;
-        const venue: Omit<MasterVenue, 'id'> = { name: newVenue.trim() };
-        try {
-            const savedVenue = await saveMasterVenue(venue);
-            setMasterVenues(prev => [...prev, savedVenue]);
-            setSelectedVenue(savedVenue.name);
-            setNewVenue("");
-            toast({ title: "Venue Saved", description: `${savedVenue.name} has been added to the master list.` });
-        } catch (error) {
-            console.error("Failed to save new venue:", error);
-            toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue." });
-        }
-    }
-    
-    const handleDeleteVenue = async () => {
-        if(!selectedVenue) return;
-        const venueToDelete = masterVenues.find(v => v.name === selectedVenue);
-        if (!venueToDelete) return;
-
-        try {
-            await deleteMasterVenue(venueToDelete.id);
-            setMasterVenues(prev => prev.filter(v => v.id !== venueToDelete.id));
-            setSelectedVenue("");
-            toast({ title: "Venue Deleted", description: `${selectedVenue} has been deleted.` });
-        } catch (error) {
-            console.error("Failed to delete venue:", error);
-            toast({ variant: "destructive", title: "Delete Error", description: `Could not delete ${selectedVenue}.` });
-        }
-    }
-
-    const handleConfirm = async () => {
-        let venueToStart = selectedVenue || newVenue.trim();
-        if (!venueToStart || !date) return;
-        
-        // If it's a new venue, save it first.
-        if (!masterVenues.some(v => v.name === venueToStart)) {
-            const venueData: Omit<MasterVenue, 'id'> = { name: venueToStart };
-            try {
-                const savedVenue = await saveMasterVenue(venueData);
-                setMasterVenues(prev => [...prev, savedVenue]);
-                venueToStart = savedVenue.name; // Use the saved name
-            } catch (error) {
-                toast({ variant: "destructive", title: "Save Error", description: "Could not save the new venue before starting." });
-                return;
-            }
-        }
-        
-        onStartGame(venueToStart, date);
-    }
-    
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader><DialogTitle>Set Game Venue & Date</DialogTitle><DialogDescription>Select or create a venue and date to start a new game.</DialogDescription></DialogHeader>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Game Date</Label>
-                         <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !date && "text-muted-foreground"
-                                )}
-                                >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                mode="single"
-                                selected={date}
-                                onSelect={setDate}
-                                initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Existing Venues</Label>
-                        <div className="flex gap-2">
-                        <Select onValueChange={setSelectedVenue} value={selectedVenue}>
-                            <SelectTrigger><SelectValue placeholder="-- Select Venue --" /></SelectTrigger>
-                            <SelectContent>
-                                {masterVenues.map(v => <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Button variant="destructive" onClick={handleDeleteVenue} disabled={!selectedVenue}>Delete</Button>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                         <Label>Or Enter New Venue</Label>
-                        <div className="flex gap-2">
-                            <Input value={newVenue} onChange={e => setNewVenue(e.target.value)} placeholder="e.g., John's House"/>
-                            <Button onClick={handleSaveNewVenue} disabled={!newVenue.trim()}>Save New</Button>
-                        </div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button onClick={handleConfirm} disabled={(!selectedVenue && !newVenue.trim()) || !date}>Start New Game</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-const countryCodes = [
-    { value: "91", label: "IN (+91)" },
-    { value: "1", label: "US (+1)" },
-    { value: "44", label: "UK (+44)" },
-    { value: "61", label: "AU (+61)" },
-    { value: "81", label: "JP (+81)" },
-];
-
-const ManagePlayersDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    masterPlayers: MasterPlayer[];
-    setMasterPlayers: (players: MasterPlayer[] | ((prev: MasterPlayer[]) => MasterPlayer[])) => void;
-    currentUser: MasterPlayer | null;
-    whatsappConfig: WhatsappConfig;
-    toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast }) => {
-    const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
-    const [name, setName] = useState("");
-    const [countryCode, setCountryCode] = useState("91");
-    const [mobileNumber, setMobileNumber] = useState("");
-    const [group, setGroup] = useState("");
-    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [isUpdating, setIsUpdating] = useState(false);
-
-    const splitPhoneNumber = (fullNumber: string) => {
-        if (!fullNumber) return { cc: "91", num: "" };
-        const fullNumberStr = String(fullNumber).replace('+', '');
-
-        for (const code of countryCodes) {
-            if (fullNumberStr.startsWith(code.value)) {
-                return { cc: code.value, num: fullNumberStr.substring(code.value.length) };
-            }
-        }
-        
-        return { cc: "91", num: fullNumberStr };
-    };
-
-    useEffect(() => {
-        if(editingPlayer) {
-            setName(editingPlayer.name);
-            const { cc, num } = splitPhoneNumber(editingPlayer.whatsappNumber);
-            setCountryCode(cc);
-            setMobileNumber(num);
-            setGroup(editingPlayer.group || "");
-            setIsAdmin(editingPlayer.isAdmin || false);
-        } else {
-            setName("");
-            setCountryCode("91");
-            setMobileNumber("");
-            setGroup("");
-            setIsAdmin(false);
-        }
-    }, [editingPlayer]);
-    
-    useEffect(() => {
-        if (!isOpen) {
-            setSelectedPlayerIds([]);
-            setEditingPlayer(null);
-        }
-    }, [isOpen]);
-
-    const handleSave = async () => {
-        const trimmedName = name.trim();
-        if (!trimmedName) {
-            toast({ variant: "destructive", title: "Invalid Name", description: "Player name cannot be empty." });
-            return;
-        }
-
-        const isDuplicate = masterPlayers.some(p => p.name.toLowerCase() === trimmedName.toLowerCase() && p.id !== editingPlayer?.id);
-        if (isDuplicate) {
-            toast({ variant: "destructive", title: "Duplicate Player", description: "A player with this name already exists. Please merge them instead." });
-            return;
-        }
-
-        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : "";
-
-        if (mobileNumber) {
-            const mobileRegex = /^\d{10,14}$/;
-            if (!mobileRegex.test(fullWhatsappNumber.replace(/\s/g, ''))) {
-                 toast({
-                     variant: "destructive",
-                     title: "Invalid Mobile Number",
-                     description: "Please enter a valid mobile number (e.g., 919876543210). It should be 10-14 digits including country code.",
-                 });
-                 return;
-            }
-        }
-        
-        setIsUpdating(true);
-        try {
-            if (editingPlayer) {
-                const updatedPlayer: MasterPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber, group, isAdmin };
-                await saveMasterPlayer(updatedPlayer);
-                setMasterPlayers(mp => mp.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
-                toast({title: "Player Updated", description: "Player details have been saved."});
-            } else {
-                const newPlayer: Omit<MasterPlayer, 'id'> = { name: trimmedName, whatsappNumber: fullWhatsappNumber, group, isAdmin };
-                const savedPlayer = await saveMasterPlayer(newPlayer);
-                setMasterPlayers(mp => [...mp, savedPlayer]);
-                toast({title: "Player Added", description: "New player has been added to the list."});
-            }
-            setEditingPlayer(null);
-        } catch (error) {
-            console.error("Failed to save player:", error);
-            toast({variant: "destructive", title: "Save Error", description: "Could not save player to server."});
-        } finally {
-            setIsUpdating(false);
-        }
-    }
-
-    const handleDeletePlayer = async (playerId: string) => {
-        setIsUpdating(true);
-        try {
-            await deleteMasterPlayer(playerId);
-            setMasterPlayers(mp => mp.filter(p => p.id !== playerId));
-            toast({title: "Player Deleted", description: "Player has been removed."});
-        } catch (error) {
-             console.error("Failed to delete player:", error);
-             toast({variant: "destructive", title: "Delete Error", description: "Could not delete player from server."});
-        } finally {
-            setIsUpdating(false);
-        }
-    };
-    
-    const handleMultiAdminChange = async (makeAdmin: boolean) => {
-        if (selectedPlayerIds.length === 0) return;
-
-        setIsUpdating(true);
-        const updates: Promise<MasterPlayer>[] = [];
-        const updatedPlayerList = [...masterPlayers];
-
-        selectedPlayerIds.forEach(playerId => {
-            const playerIndex = updatedPlayerList.findIndex(p => p.id === playerId);
-            if (playerIndex > -1) {
-                const player = updatedPlayerList[playerIndex];
-                // Prevent changing super admin or self
-                if (player.whatsappNumber === '919843350000' || player.id === currentUser?.id) {
-                    return;
-                }
-                const updatedPlayer = { ...player, isAdmin: makeAdmin };
-                updatedPlayerList[playerIndex] = updatedPlayer;
-                updates.push(saveMasterPlayer(updatedPlayer));
-            }
-        });
-
-        try {
-            await Promise.all(updates);
-            setMasterPlayers(updatedPlayerList);
-            toast({
-                title: 'Permissions Updated',
-                description: `Successfully updated ${updates.length} player(s).`,
-            });
-        } catch (error) {
-            console.error('Failed to update multiple players:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Update Error',
-                description: 'Could not update player permissions.',
-            });
-        } finally {
-            setIsUpdating(false);
-            setSelectedPlayerIds([]);
-        }
-    };
-
-
-    const handleSelectPlayer = (id: string, isSelected: boolean) => {
-        if (isSelected) {
-            setSelectedPlayerIds(prev => [...prev, id]);
-        } else {
-            setSelectedPlayerIds(prev => prev.filter(playerId => playerId !== id));
-        }
-    }
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-lg flex flex-col h-[90vh] max-h-[700px]">
-                <DialogHeader>
-                    <div className="flex items-center justify-center gap-2">
-                        <DialogTitle>Manage Players</DialogTitle>
-                        <Badge variant="secondary">{masterPlayers.length}</Badge>
-                    </div>
-                </DialogHeader>
-                <div className="space-y-2 border-b pb-4">
-                    <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Player Name" value={name} onChange={e => setName(e.target.value)} className="col-span-2" />
-                         <Select value={countryCode} onValueChange={setCountryCode}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                {countryCodes.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Input placeholder="10-digit mobile" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} />
-                    </div>
-                     <Input placeholder="Group Name (optional)" value={group} onChange={e => setGroup(e.target.value)} />
-                    <div className="flex items-center space-x-2 pt-2">
-                        <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id || editingPlayer?.whatsappNumber === '919843350000'} />
-                        <Label htmlFor="admin-switch">Make this player an Admin</Label>
-                    </div>
-                    <Button onClick={handleSave} className="w-full" disabled={isUpdating}>{editingPlayer ? 'Save Changes' : 'Add to List'}</Button>
-                    {editingPlayer && <Button variant="ghost" className="w-full" onClick={() => setEditingPlayer(null)}>Cancel Edit</Button>}
-                </div>
-                <div className="flex-1 min-h-0">
-                    <ScrollArea className="h-full">
-                        <div className="space-y-2 py-4 pr-6">
-                            {masterPlayers.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-1.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                                    <div className="flex items-center gap-3 flex-1 mr-4">
-                                        <Checkbox 
-                                            id={`select-${p.id}`}
-                                            checked={selectedPlayerIds.includes(p.id)}
-                                            onCheckedChange={(checked) => handleSelectPlayer(p.id, !!checked)}
-                                            disabled={p.id === currentUser?.id || p.whatsappNumber === '919843350000'}
-                                        />
-                                        <div className="grid grid-cols-3 gap-4 flex-1">
-                                            <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">
-                                                {p.name} {p.isAdmin && <UserCog className="h-3 w-3 text-primary"/>}
-                                                {p.whatsappNumber === '919843350000' && <Crown className="h-3 w-3 text-amber-500" />}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
-                                            <p className="text-xs text-muted-foreground truncate col-span-1">{p.group || '-'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button size="icon" variant="ghost" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
-                                         <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button size="icon" variant="destructive" disabled={p.id === currentUser?.id || p.whatsappNumber === '919843350000' || isUpdating}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    This action will permanently delete the player "{p.name}". This cannot be undone.
-                                                </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeletePlayer(p.id)}>
-                                                    Continue
-                                                </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
-                </div>
-                <DialogFooter className="pt-4 border-t">
-                     {selectedPlayerIds.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 justify-between w-full">
-                             <div className="flex gap-2">
-                                <Button size="sm" onClick={() => handleMultiAdminChange(true)} disabled={isUpdating}>
-                                    <UserPlus className="mr-2 h-4 w-4" />
-                                    Make Admin ({selectedPlayerIds.length})
-                                </Button>
-                                <Button size="sm" variant="secondary" onClick={() => handleMultiAdminChange(false)} disabled={isUpdating}>
-                                    <UserMinus className="mr-2 h-4 w-4" />
-                                    Remove Admin
-                                </Button>
-                            </div>
-                           <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                        </div>
-                    ) :  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-const AddPlayerDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  masterPlayers: MasterPlayer[];
-  gamePlayers: Player[];
-  onAddPlayers: (players: MasterPlayer[]) => void;
-  toast: (options: { variant?: 'default' | 'destructive' | null; title: string; description: string }) => void;
-}> = ({ isOpen, onOpenChange, masterPlayers, gamePlayers, onAddPlayers, toast }) => {
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-
-  const availablePlayers = useMemo(() => {
-    const gamePlayerNames = gamePlayers.map(p => p.name);
-    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name));
-  }, [masterPlayers, gamePlayers]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedPlayerIds([]);
-    }
-  }, [isOpen]);
-
-  const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedPlayerIds(prev => [...prev, playerId]);
-    } else {
-      setSelectedPlayerIds(prev => prev.filter(id => id !== playerId));
-    }
-  };
-
-  const handleConfirmAdd = () => {
-    if (selectedPlayerIds.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Players Selected',
-        description: 'Please select at least one player to add.',
-      });
-      return;
-    }
-    const playersToAdd = masterPlayers.filter(mp => selectedPlayerIds.includes(mp.id));
-    onAddPlayers(playersToAdd);
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Add Players to Game</DialogTitle>
-          <DialogDescription>Select players from your master list to add to the current game.</DialogDescription>
-        </DialogHeader>
-        <div className="py-4">
-          {availablePlayers.length > 0 ? (
-            <ScrollArea className="h-60 border rounded-md p-2">
-              <div className="space-y-2">
-                {availablePlayers.map(player => (
-                  <div key={player.id} className="flex items-center space-x-3 p-1">
-                    <Checkbox
-                      id={`add-${player.id}`}
-                      checked={selectedPlayerIds.includes(player.id)}
-                      onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
-                    />
-                    <Label htmlFor={`add-${player.id}`} className="flex-1 cursor-pointer">
-                      {player.name}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex h-40 items-center justify-center text-muted-foreground">
-              <p>All master players are already in the game.</p>
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleConfirmAdd} disabled={selectedPlayerIds.length === 0}>
-            Add {selectedPlayerIds.length > 0 ? selectedPlayerIds.length : ''} Player(s)
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-
-const LoadGameDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  gameHistory: GameHistory[];
-  onLoadGame: (id: string) => void;
-  onJoinGame: (id: string) => void;
-  onDeleteGame: (id: string) => void;
-  onNewGame: () => void;
-  whatsappConfig: WhatsappConfig;
-  toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
-  currentUser: MasterPlayer | null;
-}> = ({
-  isOpen,
-  onOpenChange,
-  gameHistory,
-  onLoadGame,
-  onJoinGame,
-  onDeleteGame,
-  onNewGame,
-  whatsappConfig,
-  toast,
-  currentUser,
-}) => {
-  const isAdmin = currentUser?.isAdmin;
-
-  const sortedHistory = useMemo(
-    () => [...gameHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
-    [gameHistory]
-  );
-  
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <DialogTitle>Load Previous Game</DialogTitle>
-            {gameHistory.length > 0 && <Badge variant="secondary">{gameHistory.length}</Badge>}
-          </div>
-          <DialogDescription>
-            Select a game from your history to load or delete.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="mt-4">
-            <ScrollArea className="h-72">
-            {sortedHistory.length > 0 ? (
-                <div className="space-y-2 pr-4">
-                {sortedHistory.map(g => {
-                    const isGameActive = !!g.startTime && !g.endTime;
-                    const isPlayerInGame = g.players.some(p => p.name === currentUser?.name);
-
-                    return (
-                        <div key={g.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md gap-2">
-                        <div>
-                            <p className="font-semibold">{g.venue}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(g.timestamp), "PPP, p")}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            {isGameActive ? (
-                                <Button onClick={() => onJoinGame(g.id)} size="sm">
-                                    Join Table
-                                </Button>
-                            ) : (
-                                <Button onClick={() => onLoadGame(g.id)} size="sm" variant="outline" className="flex items-center gap-2">
-                                    <Pencil className="h-4 w-4" /> Edit
-                                </Button>
-                            )}
-                            {isAdmin && (
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="icon" className="h-9 w-9">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action will permanently delete the game at "{g.venue}" on {format(new Date(g.timestamp), "PPP")}.
-                                        </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => onDeleteGame(g.id)}>
-                                            Continue
-                                        </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            )}
-                        </div>
-                        </div>
-                    )
-                })}
-                </div>
-            ) : (
-                <div className="flex h-full items-center justify-center">
-                <p className="text-muted-foreground">No games in history.</p>
-                </div>
-            )}
-            </ScrollArea>
-        </div>
-        {isAdmin && (
-            <DialogFooter className="mt-4 flex sm:justify-between w-full">
-                <Button variant="destructive" onClick={() => { onOpenChange(false); onNewGame();}}>
-                <Plus className="mr-2 h-4 w-4" /> Add New Game
-                </Button>
-                <DialogClose asChild>
-                <Button variant="outline">Close</Button>
-                </DialogClose>
-            </DialogFooter>
-            )}
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-
 const ReportsDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
@@ -2267,10 +1574,12 @@ const ReportsDialog: FC<{
         });
     }, [activeGame]);
     
-    const transfers = useMemo(() => {
-        if (!calculatedPlayers) return [];
-        return calculateInterPlayerTransfers(calculatedPlayers);
-    }, [calculatedPlayers]);
+    const buyInLog = useMemo(() => {
+        if (!activeGame) return [];
+        return (activeGame.players || [])
+            .flatMap(p => (p.buyIns || []).map(b => ({ ...b, playerName: p.name })))
+            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    }, [activeGame]);
     
     const handleExportPdf = async () => {
         if (!activeGame || !reportContentRef.current) return;
@@ -2316,16 +1625,14 @@ const ReportsDialog: FC<{
         .filter(p => p.finalChips > 0)
         .map(p => ({ name: p.name, value: p.finalChips }));
 
-    const barChartData = calculatedPlayers.map(p => ({
-        name: p.name,
-        'P/L': p.profitLoss
-    }));
-
     const sortedStandings = [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
-    const totalBuyIns = calculatedPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0);
-    const totalChips = calculatedPlayers.reduce((sum, p) => sum + p.finalChips, 0);
-    const totalPL = calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0);
-    
+    const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
+        return {
+            grandTotalBuyin: calculatedPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0),
+            grandTotalChips: calculatedPlayers.reduce((sum, p) => sum + p.finalChips, 0),
+            grandTotalProfitLoss: calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0)
+        };
+    }, [calculatedPlayers]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -2356,78 +1663,115 @@ const ReportsDialog: FC<{
                     </div>
                 </DialogHeader>
                 <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
-                    <div ref={reportContentRef} className="p-4 bg-background">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            
-                            <Card className="lg:col-span-2"><CardHeader><CardTitle>Final Standings</CardTitle></CardHeader><CardContent>
-                                 <Table><TableHeader><TableRow>
-                                     <TableHead>Player</TableHead>
-                                     <TableHead className="text-right">Buy-in</TableHead>
-                                     <TableHead className="text-right">Chip Return</TableHead>
-                                     <TableHead className="text-right">P/L</TableHead>
-                                 </TableRow></TableHeader>
-                                 <TableBody>
-                                     {sortedStandings.map((p) => (
-                                         <TableRow key={p.id}>
-                                             <TableCell className="font-medium">{p.name}</TableCell>
-                                             <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                             <TableCell className="text-right">{p.finalChips}</TableCell>
-                                             <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>{p.profitLoss.toFixed(0)}</TableCell>
-                                         </TableRow>
-                                     ))}
-                                 </TableBody>
-                                 <TableFoot>
-                                    <TableRow className="font-bold border-t-2 border-foreground">
-                                        <TableCell>Grand Totals</TableCell>
-                                        <TableCell className="text-right">{totalBuyIns}</TableCell>
-                                        <TableCell className="text-right">{totalChips}</TableCell>
-                                        <TableCell className="text-right">{totalPL.toFixed(0)}</TableCell>
-                                    </TableRow>
-                                 </TableFoot>
-                                 </Table>
-                             </CardContent></Card>
-
-                             <Card className="lg:col-span-1"><CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader><CardContent className="space-y-2">
-                                {transfers.length > 0 ? transfers.map((t, i) => (
-                                    <div key={i} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-md text-sm" dangerouslySetInnerHTML={{ __html: t }} />
-                                )) : <p className="text-muted-foreground text-sm">No transfers needed.</p>}
-                            </CardContent></Card>
-                            
-                            <Card className="lg:col-span-2"><CardHeader><CardTitle>Player Performance (Profit/Loss)</CardTitle></CardHeader><CardContent>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={barChartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} interval={0} />
-                                        <YAxis />
-                                        <RechartsTooltip
-                                            content={({ payload }) => {
-                                                if (!payload || !payload.length) return null;
-                                                const data = payload[0].payload;
-                                                return (
-                                                    <div className="bg-background border p-2 rounded-md shadow-lg">
-                                                        <p className="font-bold">{data.name}</p>
-                                                        <p className={data['P/L'] >= 0 ? 'text-green-600' : 'text-red-600'}>P/L: {data['P/L'].toFixed(0)}</p>
-                                                    </div>
-                                                );
-                                            }}
-                                        />
-                                        <Legend />
-                                        <Bar dataKey="P/L" name="Profit/Loss">
-                                        {barChartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry['P/L'] >= 0 ? '#10b981' : '#ef4444'} />
+                    <div ref={reportContentRef} className="p-4 bg-background space-y-6">
+                        
+                         {/* Player Summary & Accumulative Report */}
+                        <Card>
+                            <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Player</TableHead>
+                                            <TableHead className="text-right">Buy-in</TableHead>
+                                            <TableHead className="text-right">Chip Return</TableHead>
+                                            <TableHead className="text-right">P/L</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sortedStandings.map((p) => (
+                                            <TableRow key={p.id}>
+                                                <TableCell className="font-medium">{p.name}</TableCell>
+                                                <TableCell className="text-right">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="text-right">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                            </TableRow>
                                         ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </CardContent></Card>
+                                    </TableBody>
+                                    <TableFoot>
+                                        <TableRow className="font-bold border-t-2 border-foreground">
+                                            <TableCell>Accumulative Report</TableCell>
+                                            <TableCell className="text-right">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="text-right">₹{grandTotalChips}</TableCell>
+                                            <TableCell className="text-right">₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                        </TableRow>
+                                    </TableFoot>
+                                </Table>
+                            </CardContent>
+                        </Card>
 
-                            <Card className="lg:col-span-1"><CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader><CardContent>
-                                <ChipDistributionChart data={pieChartData} />
-                            </CardContent></Card>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Player Performance */}
+                            <Card>
+                                <CardHeader><CardTitle>Player Performance (P/L vs Buy-ins)</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    {sortedStandings.map(p => {
+                                        const progressValue = p.totalBuyIns > 0 ? ((p.profitLoss + p.totalBuyIns) / p.totalBuyIns) * 100 : 0;
+                                        return (
+                                            <div key={p.id}>
+                                                <div className="flex justify-between items-baseline mb-1">
+                                                    <span className="font-medium">{p.name}</span>
+                                                    <span className={`font-semibold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                        P/L: ₹{p.profitLoss.toFixed(0)}
+                                                    </span>
+                                                </div>
+                                                <TooltipProvider>
+                                                <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Progress 
+                                                        value={progressValue}
+                                                        className={cn("h-4", p.profitLoss < 0 && "[&>div]:bg-destructive")}
+                                                    />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Buy-in: ₹{p.totalBuyIns}</p>
+                                                    <p>Return: ₹{p.finalChips}</p>
+                                                </TooltipContent>
+                                                </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        )
+                                    })}
+                                </CardContent>
+                            </Card>
+
+                             {/* Final Chip Distribution */}
+                            <Card>
+                                <CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader>
+                                <CardContent>
+                                    <ChipDistributionChart data={pieChartData} />
+                                </CardContent>
+                            </Card>
                         </div>
+                        
+                        {/* Buy-in Log */}
+                        <Card>
+                             <CardHeader><CardTitle>Buy-in Log</CardTitle></CardHeader>
+                             <CardContent>
+                                 <ScrollArea className="h-48">
+                                     <Table>
+                                         <TableHeader>
+                                             <TableRow>
+                                                 <TableHead>Player</TableHead>
+                                                 <TableHead>Amount</TableHead>
+                                                 <TableHead className="text-right">Time</TableHead>
+                                             </TableRow>
+                                         </TableHeader>
+                                         <TableBody>
+                                             {buyInLog.map((log) => (
+                                                 <TableRow key={log.id}>
+                                                     <TableCell className="font-medium">{log.playerName}</TableCell>
+                                                     <TableCell>₹{log.amount}</TableCell>
+                                                     <TableCell className="text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
+                                                 </TableRow>
+                                             ))}
+                                         </TableBody>
+                                     </Table>
+                                 </ScrollArea>
+                             </CardContent>
+                        </Card>
                     </div>
                 </ScrollArea>
-                
             </DialogContent>
         </Dialog>
     )
