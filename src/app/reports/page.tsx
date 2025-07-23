@@ -32,6 +32,7 @@ import {
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { Badge } from '@/components/ui/badge';
 
 type AggregatedPlayerData = {
   name: string;
@@ -354,10 +355,10 @@ export default function BulkReportsPage() {
               data={filteredData.players.map(p => [
                 p.name,
                 p.gamesPlayed,
-                p.totalBuyIn.toFixed(0),
-                p.totalChipReturn.toFixed(0),
-                p.totalProfitLoss.toFixed(0),
-                p.avgProfitLoss.toFixed(0),
+                (p.totalBuyIn ?? 0).toFixed(0),
+                (p.totalChipReturn ?? 0).toFixed(0),
+                (p.totalProfitLoss ?? 0).toFixed(0),
+                (p.avgProfitLoss ?? 0).toFixed(0),
               ])}
             />
           </CardContent>
@@ -380,21 +381,22 @@ export default function BulkReportsPage() {
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle>Daily Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              columns={['Date', 'Games Played', 'Total Buy-in', 'Total Chip Return', 'Total P/L']}
-              data={filteredData.daily.map(d => [
-                format(new Date(d.date), 'dd MMMM yyyy'),
-                d.gamesCount,
-                (d.totalBuyIn ?? 0).toFixed(0),
-                (d.totalChipReturn ?? 0).toFixed(0),
-                (d.totalProfitLoss ?? 0).toFixed(0),
-              ])}
-            />
-          </CardContent>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                Daily Summary
+                {filteredData.totalGames > 0 && <Badge variant="secondary">{filteredData.totalGames}</Badge>}
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <DataTable
+                columns={['Date', 'Total Buy-in', 'Total Chip Return']}
+                data={filteredData.daily.map(d => [
+                    format(new Date(d.date), 'dd MMMM yyyy'),
+                    (d.totalBuyIn ?? 0).toFixed(0),
+                    (d.totalChipReturn ?? 0).toFixed(0),
+                ])}
+                />
+            </CardContent>
         </Card>
       </div>
     </div>
@@ -494,5 +496,3 @@ const DataTable: FC<{
         </Table>
     )
 }
-
-    
