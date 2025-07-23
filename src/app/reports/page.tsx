@@ -15,14 +15,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { BarChart as RechartsBarChart, Bar as RechartsBar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { DateRange } from 'react-day-picker';
 
 
@@ -48,7 +48,7 @@ const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6"
 
 export default function GameHistoryPage() {
   const { toast } = useToast();
-  const reportCardRef = useRef<HTMLDivElement>(null);
+  const reportContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   // Data state
@@ -205,14 +205,14 @@ export default function GameHistoryPage() {
   };
 
   const handleExportPdf = async () => {
-    if (!reportCardRef.current) {
+    if (!reportContainerRef.current) {
         toast({ variant: "destructive", title: "Export Error", description: "Report content not found." });
         return;
     }
     
     setIsExporting(true);
     try {
-        const canvas = await html2canvas(reportCardRef.current, {
+        const canvas = await html2canvas(reportContainerRef.current, {
             scale: 2, // Higher scale for better quality before compression
             useCORS: true,
             backgroundColor: null, // Use transparent background for dark mode compatibility
@@ -305,30 +305,38 @@ export default function GameHistoryPage() {
         </CardContent>
       </Card>
       
-      <Card ref={reportCardRef} className="p-4 bg-background">
-          <CardHeader>
-              <div className="flex items-center gap-2">
-                <CardTitle>Player Report</CardTitle>
-                <Badge variant="secondary">{playerReportData.length} players</Badge>
-              </div>
-          </CardHeader>
-          <CardContent className="space-y-8">
-              <PlayerReportTable
-                playerReportData={playerReportData}
-                filteredGames={filteredGames}
-              />
+      <div ref={reportContainerRef} className="space-y-6">
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <CardTitle>Player Report</CardTitle>
+                    <Badge variant="secondary">{playerReportData.length} players</Badge>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <PlayerReportTable
+                    playerReportData={playerReportData}
+                    filteredGames={filteredGames}
+                />
+            </CardContent>
+        </Card>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
-                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
-                {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
-                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
-                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
-                {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={playerReportData} />}
-              </div>
-
-          </CardContent>
-      </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
+                    {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
+                    {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
+                    {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
+                    {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
+                    {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={playerReportData} />}
+                </div>
+            </CardContent>
+        </Card>
+      </div>
 
     </div>
   );
@@ -511,8 +519,8 @@ const PlayerReportTable: FC<{
     const totals = useMemo(() => {
         const result = playerReportData.reduce((acc, player) => {
             acc.gamesPlayed += player.gamesPlayed;
-            acc.totalBuyIn += player.totalBuyIn;
-            acc.totalChipReturn += player.totalChipReturn;
+            acc.totalBuyIn += player.totalBuyIn || 0;
+            acc.totalChipReturn += player.totalChipReturn || 0;
             return acc;
         }, { gamesPlayed: 0, totalBuyIn: 0, totalChipReturn: 0 });
         
@@ -550,9 +558,9 @@ const PlayerReportTable: FC<{
                                         </TableCell>
                                         <TableCell className='font-medium'>{player.name}</TableCell>
                                         <TableCell>{player.gamesPlayed}</TableCell>
-                                        <TableCell className="font-mono">₹{player.totalBuyIn.toFixed(0)}</TableCell>
-                                        <TableCell className="font-mono">₹{player.totalChipReturn.toFixed(0)}</TableCell>
-                                        <TableCell className={cn('font-mono font-bold', player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>₹{player.profitLoss.toFixed(0)}</TableCell>
+                                        <TableCell className="font-mono">₹{(player.totalBuyIn || 0).toFixed(0)}</TableCell>
+                                        <TableCell className="font-mono">₹{(player.totalChipReturn || 0).toFixed(0)}</TableCell>
+                                        <TableCell className={cn('font-mono font-bold', player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>₹{(player.profitLoss || 0).toFixed(0)}</TableCell>
                                     </TableRow>
                                     {isExpanded && (
                                         <TableRow>
@@ -634,14 +642,14 @@ const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
 
     return (
         <ChartContainer title="Total Buy-ins per Venue">
-            <BarChart data={chartData}>
+            <RechartsBarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                 <Tooltip formatter={(value) => `₹${value}`} />
                 <Legend />
-                <Bar dataKey="totalBuyIn" fill="#4f46e5" name="Total Buy-in" />
-            </BarChart>
+                <RechartsBar dataKey="totalBuyIn" fill="#4f46e5" name="Total Buy-in" />
+            </RechartsBarChart>
         </ChartContainer>
     );
 };
@@ -732,15 +740,15 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
 
     return (
         <ChartContainer title="Buy-ins vs. Returns per Venue">
-            <BarChart data={chartData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tickFormatter={(value) => `₹${value / 1000}k`} />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => `₹${value}`}/>
                 <Legend />
-                <Bar dataKey="totalBuyIn" stackId="a" fill="#8b5cf6" name="Total Buy-in" />
-                <Bar dataKey="totalChipReturn" stackId="a" fill="#3b82f6" name="Total Chip Return" />
-            </BarChart>
+                <RechartsBar dataKey="totalBuyIn" stackId="a" fill="#8b5cf6" name="Total Buy-in" />
+                <RechartsBar dataKey="totalChipReturn" stackId="a" fill="#3b82f6" name="Total Chip Return" />
+            </RechartsBarChart>
         </ChartContainer>
     );
 };
@@ -750,20 +758,18 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
     
     return (
         <ChartContainer title="Total Player Profit/Loss">
-            <BarChart data={data}>
+            <RechartsBarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                 <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
                 <Legend />
-                <Bar dataKey="profitLoss" name="Total P/L">
+                <RechartsBar dataKey="profitLoss" name="Total P/L">
                     {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
                     ))}
-                </Bar>
-            </BarChart>
+                </RechartsBar>
+            </RechartsBarChart>
         </ChartContainer>
     );
 };
-
-
