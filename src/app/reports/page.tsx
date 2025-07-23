@@ -253,23 +253,6 @@ export default function GameHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Game History & Reports</h1>
-          {dateRange?.from && (
-            <p className="text-muted-foreground mt-1">
-              {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-            <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
-                {isExporting ? <Loader2 className="mr-2 animate-spin"/> : <FileDown className="mr-2"/>}
-                Export PDF
-            </Button>
-        </div>
-      </div>
-      
       <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters & Display Options</CardTitle>
@@ -313,6 +296,22 @@ export default function GameHistoryPage() {
       </Card>
       
       <div ref={reportContainerRef} className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Game History & Reports</h1>
+            {dateRange?.from && (
+              <p className="text-muted-foreground mt-1">
+                {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+              <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
+                  {isExporting ? <Loader2 className="mr-2 animate-spin"/> : <FileDown className="mr-2"/>}
+                  Export PDF
+              </Button>
+          </div>
+        </div>
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2">
@@ -792,3 +791,4 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
         </div>
     );
 };
+
