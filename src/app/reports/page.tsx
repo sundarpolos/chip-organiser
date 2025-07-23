@@ -53,8 +53,6 @@ type DailySummaryData = {
     date: string;
     totalBuyIn: number;
     totalChipReturn: number;
-    totalProfitLoss: number;
-    gamesCount: number;
 }
 
 export default function BulkReportsPage() {
@@ -70,10 +68,8 @@ export default function BulkReportsPage() {
   // Filter state
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [selectedVenueIds, setSelectedVenueIds] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
-  });
+  const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 30));
+  const [toDate, setToDate] = useState<Date | undefined>(new Date());
 
   // Load all data on component mount
   useEffect(() => {
@@ -116,10 +112,7 @@ export default function BulkReportsPage() {
 
     const filteredGames = allGames.filter(game => {
       const gameDate = new Date(game.timestamp);
-      const isDateInRange =
-        dateRange?.from && dateRange?.to
-          ? gameDate >= dateRange.from && gameDate <= dateRange.to
-          : true;
+      const isDateInRange = fromDate && toDate ? gameDate >= fromDate && gameDate <= toDate : true;
       
       const isVenueSelected = selectedVenueNames.includes(game.venue);
       
@@ -189,18 +182,13 @@ export default function BulkReportsPage() {
                 date: game.timestamp,
                 totalBuyIn: 0,
                 totalChipReturn: 0,
-                totalProfitLoss: 0,
-                gamesCount: 0,
             };
         }
         
-        dailyStats[gameDateKey].gamesCount += 1;
         game.players.forEach(p => {
             const playerBuyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            const playerPL = p.finalChips - playerBuyIn;
             dailyStats[gameDateKey].totalBuyIn += playerBuyIn;
             dailyStats[gameDateKey].totalChipReturn += p.finalChips;
-            dailyStats[gameDateKey].totalProfitLoss += playerPL;
         });
 
     });
@@ -211,7 +199,7 @@ export default function BulkReportsPage() {
       daily: Object.values(dailyStats).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
       totalGames: filteredGames.length,
     };
-  }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
+  }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
 
   const handleExportPdf = () => {
     const doc = new jsPDF();
@@ -275,43 +263,55 @@ export default function BulkReportsPage() {
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
             <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
-             <div>
-                <Label>Date Range</Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        className={cn(
-                        "w-full justify-start text-left font-normal mt-2",
-                        !dateRange && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange?.from ? (
-                        dateRange.to ? (
-                            <>
-                            {format(dateRange.from, "LLL dd, y")} -{" "}
-                            {format(dateRange.to, "LLL dd, y")}
-                            </>
-                        ) : (
-                            format(dateRange.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Pick a date range</span>
-                        )}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
-                    />
-                    </PopoverContent>
-                </Popover>
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="from-date">From</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="from-date"
+                                variant="outline"
+                                className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {fromDate ? format(fromDate, "LLL dd, y") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={fromDate}
+                                onSelect={setFromDate}
+                                disabled={(date) => toDate ? date > toDate : false}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="to-date">To</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                id="to-date"
+                                variant="outline"
+                                className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {toDate ? format(toDate, "LLL dd, y") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={toDate}
+                                onSelect={setToDate}
+                                disabled={(date) => fromDate ? date < fromDate : false}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
             </div>
         </CardContent>
       </Card>
