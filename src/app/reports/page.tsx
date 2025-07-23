@@ -45,6 +45,9 @@ type ChartVisibilityState = {
 }
 
 const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"];
+const customTicks = [5000, 10000, 25000, 50000, 100000];
+const tickFormatter = (value: number) => `₹${value / 1000}k`;
+
 
 export default function GameHistoryPage() {
   const { toast } = useToast();
@@ -299,11 +302,6 @@ export default function GameHistoryPage() {
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold">Game History & Reports</h1>
-            {dateRange?.from && (
-              <p className="text-muted-foreground mt-1">
-                {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-              </p>
-            )}
           </div>
           <div className="flex gap-2">
               <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
@@ -312,6 +310,11 @@ export default function GameHistoryPage() {
               </Button>
           </div>
         </div>
+         {dateRange?.from && (
+            <p className="text-muted-foreground mt-1">
+                {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+            </p>
+        )}
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2">
@@ -626,7 +629,7 @@ const PlayerReportTable: FC<{
                         <TableCell>{totals.gamesPlayed}</TableCell>
                         <TableCell className="font-mono">₹{totals.totalBuyIn.toFixed(0)}</TableCell>
                         <TableCell className="font-mono">₹{totals.totalChipReturn.toFixed(0)}</TableCell>
-                        <TableCell className={cn('font-mono', totals.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
+                        <TableCell className={cn('font-mono font-bold', totals.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
                             ₹{totals.totalProfitLoss.toFixed(0)}
                         </TableCell>
                     </TableRow>
@@ -655,13 +658,15 @@ const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
     }, [data]);
 
     if (chartData.length === 0) return <ChartContainer title="Total Buy-ins per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    
+    const maxVal = Math.max(...chartData.map(d => d.totalBuyIn), ...customTicks);
 
     return (
         <ChartContainer title="Total Buy-ins per Venue">
             <RechartsBarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                <YAxis domain={[0, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
                 <Tooltip formatter={(value) => `₹${value}`} />
                 <Legend />
                 <RechartsBar dataKey="totalBuyIn" fill="#4f46e5" name="Total Buy-in" />
@@ -674,12 +679,14 @@ const BuyInLineChart: FC<{ data: any[] }> = ({ data }) => {
     const chartData = [...data].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map(g => ({...g, date: format(new Date(g.timestamp), 'dd/MM')}));
     if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
+    const maxVal = Math.max(...chartData.map(d => d.totalBuyIn), ...customTicks);
+    
     return (
         <ChartContainer title="Total Buy-ins Over Time">
             <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }}/>
-                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                <YAxis domain={[0, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
                 <Tooltip formatter={(value) => `₹${value}`} />
                 <Legend />
                 <Line type="monotone" dataKey="totalBuyIn" stroke="#10b981" name="Total Buy-in" />
@@ -753,12 +760,14 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
     }, [data]);
 
     if (chartData.length === 0) return <ChartContainer title="Buy-ins vs. Returns per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    
+    const maxVal = Math.max(...chartData.map(d => Math.max(d.totalBuyIn, d.totalChipReturn)), ...customTicks);
 
     return (
         <ChartContainer title="Buy-ins vs. Returns per Venue">
             <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tickFormatter={(value) => `₹${value / 1000}k`} />
+                <XAxis type="number" domain={[0, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => `₹${value}`}/>
                 <Legend />
@@ -772,13 +781,16 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
 const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
     if (data.length === 0) return <ChartContainer title=""><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
+    const maxAbsProfitLoss = Math.max(...data.map(d => Math.abs(d.profitLoss)));
+    const maxVal = Math.max(maxAbsProfitLoss, ...customTicks);
+
     return (
         <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 75 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" tick={{ fontSize: 12, angle: -90, textAnchor: 'end' }} interval={0} />
-                    <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                    <YAxis domain={[-maxVal, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
                     <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
                     <Legend verticalAlign="top" />
                     <RechartsBar dataKey="profitLoss" name="Total P/L">
@@ -791,4 +803,3 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
         </div>
     );
 };
-
