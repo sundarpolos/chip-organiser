@@ -16,12 +16,13 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { DateRange } from 'react-day-picker';
 
 
 type GameHistoryRow = {
@@ -55,8 +56,10 @@ export default function GameHistoryPage() {
   // Filter state
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [selectedVenueIds, setSelectedVenueIds] = useState<string[]>([]);
-  const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 30));
-  const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 29),
+    to: new Date(),
+  });
   
   // Chart visibility state
   const [chartVisibility, setChartVisibility] = useState<ChartVisibilityState>({
@@ -109,8 +112,8 @@ export default function GameHistoryPage() {
     return allGames
       .filter(game => {
         const gameDate = new Date(game.timestamp);
-        const startOfDayFromDate = fromDate ? new Date(fromDate.setHours(0, 0, 0, 0)) : null;
-        const endOfDayToDate = toDate ? new Date(toDate.setHours(23, 59, 59, 999)) : null;
+        const startOfDayFromDate = dateRange?.from ? new Date(dateRange.from.setHours(0, 0, 0, 0)) : null;
+        const endOfDayToDate = dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : null;
 
         const isDateInRange = 
             (!startOfDayFromDate || gameDate >= startOfDayFromDate) && 
@@ -139,7 +142,7 @@ export default function GameHistoryPage() {
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
+  }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
   
   const handleChartVisibilityChange = (chartName: keyof ChartVisibilityState, isVisible: boolean) => {
     setChartVisibility(prev => ({ ...prev, [chartName]: isVisible }));
@@ -194,61 +197,9 @@ export default function GameHistoryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-b pb-4 mb-4">
                 <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
                 <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="from-date">From</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    id="from-date"
-                                    variant="outline"
-                                    className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {fromDate ? format(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={fromDate}
-                                    onSelect={setFromDate}
-                                    disabled={(date) => toDate ? date > toDate : false}
-                                    initialFocus
-                                    captionLayout="dropdown-buttons"
-                                    fromYear={1990}
-                                    toYear={2030}
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="to-date">To</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    id="to-date"
-                                    variant="outline"
-                                    className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {toDate ? format(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={toDate}
-                                    onSelect={setToDate}
-                                    disabled={(date) => fromDate ? date < fromDate : false}
-                                    initialFocus
-                                    captionLayout="dropdown-buttons"
-                                    fromYear={1990}
-                                    toYear={2030}
-                                />
-                            </PopoverContent>
-                        </Popover>
-                    </div>
+                <div className="space-y-2">
+                    <Label>Date Range</Label>
+                    <DateRangePicker date={dateRange} onDateChange={setDateRange} />
                 </div>
             </div>
              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -308,6 +259,59 @@ export default function GameHistoryPage() {
 
     </div>
   );
+}
+
+const DateRangePicker: FC<{
+    date: DateRange | undefined,
+    onDateChange: (date: DateRange | undefined) => void,
+}> = ({ date, onDateChange }) => {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    id="date"
+                    variant="outline"
+                    className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
+                    )}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date?.from ? (
+                        date.to ? (
+                            <>
+                                {format(date.from, "LLL dd, y")} -{" "}
+                                {format(date.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(date.from, "LLL dd, y")
+                        )
+                    ) : (
+                        <span>Pick a date</span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+                <div className="flex">
+                    <div className="p-2 space-y-1">
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: new Date(), to: new Date() })}>Today</Button>
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 6), to: new Date() })}>Last 7 days</Button>
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 days</Button>
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: startOfMonth(subDays(new Date(), 30)), to: endOfMonth(subDays(new Date(), 30)) })}>Last Month</Button>
+                    </div>
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={onDateChange}
+                        numberOfMonths={2}
+                    />
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
 }
 
 
