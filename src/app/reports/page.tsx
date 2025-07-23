@@ -70,12 +70,12 @@ export default function GameHistoryPage() {
   
   // Chart visibility state
   const [chartVisibility, setChartVisibility] = useState<ChartVisibilityState>({
-    venueBar: true,
-    buyInLine: true,
-    venuePie: true,
-    profitScatter: true,
-    venueStackedBar: true,
-    playerProfitBar: true,
+    venueBar: false,
+    buyInLine: false,
+    venuePie: false,
+    profitScatter: false,
+    venueStackedBar: false,
+    playerProfitBar: false,
   });
 
   // Load all data on component mount
