@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday, startOfToday, endOfToday, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -25,19 +25,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { DateRange } from 'react-day-picker';
 
 
-type GameHistoryRow = {
+type PlayerReportRow = {
   id: string;
-  date: string;
-  venue: string;
+  name: string;
+  gamesPlayed: number;
   totalBuyIn: number;
   totalChipReturn: number;
   profitLoss: number;
-  players: {
-    name: string;
-    buyIn: number;
-    finalChips: number;
-    profitLoss: number;
-  }[];
 };
 
 type ChartVisibilityState = {
@@ -108,87 +102,125 @@ export default function GameHistoryPage() {
   }, [toast]);
 
   // Memoized filtered data
-  const filteredGames = useMemo<GameHistoryRow[]>(() => {
-    const selectedPlayerNames = masterPlayers
-      .filter(p => selectedPlayerIds.includes(p.id))
-      .map(p => p.name);
+    const filteredGamesForCharts = useMemo(() => {
+        const selectedPlayerNames = masterPlayers
+        .filter(p => selectedPlayerIds.includes(p.id))
+        .map(p => p.name);
 
-    const selectedVenueNames = masterVenues
-      .filter(v => selectedVenueIds.includes(v.id))
-      .map(v => v.name);
+        const selectedVenueNames = masterVenues
+        .filter(v => selectedVenueIds.includes(v.id))
+        .map(v => v.name);
 
-    return allGames
-      .filter(game => {
-        const gameDate = new Date(game.timestamp);
-        const startOfDayFromDate = dateRange?.from ? new Date(dateRange.from.setHours(0, 0, 0, 0)) : null;
-        const endOfDayToDate = dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : null;
+        return allGames
+        .filter(game => {
+            const gameDate = new Date(game.timestamp);
+            const startOfDayFromDate = dateRange?.from ? new Date(dateRange.from.setHours(0, 0, 0, 0)) : null;
+            const endOfDayToDate = dateRange?.to ? new Date(dateRange.to.setHours(23, 59, 59, 999)) : null;
 
-        const isDateInRange = 
-            (!startOfDayFromDate || gameDate >= startOfDayFromDate) && 
-            (!endOfDayToDate || gameDate <= endOfDayToDate);
-        
-        const isVenueSelected = selectedVenueNames.includes(game.venue);
-        
-        const hasSelectedPlayer = game.players.some(p => selectedPlayerNames.includes(p.name));
-
-        return isDateInRange && isVenueSelected && hasSelectedPlayer;
-      })
-      .map(game => {
-         const gamePlayers = game.players
-            .filter(p => selectedPlayerNames.includes(p.name))
-            .map(p => {
-                const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-                const finalChips = p.finalChips;
-                return {
-                    name: p.name,
-                    buyIn: buyIn,
-                    finalChips: finalChips,
-                    profitLoss: finalChips - buyIn
-                }
-            });
+            const isDateInRange = 
+                (!startOfDayFromDate || gameDate >= startOfDayFromDate) && 
+                (!endOfDayToDate || gameDate <= endOfDayToDate);
             
-         const totalBuyIn = gamePlayers.reduce((sum, p) => sum + p.buyIn, 0);
-         const totalChipReturn = gamePlayers.reduce((sum, p) => sum + p.finalChips, 0);
+            const isVenueSelected = selectedVenueNames.includes(game.venue);
+            
+            const hasSelectedPlayer = game.players.some(p => selectedPlayerNames.includes(p.name));
 
-         return {
-            id: game.id,
-            date: format(new Date(game.timestamp), 'dd MMMM yyyy'),
-            venue: game.venue,
-            totalBuyIn,
-            totalChipReturn,
-            profitLoss: totalChipReturn - totalBuyIn,
-            players: gamePlayers,
-         }
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            return isDateInRange && isVenueSelected && hasSelectedPlayer;
+        })
+        .map(game => {
+            const gamePlayers = game.players
+                .filter(p => selectedPlayerNames.includes(p.name))
+                .map(p => {
+                    const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                    const finalChips = p.finalChips;
+                    return {
+                        name: p.name,
+                        buyIn: buyIn,
+                        finalChips: finalChips,
+                        profitLoss: finalChips - buyIn
+                    }
+                });
+                
+            const totalBuyIn = gamePlayers.reduce((sum, p) => sum + p.buyIn, 0);
+            const totalChipReturn = gamePlayers.reduce((sum, p) => sum + p.finalChips, 0);
 
+            return {
+                id: game.id,
+                date: format(new Date(game.timestamp), 'dd MMMM yyyy'),
+                venue: game.venue,
+                totalBuyIn,
+                totalChipReturn,
+                profitLoss: totalChipReturn - totalBuyIn,
+                players: gamePlayers,
+            }
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
   
+  const playerReportData = useMemo<PlayerReportRow[]>(() => {
+    const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; totalProfitLoss: number }>();
+    const selectedPlayerNames = masterPlayers.filter(p => selectedPlayerIds.includes(p.id)).map(p => p.name);
+
+    filteredGamesForCharts.forEach(game => {
+        game.players.forEach(player => {
+            if (selectedPlayerNames.includes(player.name)) {
+                const masterPlayer = masterPlayers.find(mp => mp.name === player.name);
+                if (!masterPlayer) return;
+
+                const stats = playerStats.get(player.name) || {
+                    id: masterPlayer.id,
+                    name: player.name,
+                    gamesPlayed: 0,
+                    totalBuyIn: 0,
+                    totalChipReturn: 0,
+                    totalProfitLoss: 0,
+                };
+
+                stats.gamesPlayed += 1;
+                stats.totalBuyIn += player.buyIn;
+                stats.totalChipReturn += player.finalChips;
+                stats.totalProfitLoss += player.profitLoss;
+
+                playerStats.set(player.name, stats);
+            }
+        });
+    });
+
+    return Array.from(playerStats.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        gamesPlayed: p.gamesPlayed,
+        totalBuyIn: p.totalBuyIn,
+        totalChipReturn: p.totalChipReturn,
+        profitLoss: p.totalProfitLoss,
+    })).sort((a,b) => b.profitLoss - a.profitLoss);
+  }, [filteredGamesForCharts, masterPlayers, selectedPlayerIds]);
+
   const handleChartVisibilityChange = (chartName: keyof ChartVisibilityState, isVisible: boolean) => {
     setChartVisibility(prev => ({ ...prev, [chartName]: isVisible }));
   };
 
   const handleExportPdf = () => {
     const doc = new jsPDF();
-    doc.text("Game History Report", 14, 16);
+    doc.text("Player Report", 14, 16);
     doc.setFontSize(10);
-    doc.text(`Filters applied: ${filteredGames.length} games`, 14, 22);
+    doc.text(`Filters applied: ${playerReportData.length} players`, 14, 22);
 
     (doc as any).autoTable({
-      head: [['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']],
-      body: filteredGames.map(g => [
-        g.date,
-        g.venue,
-        `Rs. ${g.totalBuyIn.toFixed(0)}`,
-        `Rs. ${g.totalChipReturn.toFixed(0)}`,
-        `Rs. ${g.profitLoss.toFixed(0)}`,
+      head: [['Player', 'Games Played', 'Total Buy-in', 'Total Returns', 'Total P/L']],
+      body: playerReportData.map(p => [
+        p.name,
+        p.gamesPlayed,
+        `Rs. ${p.totalBuyIn.toFixed(0)}`,
+        `Rs. ${p.totalChipReturn.toFixed(0)}`,
+        `Rs. ${p.profitLoss.toFixed(0)}`,
       ]),
       startY: 30,
       headStyles: { fillColor: [79, 70, 229] },
     });
     
-    doc.save(`chip-maestro-game-history-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    toast({ title: 'Report Exported', description: 'Your game history has been downloaded as a PDF.' });
+    doc.save(`chip-maestro-player-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast({ title: 'Report Exported', description: 'Your player report has been downloaded as a PDF.' });
   };
 
 
@@ -203,9 +235,9 @@ export default function GameHistoryPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <h1 className="text-3xl font-bold">Game History</h1>
+        <h1 className="text-3xl font-bold">Game History & Reports</h1>
         <div className="flex gap-2">
-            <Button onClick={handleExportPdf} disabled={filteredGames.length === 0}><FileDown className="mr-2"/>Export PDF</Button>
+            <Button onClick={handleExportPdf} disabled={playerReportData.length === 0}><FileDown className="mr-2"/>Export PDF</Button>
         </div>
       </div>
       
@@ -254,29 +286,29 @@ export default function GameHistoryPage() {
       <Card>
           <CardHeader>
               <div className="flex items-center gap-2">
-                <CardTitle>Results</CardTitle>
-                <Badge variant="secondary">{filteredGames.length} games</Badge>
+                <CardTitle>Player Report</CardTitle>
+                <Badge variant="secondary">{playerReportData.length} players</Badge>
               </div>
           </CardHeader>
           <CardContent className="space-y-8">
               <DataTable
-                columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']}
-                data={filteredGames.map(g => [
-                  g.date,
-                  g.venue,
-                  g.totalBuyIn.toFixed(0),
-                  g.totalChipReturn.toFixed(0),
-                  g.profitLoss.toFixed(0),
+                columns={['Player', 'Games Played', 'Total Buy-in', 'Total Chip Return', 'Total P/L']}
+                data={playerReportData.map(p => [
+                  p.name,
+                  p.gamesPlayed,
+                  p.totalBuyIn.toFixed(0),
+                  p.totalChipReturn.toFixed(0),
+                  p.profitLoss.toFixed(0),
                 ])}
               />
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
-                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
-                {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
-                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
-                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
-                {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={filteredGames} />}
+                {chartVisibility.venueBar && <VenueBarChart data={filteredGamesForCharts} />}
+                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGamesForCharts} />}
+                {chartVisibility.venuePie && <VenuePieChart data={filteredGamesForCharts} />}
+                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGamesForCharts} />}
+                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGamesForCharts} />}
+                {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={playerReportData} />}
               </div>
 
           </CardContent>
@@ -289,16 +321,53 @@ export default function GameHistoryPage() {
 const DateRangePicker: FC<{
     date: DateRange | undefined,
     onDateChange: (date: DateRange | undefined) => void,
-}> = ({ date, onDateChange }) => {
+    className?: string,
+}> = ({ date, onDateChange, className }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handlePreset = (preset: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth') => {
+        const today = new Date();
+        let from, to;
+        switch(preset) {
+            case 'today':
+                from = startOfToday();
+                to = endOfToday();
+                break;
+            case 'yesterday':
+                from = startOfYesterday();
+                to = endOfYesterday();
+                break;
+            case 'last7':
+                from = subDays(today, 6);
+                to = today;
+                break;
+            case 'last30':
+                from = subDays(today, 29);
+                to = today;
+                break;
+            case 'thisMonth':
+                from = startOfMonth(today);
+                to = endOfMonth(today);
+                break;
+            case 'lastMonth':
+                const lastMonth = subMonths(today, 1);
+                from = startOfMonth(lastMonth);
+                to = endOfMonth(lastMonth);
+                break;
+        }
+        onDateChange({ from, to });
+    };
+
     return (
-        <Popover>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <Button
                     id="date"
                     variant="outline"
                     className={cn(
                         "w-full justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
+                        !date && "text-muted-foreground",
+                        className,
                     )}
                 >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -316,15 +385,31 @@ const DateRangePicker: FC<{
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={onDateChange}
-                    numberOfMonths={2}
-                />
+            <PopoverContent className="w-auto p-0 flex" align="start">
+                 <div className="flex flex-col space-y-2 p-2 border-r">
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('today')}>Today</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('yesterday')}>Yesterday</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('last7')}>Last 7 days</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('last30')}>Last 30 days</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('thisMonth')}>This month</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('lastMonth')}>Last month</Button>
+                </div>
+                <div className="flex flex-col">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={onDateChange}
+                        numberOfMonths={2}
+                        captionLayout="dropdown-buttons"
+                        fromYear={2020}
+                        toYear={new Date().getFullYear() + 1}
+                    />
+                     <div className="p-2 border-t">
+                        <Button className="w-full" onClick={() => setIsOpen(false)}>Apply</Button>
+                    </div>
+                </div>
             </PopoverContent>
         </Popover>
     )
@@ -366,7 +451,7 @@ const MultiSelectPopover: FC<{
                 <PopoverContent className="w-64 p-0">
                     <div className="p-2 border-b">
                         <div className="flex items-center space-x-2">
-                            <Checkbox id={`all-${title}`} onCheckedChange={handleSelectAll} checked={selected.length === options.length} />
+                            <Checkbox id={`all-${title}`} onCheckedChange={handleSelectAll} checked={options.length > 0 && selected.length === options.length} disabled={options.length === 0} />
                             <Label htmlFor={`all-${title}`} className="font-medium">Select All</Label>
                         </div>
                     </div>
@@ -439,7 +524,7 @@ const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ titl
   </Card>
 );
 
-const VenueBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+const VenueBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -464,7 +549,7 @@ const VenueBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
     );
 };
 
-const BuyInLineChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+const BuyInLineChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     const chartData = [...data].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
@@ -482,7 +567,7 @@ const BuyInLineChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
     );
 };
 
-const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+const VenuePieChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -508,7 +593,7 @@ const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
     );
 };
 
-const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+const ProfitScatterPlot: FC<{ data: GameHistory[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         return data.filter(d => 
             typeof d.totalBuyIn === 'number' && !isNaN(d.totalBuyIn) &&
@@ -534,7 +619,7 @@ const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
 };
 
 
-const VenueStackedBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+const VenueStackedBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, { totalBuyIn: number; totalChipReturn: number }>();
         data.forEach(game => {
@@ -563,29 +648,19 @@ const VenueStackedBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
     );
 };
 
-const PlayerProfitBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
-    const chartData = useMemo(() => {
-        const playerData = new Map<string, number>();
-        data.forEach(game => {
-            game.players.forEach(player => {
-                playerData.set(player.name, (playerData.get(player.name) || 0) + player.profitLoss);
-            });
-        });
-        return Array.from(playerData.entries()).map(([name, profitLoss]) => ({ name, profitLoss }));
-    }, [data]);
-
-    if (chartData.length === 0) return <ChartContainer title="Total Player Profit/Loss"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
+    if (data.length === 0) return <ChartContainer title="Total Player Profit/Loss"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
     return (
         <ChartContainer title="Total Player Profit/Loss">
-            <BarChart data={chartData}>
+            <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                 <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
                 <Legend />
                 <Bar dataKey="profitLoss" name="Total P/L">
-                    {chartData.map((entry, index) => (
+                    {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
                     ))}
                 </Bar>
