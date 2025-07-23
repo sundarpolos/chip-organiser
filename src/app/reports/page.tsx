@@ -332,10 +332,20 @@ export default function GameHistoryPage() {
                     {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
                     {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
                     {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
-                    {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={playerReportData} />}
                 </div>
             </CardContent>
         </Card>
+        
+        {chartVisibility.playerProfitBar && (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Total Player Profit/Loss</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <PlayerProfitBarChart data={playerReportData} />
+                </CardContent>
+            </Card>
+        )}
       </div>
 
     </div>
@@ -754,23 +764,24 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
 };
 
 const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
-    if (data.length === 0) return <ChartContainer title="Total Player Profit/Loss"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (data.length === 0) return <ChartContainer title=""><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
     return (
-        <ChartContainer title="Total Player Profit/Loss">
-            <RechartsBarChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
-                <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
-                <Legend />
-                <RechartsBar dataKey="profitLoss" name="Total P/L">
-                    {data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
-                    ))}
-                </RechartsBar>
-            </RechartsBarChart>
-        </ChartContainer>
+        <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={data}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                    <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
+                    <Legend />
+                    <RechartsBar dataKey="profitLoss" name="Total P/L">
+                        {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
+                        ))}
+                    </RechartsBar>
+                </RechartsBarChart>
+            </ResponsiveContainer>
+        </div>
     );
 };
-
