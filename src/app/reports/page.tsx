@@ -48,6 +48,14 @@ type AggregatedVenueData = {
   totalBuyIn: number;
 };
 
+type DailySummaryData = {
+    date: string;
+    totalBuyIn: number;
+    totalChipReturn: number;
+    totalProfitLoss: number;
+    gamesCount: number;
+}
+
 export default function BulkReportsPage() {
   const { toast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
@@ -161,11 +169,39 @@ export default function BulkReportsPage() {
         };
     });
 
+    // Aggregate daily data
+    const dailyStats: Record<string, DailySummaryData> = {};
+    
     filteredGames.forEach(game => {
         if(venueStats[game.venue]) {
             venueStats[game.venue].gamesPlayed += 1;
-            venueStats[game.venue].totalBuyIn += game.players.reduce((sum, p) => sum + (p.totalBuyIns || 0), 0);
+            const gameBuyIn = game.players.reduce((sum, p) => {
+                 const playerBuyIn = (p.buyIns || []).reduce((playerSum, bi) => playerSum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                 return sum + playerBuyIn;
+            }, 0);
+            venueStats[game.venue].totalBuyIn += gameBuyIn;
         }
+
+        const gameDateKey = format(new Date(game.timestamp), 'yyyy-MM-dd');
+        if (!dailyStats[gameDateKey]) {
+            dailyStats[gameDateKey] = {
+                date: game.timestamp,
+                totalBuyIn: 0,
+                totalChipReturn: 0,
+                totalProfitLoss: 0,
+                gamesCount: 0,
+            };
+        }
+        
+        dailyStats[gameDateKey].gamesCount += 1;
+        game.players.forEach(p => {
+            const playerBuyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+            const playerPL = p.finalChips - playerBuyIn;
+            dailyStats[gameDateKey].totalBuyIn += playerBuyIn;
+            dailyStats[gameDateKey].totalChipReturn += p.finalChips;
+            dailyStats[gameDateKey].totalProfitLoss += playerPL;
+        });
+
     });
 
     const detailedLog = filteredGames
@@ -173,8 +209,8 @@ export default function BulkReportsPage() {
         game.players
           .filter(p => selectedPlayerNames.includes(p.name))
           .map(p => {
-              const buyIn = p.totalBuyIns || (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-              const pl = p.profitLoss ?? (p.finalChips - buyIn);
+              const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+              const pl = p.finalChips - buyIn;
               return {
                 gameId: game.id,
                 gameDate: game.timestamp,
@@ -191,6 +227,7 @@ export default function BulkReportsPage() {
     return {
       players: Object.values(playerStats).sort((a, b) => b.totalProfitLoss - a.totalProfitLoss),
       venues: Object.values(venueStats).sort((a, b) => b.gamesPlayed - a.gamesPlayed),
+      daily: Object.values(dailyStats).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
       log: detailedLog,
       totalGames: filteredGames.length,
     };
@@ -379,6 +416,24 @@ export default function BulkReportsPage() {
         
         <Card>
           <CardHeader>
+            <CardTitle>Daily Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              columns={['Date', 'Games Played', 'Total Buy-in', 'Total Chip Return', 'Total P/L']}
+              data={filteredData.daily.map(d => [
+                format(new Date(d.date), 'dd MMMM yyyy'),
+                d.gamesCount,
+                d.totalBuyIn.toFixed(0),
+                d.totalChipReturn.toFixed(0),
+                d.totalProfitLoss.toFixed(0),
+              ])}
+            />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
             <CardTitle>Detailed Game Log ({filteredData.log.length} entries)</CardTitle>
           </CardHeader>
           <CardContent>
@@ -389,9 +444,9 @@ export default function BulkReportsPage() {
                     format(new Date(l.gameDate), 'dd/MM/yy'),
                     l.venue,
                     l.playerName,
-                    (l.buyIn || 0).toFixed(0),
-                    (l.chipReturn || 0).toFixed(0),
-                    (l.pl || 0).toFixed(0),
+                    (l.buyIn ?? 0).toFixed(0),
+                    (l.chipReturn ?? 0).toFixed(0),
+                    (l.pl ?? 0).toFixed(0),
                 ])}
                 />
             </ScrollArea>
