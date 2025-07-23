@@ -1,3 +1,4 @@
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -9,6 +10,7 @@ export interface Player {
   id: string;
   name: string;
   whatsappNumber: string;
+  group?: string;
   buyIns: BuyIn[];
   finalChips: number;
 }
@@ -22,6 +24,7 @@ export interface MasterPlayer {
   id: string;
   name: string;
   whatsappNumber: string;
+  group?: string;
   isAdmin: boolean;
 }
 

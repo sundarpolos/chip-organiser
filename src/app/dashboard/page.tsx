@@ -84,6 +84,7 @@ import {
   Hourglass,
   Check,
   Info,
+  Merge,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -649,6 +650,7 @@ export default function ChipMaestroPage() {
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
+          group: playerToAdd.group,
           buyIns: [],
           finalChips: 0,
       }));
@@ -683,7 +685,7 @@ export default function ChipMaestroPage() {
     await saveGameHistory({ ...activeGame, players: updatedPlayers });
   };
   
-  const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
+    const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
     if (!activeGame) return;
 
     if (finalPlayers.length === 0) {
@@ -703,9 +705,25 @@ export default function ChipMaestroPage() {
     
     const now = new Date();
     
+    // Create a serializable version of the players
+    const serializablePlayers = finalPlayers.map(p => ({
+        id: p.id,
+        name: p.name,
+        whatsappNumber: p.whatsappNumber,
+        group: p.group || '',
+        buyIns: p.buyIns.map(b => ({
+            id: b.id,
+            amount: b.amount,
+            timestamp: b.timestamp,
+            status: b.status,
+        })),
+        finalChips: p.finalChips,
+        // Calculated properties are not saved, they will be recalculated on load
+    }));
+
     const finalGame: GameHistory = {
         ...activeGame,
-        players: finalPlayers,
+        players: serializablePlayers as CalculatedPlayer[],
         endTime: now.toISOString(),
         duration: activeGame.startTime ? (now.getTime() - new Date(activeGame.startTime).getTime()) : undefined
     }
@@ -748,13 +766,15 @@ export default function ChipMaestroPage() {
                 id: currentUser.id,
                 name: currentUser.name,
                 whatsappNumber: currentUser.whatsappNumber,
-                isAdmin: currentUser.isAdmin
+                isAdmin: currentUser.isAdmin,
+                group: currentUser.group,
             };
             
             const newPlayer: Player = {
                 id: `player-${Date.now()}-${playerToAdd.id}`,
                 name: playerToAdd.name,
                 whatsappNumber: playerToAdd.whatsappNumber,
+                group: playerToAdd.group,
                 buyIns: [],
                 finalChips: 0,
             };
@@ -888,6 +908,7 @@ export default function ChipMaestroPage() {
             const newPlayer: Omit<MasterPlayer, 'id'> = {
                 name: p.name,
                 whatsappNumber: p.whatsappNumber || "",
+                group: p.group || "",
                 isAdmin: false,
             };
             return await saveMasterPlayer(newPlayer);
@@ -906,10 +927,20 @@ export default function ChipMaestroPage() {
 
     const newGameDate = new Date(importedGame.timestamp);
     
-    const calculatedPlayers = importedGame.players.map(p => {
+    const serializablePlayers = importedGame.players.map(p => {
         const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
         return {
-            ...p,
+            id: p.id,
+            name: p.name,
+            whatsappNumber: p.whatsappNumber,
+            group: p.group || '',
+            buyIns: (p.buyIns || []).map(b => ({
+                id: b.id,
+                amount: b.amount,
+                timestamp: b.timestamp,
+                status: b.status,
+            })),
+            finalChips: p.finalChips,
             totalBuyIns,
             profitLoss: p.finalChips - totalBuyIns,
         }
@@ -919,7 +950,7 @@ export default function ChipMaestroPage() {
         id: `game-import-${Date.now()}`,
         venue: importedGame.venue,
         timestamp: newGameDate.toISOString(),
-        players: calculatedPlayers,
+        players: serializablePlayers as CalculatedPlayer[],
         startTime: newGameDate.toISOString(),
         endTime: new Date().toISOString(),
     };
@@ -995,6 +1026,12 @@ export default function ChipMaestroPage() {
                 <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)} disabled={!isAdmin}>
                     <BookUser className="h-4 w-4 mr-2" />
                     Manage Players
+                </DropdownMenuItem>
+                 <DropdownMenuItem asChild disabled={!isAdmin}>
+                   <Link href="/merge">
+                      <Merge className="h-4 w-4" />
+                      <span className="ml-2">Merge Players</span>
+                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild disabled={!isAdmin}>
@@ -1428,17 +1465,17 @@ const PlayerCard: FC<{
                 <Label className="text-lg mb-2">Buy-ins</Label>
                 <div className="space-y-2">
                     {(player.buyIns || []).map((buyIn) => (
-                    <BuyInRow 
-                        key={buyIn.id}
-                        buyIn={buyIn}
-                        player={player}
-                        onUpdateBuyIn={handleUpdateBuyIn}
-                        onRemoveBuyIn={removeBuyIn}
-                        isOtpEnabled={isOtpEnabled}
-                        whatsappConfig={whatsappConfig}
-                        isAdmin={isAdmin}
-                        toast={toast}
-                    />
+                      <BuyInRow 
+                          key={buyIn.id}
+                          buyIn={buyIn}
+                          player={player}
+                          onUpdateBuyIn={handleUpdateBuyIn}
+                          onRemoveBuyIn={removeBuyIn}
+                          isOtpEnabled={isOtpEnabled}
+                          whatsappConfig={whatsappConfig}
+                          isAdmin={isAdmin}
+                          toast={toast}
+                      />
                     ))}
                     <div className="flex gap-2">
                          {isCurrentUser && !isAdmin ? (
@@ -1565,7 +1602,9 @@ const SummaryCard: FC<{activeGame: GameHistory | null, calculatedPlayers: Calcul
                                 <TableCell>{log.playerName}</TableCell>
                                 <TableCell>₹{log.amount}</TableCell>
                                 <TableCell className="text-right">
-                                     <Badge variant={log.status === 'verified' ? 'default' : (log.status === 'approved' ? 'secondary' : 'outline')} className={cn(log.status === 'verified' && 'bg-green-600')}>{log.status}</Badge>
+                                    <Badge variant={log.status === 'verified' ? 'default' : (log.status === 'approved' ? 'secondary' : 'outline')} className={cn(log.status === 'verified' && 'bg-green-600')}>
+                                      {format(new Date(log.timestamp), 'HH:mm')}
+                                    </Badge>
                                 </TableCell>
                             </TableRow>
                            ))}
@@ -1739,6 +1778,7 @@ const ManagePlayersDialog: FC<{
     const [name, setName] = useState("");
     const [countryCode, setCountryCode] = useState("91");
     const [mobileNumber, setMobileNumber] = useState("");
+    const [group, setGroup] = useState("");
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isAdmin, setIsAdmin] = useState(false);
     
@@ -1768,11 +1808,13 @@ const ManagePlayersDialog: FC<{
             const { cc, num } = splitPhoneNumber(editingPlayer.whatsappNumber);
             setCountryCode(cc);
             setMobileNumber(num);
+            setGroup(editingPlayer.group || "");
             setIsAdmin(editingPlayer.isAdmin || false);
         } else {
             setName("");
             setCountryCode("91");
             setMobileNumber("");
+            setGroup("");
             setIsAdmin(false);
         }
     }, [editingPlayer]);
@@ -1796,7 +1838,7 @@ const ManagePlayersDialog: FC<{
 
         const isDuplicate = masterPlayers.some(p => p.name.toLowerCase() === trimmedName.toLowerCase() && p.id !== editingPlayer?.id);
         if (isDuplicate) {
-            toast({ variant: "destructive", title: "Duplicate Player", description: "A player with this name already exists." });
+            toast({ variant: "destructive", title: "Duplicate Player", description: "A player with this name already exists. Please merge them instead." });
             return;
         }
 
@@ -1817,12 +1859,12 @@ const ManagePlayersDialog: FC<{
         setIsUpdating(true);
         try {
             if (editingPlayer) {
-                const updatedPlayer: MasterPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber, isAdmin };
+                const updatedPlayer: MasterPlayer = { ...editingPlayer, name: trimmedName, whatsappNumber: fullWhatsappNumber, group, isAdmin };
                 await saveMasterPlayer(updatedPlayer);
                 setMasterPlayers(mp => mp.map(p => p.id === editingPlayer.id ? updatedPlayer : p));
                 toast({title: "Player Updated", description: "Player details have been saved."});
             } else {
-                const newPlayer: Omit<MasterPlayer, 'id'> = { name: trimmedName, whatsappNumber: fullWhatsappNumber, isAdmin };
+                const newPlayer: Omit<MasterPlayer, 'id'> = { name: trimmedName, whatsappNumber: fullWhatsappNumber, group, isAdmin };
                 const savedPlayer = await saveMasterPlayer(newPlayer);
                 setMasterPlayers(mp => [...mp, savedPlayer]);
                 toast({title: "Player Added", description: "New player has been added to the list."});
@@ -1952,6 +1994,7 @@ const ManagePlayersDialog: FC<{
                         </Select>
                         <Input placeholder="10-digit mobile" value={mobileNumber} onChange={e => setMobileNumber(e.target.value)} />
                     </div>
+                     <Input placeholder="Group Name (optional)" value={group} onChange={e => setGroup(e.target.value)} />
                     <div className="flex items-center space-x-2 pt-2">
                         <Switch id="admin-switch" checked={isAdmin} onCheckedChange={setIsAdmin} disabled={editingPlayer?.id === currentUser?.id || editingPlayer?.whatsappNumber === '919843350000'} />
                         <Label htmlFor="admin-switch">Make this player an Admin</Label>
@@ -1971,12 +2014,13 @@ const ManagePlayersDialog: FC<{
                                             onCheckedChange={(checked) => handleSelectPlayer(p.id, !!checked)}
                                             disabled={p.id === currentUser?.id || p.whatsappNumber === '919843350000'}
                                         />
-                                        <div className="grid grid-cols-2 gap-4 flex-1">
+                                        <div className="grid grid-cols-3 gap-4 flex-1">
                                             <div className="text-sm font-medium truncate col-span-1 flex items-center gap-1.5">
                                                 {p.name} {p.isAdmin && <UserCog className="h-3 w-3 text-primary"/>}
                                                 {p.whatsappNumber === '919843350000' && <Crown className="h-3 w-3 text-amber-500" />}
                                             </div>
                                             <p className="text-xs text-muted-foreground truncate col-span-1">{p.whatsappNumber || '-'}</p>
+                                            <p className="text-xs text-muted-foreground truncate col-span-1">{p.group || '-'}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
