@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef, type FC } from 'react';
+import React, { useState, useEffect, useMemo, useRef, type FC } from 'react';
 import { getGameHistory } from '@/services/game-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
@@ -341,39 +341,6 @@ const DateRangePicker: FC<{
 }> = ({ date, onDateChange, className }) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    const handlePreset = (preset: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth') => {
-        const today = new Date();
-        let from, to;
-        switch(preset) {
-            case 'today':
-                from = startOfToday();
-                to = endOfToday();
-                break;
-            case 'yesterday':
-                from = startOfYesterday();
-                to = endOfYesterday();
-                break;
-            case 'last7':
-                from = subDays(today, 6);
-                to = today;
-                break;
-            case 'last30':
-                from = subDays(today, 29);
-                to = today;
-                break;
-            case 'thisMonth':
-                from = startOfMonth(today);
-                to = endOfMonth(today);
-                break;
-            case 'lastMonth':
-                const lastMonth = subMonths(today, 1);
-                from = startOfMonth(lastMonth);
-                to = endOfMonth(lastMonth);
-                break;
-        }
-        onDateChange({ from, to });
-    };
-
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
@@ -402,14 +369,6 @@ const DateRangePicker: FC<{
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 flex" align="start">
-                 <div className="flex flex-col space-y-2 p-2 border-r">
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('today')}>Today</Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('yesterday')}>Yesterday</Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('last7')}>Last 7 days</Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('last30')}>Last 30 days</Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('thisMonth')}>This month</Button>
-                    <Button variant="ghost" className="justify-start" onClick={() => handlePreset('lastMonth')}>Last month</Button>
-                </div>
                 <div className="flex flex-col">
                     <Calendar
                         initialFocus
@@ -418,13 +377,7 @@ const DateRangePicker: FC<{
                         selected={date}
                         onSelect={onDateChange}
                         numberOfMonths={2}
-                        captionLayout="dropdown-buttons"
-                        fromYear={2020}
-                        toYear={new Date().getFullYear() + 1}
                     />
-                     <div className="p-2 border-t">
-                        <Button className="w-full" onClick={() => setIsOpen(false)}>Apply</Button>
-                    </div>
                 </div>
             </PopoverContent>
         </Popover>
@@ -755,3 +708,4 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
         </ChartContainer>
     );
 };
+
