@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday, startOfToday, endOfToday, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -105,7 +105,7 @@ export default function GameHistoryPage() {
   }, [toast]);
 
   // Memoized filtered data
-    const filteredGamesForCharts = useMemo(() => {
+    const filteredGames = useMemo(() => {
         const selectedPlayerNames = masterPlayers
         .filter(p => selectedPlayerIds.includes(p.id))
         .map(p => p.name);
@@ -151,6 +151,7 @@ export default function GameHistoryPage() {
                 id: game.id,
                 date: format(new Date(game.timestamp), 'dd MMMM yyyy'),
                 venue: game.venue,
+                timestamp: game.timestamp,
                 totalBuyIn,
                 totalChipReturn,
                 profitLoss: totalChipReturn - totalBuyIn,
@@ -164,7 +165,7 @@ export default function GameHistoryPage() {
     const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; totalProfitLoss: number }>();
     const selectedPlayerNames = masterPlayers.filter(p => selectedPlayerIds.includes(p.id)).map(p => p.name);
 
-    filteredGamesForCharts.forEach(game => {
+    filteredGames.forEach(game => {
         game.players.forEach(player => {
             if (selectedPlayerNames.includes(player.name)) {
                 const masterPlayer = masterPlayers.find(mp => mp.name === player.name);
@@ -195,9 +196,9 @@ export default function GameHistoryPage() {
         gamesPlayed: p.gamesPlayed,
         totalBuyIn: p.totalBuyIn,
         totalChipReturn: p.totalChipReturn,
-        profitLoss: p.totalProfitLoss,
+        profitLoss: p.profitLoss,
     })).sort((a,b) => b.profitLoss - a.profitLoss);
-  }, [filteredGamesForCharts, masterPlayers, selectedPlayerIds]);
+  }, [filteredGames, masterPlayers, selectedPlayerIds]);
 
   const handleChartVisibilityChange = (chartName: keyof ChartVisibilityState, isVisible: boolean) => {
     setChartVisibility(prev => ({ ...prev, [chartName]: isVisible }));
@@ -312,23 +313,17 @@ export default function GameHistoryPage() {
               </div>
           </CardHeader>
           <CardContent className="space-y-8">
-              <DataTable
-                columns={['Player', 'Games Played', 'Total Buy-in', 'Total Chip Return', 'Total P/L']}
-                data={playerReportData.map(p => [
-                  p.name,
-                  p.gamesPlayed,
-                  p.totalBuyIn.toFixed(0),
-                  p.totalChipReturn.toFixed(0),
-                  p.profitLoss.toFixed(0),
-                ])}
+              <PlayerReportTable
+                playerReportData={playerReportData}
+                filteredGames={filteredGames}
               />
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartVisibility.venueBar && <VenueBarChart data={filteredGamesForCharts} />}
-                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGamesForCharts} />}
-                {chartVisibility.venuePie && <VenuePieChart data={filteredGamesForCharts} />}
-                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGamesForCharts} />}
-                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGamesForCharts} />}
+                {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
+                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
+                {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
+                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
+                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
                 {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={playerReportData} />}
               </div>
 
@@ -496,32 +491,107 @@ const MultiSelectPopover: FC<{
     )
 }
 
-const DataTable: FC<{
-    columns: string[],
-    data: (string | number)[][],
-}> = ({ columns, data }) => {
+const PlayerReportTable: FC<{
+    playerReportData: PlayerReportRow[],
+    filteredGames: any[],
+}> = ({ playerReportData, filteredGames }) => {
+    const [expandedRows, setExpandedRows] = useState<string[]>([]);
+
+    const toggleRow = (playerId: string) => {
+        setExpandedRows(prev => 
+            prev.includes(playerId) 
+                ? prev.filter(id => id !== playerId)
+                : [...prev, playerId]
+        );
+    };
+    
+    const getPlayerGameDetails = (playerName: string) => {
+        return filteredGames
+            .map(game => {
+                const playerInGame = game.players.find((p: any) => p.name === playerName);
+                if (playerInGame) {
+                    return {
+                        date: game.date,
+                        venue: game.venue,
+                        buyIn: playerInGame.buyIn,
+                        chipReturn: playerInGame.finalChips,
+                        profitLoss: playerInGame.profitLoss,
+                    };
+                }
+                return null;
+            })
+            .filter(details => details !== null);
+    };
+
     return (
        <ScrollArea className="h-96">
             <Table>
                 <TableHeader>
                     <TableRow>
-                        {columns.map(col => <TableHead key={col}>{col}</TableHead>)}
+                        <TableHead className="w-12"></TableHead>
+                        <TableHead>Player</TableHead>
+                        <TableHead>Games Played</TableHead>
+                        <TableHead>Total Buy-in</TableHead>
+                        <TableHead>Total Chip Return</TableHead>
+                        <TableHead>Total P/L</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {data.length > 0 ? (
-                        data.map((row, rowIndex) => (
-                            <TableRow key={rowIndex}>
-                                {row.map((cell, cellIndex) => (
-                                    <TableCell key={cellIndex} className={cn(cellIndex > 1 ? 'font-mono' : 'font-medium', cellIndex === 4 && (Number(cell) >= 0 ? 'text-green-600' : 'text-red-600'))}>
-                                        {cellIndex > 1 && cellIndex < 5 ? `₹${cell}` : cell}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        ))
+                    {playerReportData.length > 0 ? (
+                        playerReportData.map(player => {
+                            const isExpanded = expandedRows.includes(player.id);
+                            const playerGames = isExpanded ? getPlayerGameDetails(player.name) : [];
+                            return (
+                                <React.Fragment key={player.id}>
+                                    <TableRow>
+                                        <TableCell>
+                                            <Button variant="ghost" size="icon" onClick={() => toggleRow(player.id)} className="h-6 w-6">
+                                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                            </Button>
+                                        </TableCell>
+                                        <TableCell className='font-medium'>{player.name}</TableCell>
+                                        <TableCell>{player.gamesPlayed}</TableCell>
+                                        <TableCell className="font-mono">₹{player.totalBuyIn.toFixed(0)}</TableCell>
+                                        <TableCell className="font-mono">₹{player.totalChipReturn.toFixed(0)}</TableCell>
+                                        <TableCell className={cn('font-mono font-bold', player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>₹{player.profitLoss.toFixed(0)}</TableCell>
+                                    </TableRow>
+                                    {isExpanded && (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="p-0 bg-muted/50">
+                                                <div className="p-4">
+                                                    <h4 className="font-semibold mb-2">Game Details for {player.name}</h4>
+                                                    <Table>
+                                                        <TableHeader>
+                                                            <TableRow>
+                                                                <TableHead>Date</TableHead>
+                                                                <TableHead>Venue</TableHead>
+                                                                <TableHead>Buy-in</TableHead>
+                                                                <TableHead>Chip Return</TableHead>
+                                                                <TableHead>P/L</TableHead>
+                                                            </TableRow>
+                                                        </TableHeader>
+                                                        <TableBody>
+                                                            {playerGames.map((game: any, index: number) => (
+                                                                <TableRow key={index}>
+                                                                    <TableCell>{game.date}</TableCell>
+                                                                    <TableCell>{game.venue}</TableCell>
+                                                                    <TableCell className="font-mono">₹{game.buyIn.toFixed(0)}</TableCell>
+                                                                    <TableCell className="font-mono">₹{game.chipReturn.toFixed(0)}</TableCell>
+                                                                    <TableCell className={cn('font-mono font-semibold', game.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>₹{game.profitLoss.toFixed(0)}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </React.Fragment>
+                            )
+                        })
                     ) : (
                         <TableRow>
-                            <TableCell colSpan={columns.length} className="h-24 text-center">
+                            <TableCell colSpan={6} className="h-24 text-center">
                                 No results found for the selected filters.
                             </TableCell>
                         </TableRow>
@@ -541,7 +611,7 @@ const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ titl
   </div>
 );
 
-const VenueBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
+const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -566,8 +636,8 @@ const VenueBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     );
 };
 
-const BuyInLineChart: FC<{ data: GameHistory[] }> = ({ data }) => {
-    const chartData = [...data].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+const BuyInLineChart: FC<{ data: any[] }> = ({ data }) => {
+    const chartData = [...data].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map(g => ({...g, date: format(new Date(g.timestamp), 'dd/MM')}));
     if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
@@ -584,7 +654,7 @@ const BuyInLineChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     );
 };
 
-const VenuePieChart: FC<{ data: GameHistory[] }> = ({ data }) => {
+const VenuePieChart: FC<{ data: any[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -610,7 +680,7 @@ const VenuePieChart: FC<{ data: GameHistory[] }> = ({ data }) => {
     );
 };
 
-const ProfitScatterPlot: FC<{ data: GameHistory[] }> = ({ data }) => {
+const ProfitScatterPlot: FC<{ data: any[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         return data.filter(d => 
             typeof d.totalBuyIn === 'number' && !isNaN(d.totalBuyIn) &&
@@ -636,7 +706,7 @@ const ProfitScatterPlot: FC<{ data: GameHistory[] }> = ({ data }) => {
 };
 
 
-const VenueStackedBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
+const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, { totalBuyIn: number; totalChipReturn: number }>();
         data.forEach(game => {
