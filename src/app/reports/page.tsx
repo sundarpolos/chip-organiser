@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart, Rows, Columns } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths, startOfToday, endOfYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -302,7 +302,6 @@ export default function GameHistoryPage() {
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold">Game History & Reports</h1>
-            
           </div>
           <div className="flex gap-2">
               <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
@@ -513,10 +512,6 @@ const PlayerReportTable: FC<{
 }> = ({ playerReportData, filteredGames }) => {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
 
-    useEffect(() => {
-        setExpandedRows(playerReportData.map(p => p.id));
-    }, [playerReportData]);
-
     const toggleRow = (playerId: string) => {
         setExpandedRows(prev => 
             prev.includes(playerId) 
@@ -524,6 +519,9 @@ const PlayerReportTable: FC<{
                 : [...prev, playerId]
         );
     };
+
+    const expandAll = () => setExpandedRows(playerReportData.map(p => p.id));
+    const collapseAll = () => setExpandedRows([]);
     
     const getPlayerGameDetails = (playerName: string) => {
         return filteredGames
@@ -559,6 +557,10 @@ const PlayerReportTable: FC<{
 
     return (
        <div className="w-full overflow-x-auto">
+            <div className="flex justify-end gap-2 mb-2">
+                <Button variant="outline" size="sm" onClick={expandAll}><Rows className="mr-2 h-4 w-4" />Expand All</Button>
+                <Button variant="outline" size="sm" onClick={collapseAll}><Columns className="mr-2 h-4 w-4" />Collapse All</Button>
+            </div>
             <Table>
                 <TableHeader>
                     <TableRow>
