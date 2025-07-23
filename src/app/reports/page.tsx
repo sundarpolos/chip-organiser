@@ -135,10 +135,12 @@ export default function BulkReportsPage() {
     filteredGames.forEach(game => {
         game.players.forEach(p => {
             if(playerStats[p.name]) {
+                const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                const profitLoss = p.finalChips - totalBuyIns;
                 playerStats[p.name].gamesPlayed += 1;
-                playerStats[p.name].totalBuyIn += p.totalBuyIns;
+                playerStats[p.name].totalBuyIn += totalBuyIns;
                 playerStats[p.name].totalChipReturn += p.finalChips;
-                playerStats[p.name].totalProfitLoss += p.profitLoss;
+                playerStats[p.name].totalProfitLoss += profitLoss;
             }
         })
     });
@@ -162,7 +164,7 @@ export default function BulkReportsPage() {
     filteredGames.forEach(game => {
         if(venueStats[game.venue]) {
             venueStats[game.venue].gamesPlayed += 1;
-            venueStats[game.venue].totalBuyIn += game.players.reduce((sum, p) => sum + p.totalBuyIns, 0);
+            venueStats[game.venue].totalBuyIn += game.players.reduce((sum, p) => sum + (p.totalBuyIns || 0), 0);
         }
     });
 
@@ -170,15 +172,19 @@ export default function BulkReportsPage() {
       .flatMap(game =>
         game.players
           .filter(p => selectedPlayerNames.includes(p.name))
-          .map(p => ({
-            gameId: game.id,
-            gameDate: game.timestamp,
-            venue: game.venue,
-            playerName: p.name,
-            buyIn: p.totalBuyIns,
-            chipReturn: p.finalChips,
-            pl: p.profitLoss,
-          }))
+          .map(p => {
+              const buyIn = p.totalBuyIns || (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+              const pl = p.profitLoss ?? (p.finalChips - buyIn);
+              return {
+                gameId: game.id,
+                gameDate: game.timestamp,
+                venue: game.venue,
+                playerName: p.name,
+                buyIn: buyIn,
+                chipReturn: p.finalChips || 0,
+                pl: pl,
+              }
+           })
       )
       .sort((a, b) => new Date(b.gameDate).getTime() - new Date(a.gameDate).getTime());
 
@@ -230,9 +236,9 @@ export default function BulkReportsPage() {
         format(new Date(l.gameDate), 'dd/MM/yy'),
         l.venue,
         l.playerName,
-        l.buyIn.toFixed(0),
-        l.chipReturn.toFixed(0),
-        l.pl.toFixed(0),
+        (l.buyIn || 0).toFixed(0),
+        (l.chipReturn || 0).toFixed(0),
+        (l.pl || 0).toFixed(0),
       ]),
       startY: (doc as any).autoTable.previous.finalY + 10,
     });
@@ -383,9 +389,9 @@ export default function BulkReportsPage() {
                     format(new Date(l.gameDate), 'dd/MM/yy'),
                     l.venue,
                     l.playerName,
-                    l.buyIn.toFixed(0),
-                    l.chipReturn.toFixed(0),
-                    l.pl.toFixed(0),
+                    (l.buyIn || 0).toFixed(0),
+                    (l.chipReturn || 0).toFixed(0),
+                    (l.pl || 0).toFixed(0),
                 ])}
                 />
             </ScrollArea>
