@@ -302,6 +302,11 @@ export default function GameHistoryPage() {
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold">Game History & Reports</h1>
+            {dateRange?.from && (
+                <p className="text-muted-foreground mt-1">
+                    {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+                </p>
+            )}
           </div>
           <div className="flex gap-2">
               <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
@@ -310,11 +315,7 @@ export default function GameHistoryPage() {
               </Button>
           </div>
         </div>
-         {dateRange?.from && (
-            <p className="text-muted-foreground mt-1">
-                {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-            </p>
-        )}
+        
         <Card>
             <CardHeader>
                 <div className="flex items-center gap-2">
@@ -336,11 +337,11 @@ export default function GameHistoryPage() {
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
-                    {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
-                    {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
-                    {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
-                    {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
+                    {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
+                    {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
+                    {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
+                    {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} dateRange={dateRange} />}
+                    {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} dateRange={dateRange} />}
                 </div>
             </CardContent>
         </Card>
@@ -351,7 +352,7 @@ export default function GameHistoryPage() {
                     <CardTitle>Total Player Profit/Loss</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <PlayerProfitBarChart data={playerReportData} />
+                    <PlayerProfitBarChart data={playerReportData} dateRange={dateRange} />
                 </CardContent>
             </Card>
         )}
@@ -639,16 +640,21 @@ const PlayerReportTable: FC<{
     )
 }
 
-const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const ChartContainer: FC<{ title: string; children: React.ReactNode; dateRange: DateRange | undefined; }> = ({ title, children, dateRange }) => (
   <div className="h-96">
-    <h3 className="text-center text-lg font-semibold mb-2">{title}</h3>
+    <h3 className="text-center text-lg font-semibold">{title}</h3>
+    {dateRange?.from && (
+        <p className="text-center text-xs text-muted-foreground mb-2">
+            {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+        </p>
+    )}
     <ResponsiveContainer width="100%" height={300}>
         {children}
     </ResponsiveContainer>
   </div>
 );
 
-const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
+const VenueBarChart: FC<{ data: any[]; dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -657,12 +663,12 @@ const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, totalBuyIn]) => ({ name, totalBuyIn }));
     }, [data]);
 
-    if (chartData.length === 0) return <ChartContainer title="Total Buy-ins per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (chartData.length === 0) return <ChartContainer title="Total Buy-ins per Venue" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
     const maxVal = Math.max(...chartData.map(d => d.totalBuyIn), ...customTicks);
 
     return (
-        <ChartContainer title="Total Buy-ins per Venue">
+        <ChartContainer title="Total Buy-ins per Venue" dateRange={dateRange}>
             <RechartsBarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -675,14 +681,14 @@ const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
     );
 };
 
-const BuyInLineChart: FC<{ data: any[] }> = ({ data }) => {
+const BuyInLineChart: FC<{ data: any[]; dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
     const chartData = [...data].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()).map(g => ({...g, date: format(new Date(g.timestamp), 'dd/MM')}));
-    if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     const maxVal = Math.max(...chartData.map(d => d.totalBuyIn), ...customTicks);
     
     return (
-        <ChartContainer title="Total Buy-ins Over Time">
+        <ChartContainer title="Total Buy-ins Over Time" dateRange={dateRange}>
             <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 12 }}/>
@@ -695,7 +701,7 @@ const BuyInLineChart: FC<{ data: any[] }> = ({ data }) => {
     );
 };
 
-const VenuePieChart: FC<{ data: any[] }> = ({ data }) => {
+const VenuePieChart: FC<{ data: any[]; dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
@@ -704,10 +710,10 @@ const VenuePieChart: FC<{ data: any[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, value]) => ({ name, value }));
     }, [data]);
     
-    if (chartData.length === 0) return <ChartContainer title="Games per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (chartData.length === 0) return <ChartContainer title="Games per Venue" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
-        <ChartContainer title="Games per Venue">
+        <ChartContainer title="Games per Venue" dateRange={dateRange}>
             <PieChart>
                 <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                     {chartData.map((entry, index) => (
@@ -721,7 +727,7 @@ const VenuePieChart: FC<{ data: any[] }> = ({ data }) => {
     );
 };
 
-const ProfitScatterPlot: FC<{ data: any[] }> = ({ data }) => {
+const ProfitScatterPlot: FC<{ data: any[]; dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
     const chartData = useMemo(() => {
         return data.filter(d => 
             typeof d.totalBuyIn === 'number' && !isNaN(d.totalBuyIn) &&
@@ -729,10 +735,10 @@ const ProfitScatterPlot: FC<{ data: any[] }> = ({ data }) => {
         );
     }, [data]);
 
-    if (chartData.length === 0) return <ChartContainer title="Buy-in vs. Profit/Loss per Game"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (chartData.length === 0) return <ChartContainer title="Buy-in vs. Profit/Loss per Game" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
-        <ChartContainer title="Buy-in vs. Profit/Loss per Game">
+        <ChartContainer title="Buy-in vs. Profit/Loss per Game" dateRange={dateRange}>
             <ScatterChart>
                 <CartesianGrid />
                 <XAxis type="number" dataKey="totalBuyIn" name="Total Buy-in" unit="₹" tickFormatter={(value) => `${value / 1000}k`} />
@@ -747,7 +753,7 @@ const ProfitScatterPlot: FC<{ data: any[] }> = ({ data }) => {
 };
 
 
-const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
+const VenueStackedBarChart: FC<{ data: any[], dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, { totalBuyIn: number; totalChipReturn: number }>();
         data.forEach(game => {
@@ -759,12 +765,12 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, values]) => ({ name, ...values }));
     }, [data]);
 
-    if (chartData.length === 0) return <ChartContainer title="Buy-ins vs. Returns per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    if (chartData.length === 0) return <ChartContainer title="Buy-ins vs. Returns per Venue" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
     const maxVal = Math.max(...chartData.map(d => Math.max(d.totalBuyIn, d.totalChipReturn)), ...customTicks);
 
     return (
-        <ChartContainer title="Buy-ins vs. Returns per Venue">
+        <ChartContainer title="Buy-ins vs. Returns per Venue" dateRange={dateRange}>
             <RechartsBarChart data={chartData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" domain={[0, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
@@ -778,14 +784,19 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
     );
 };
 
-const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
-    if (data.length === 0) return <ChartContainer title=""><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange | undefined }> = ({ data, dateRange }) => {
+    if (data.length === 0) return <ChartContainer title="" dateRange={dateRange}><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
     
     const maxAbsProfitLoss = Math.max(...data.map(d => Math.abs(d.profitLoss)));
     const maxVal = Math.max(maxAbsProfitLoss, ...customTicks);
 
     return (
         <div className="h-96">
+            {dateRange?.from && (
+                <p className="text-center text-xs text-muted-foreground mb-2">
+                    {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+                </p>
+            )}
             <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 75 }}>
                     <CartesianGrid strokeDasharray="3 3" />
