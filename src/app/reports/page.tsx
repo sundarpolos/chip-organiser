@@ -769,12 +769,12 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
     return (
         <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-                <RechartsBarChart data={data}>
+                <RechartsBarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 75 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, angle: -90, textAnchor: 'end' }} interval={0} />
                     <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                     <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
-                    <Legend />
+                    <Legend verticalAlign="top" />
                     <RechartsBar dataKey="profitLoss" name="Total P/L">
                         {data.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
