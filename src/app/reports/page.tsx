@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths, startOfToday, endOfYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -560,7 +560,7 @@ const PlayerReportTable: FC<{
                                         <TableCell>{player.gamesPlayed}</TableCell>
                                         <TableCell className="font-mono">₹{(player.totalBuyIn || 0).toFixed(0)}</TableCell>
                                         <TableCell className="font-mono">₹{(player.totalChipReturn || 0).toFixed(0)}</TableCell>
-                                        <TableCell className={cn('font-mono font-bold', player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>₹{(player.profitLoss || 0).toFixed(0)}</TableCell>
+                                        <TableCell className={cn('font-mono font-bold', (player.profitLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600')}>₹{(player.profitLoss || 0).toFixed(0)}</TableCell>
                                     </TableRow>
                                     {isExpanded && (
                                         <TableRow>
@@ -773,3 +773,4 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
         </ChartContainer>
     );
 };
+
