@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from "@/lib/firebase";
@@ -7,7 +8,7 @@ import { collection, getDocs, doc, setDoc, deleteDoc, orderBy, query, limit } fr
 const GAME_HISTORY_COLLECTION = "gameHistory";
 
 export async function getGameHistory(): Promise<GameHistory[]> {
-    const q = query(collection(db, GAME_HISTORY_COLLECTION), orderBy("timestamp", "desc"), limit(50));
+    const q = query(collection(db, GAME_HISTORY_COLLECTION), orderBy("timestamp", "desc"));
     const querySnapshot = await getDocs(q);
     const history: GameHistory[] = [];
     querySnapshot.forEach((doc) => {
