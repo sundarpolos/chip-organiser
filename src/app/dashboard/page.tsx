@@ -174,7 +174,7 @@ const AdminView: FC<{
 
     return (
         <main className="grid grid-cols-1 md:gap-8">
-            <section className="mb-8 md:mb-0">
+            <section>
                 <Card>
                     <CardContent className="pt-6">
                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -366,6 +366,9 @@ const EditableDate: FC<{
           selected={selectedDate}
           onSelect={handleDateSelect}
           initialFocus
+          captionLayout="dropdown-buttons"
+          fromYear={1990}
+          toYear={2030}
         />
       </PopoverContent>
     </Popover>
@@ -1552,6 +1555,507 @@ const PlayerCard: FC<{
   )
 }
 
+const VenueDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  masterVenues: MasterVenue[];
+  setMasterVenues: React.Dispatch<React.SetStateAction<MasterVenue[]>>;
+  onStartGame: (venue: string, date: Date) => void;
+  toast: ReturnType<typeof useToast>['toast'];
+  initialDate: Date;
+}> = ({ isOpen, onOpenChange, masterVenues, setMasterVenues, onStartGame, toast, initialDate }) => {
+    const [venue, setVenue] = useState("");
+    const [selectedDate, setSelectedDate] = useState(initialDate);
+
+    const handleStart = () => {
+        if (!venue.trim()) {
+            toast({ variant: "destructive", title: "Venue Required", description: "Please enter or select a venue name." });
+            return;
+        }
+        onStartGame(venue.trim(), selectedDate);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Start New Game</DialogTitle>
+                    <DialogDescription>Enter a new venue or select from your saved list.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="venue-name">Venue Name</Label>
+                        <Input id="venue-name" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g., The Poker Den" />
+                    </div>
+                    {masterVenues.length > 0 && (
+                        <div className="space-y-2">
+                            <Label>Or Select Existing</Label>
+                            <Select onValueChange={setVenue}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a venue..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {masterVenues.map(v => (
+                                        <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="game-date">Game Date</Label>
+                       <Popover>
+                          <PopoverTrigger asChild>
+                              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                              <Calendar mode="single" selected={selectedDate} onSelect={date => date && setSelectedDate(date)} initialFocus />
+                          </PopoverContent>
+                      </Popover>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleStart}>Start Game</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const ManagePlayersDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  masterPlayers: MasterPlayer[];
+  setMasterPlayers: React.Dispatch<React.SetStateAction<MasterPlayer[]>>;
+  currentUser: MasterPlayer | null;
+  whatsappConfig: WhatsappConfig;
+  toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast }) => {
+    const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+
+    const handleSavePlayer = async (playerToSave: Omit<MasterPlayer, 'id'> | MasterPlayer) => {
+        try {
+            const savedPlayer = await saveMasterPlayer(playerToSave);
+            setMasterPlayers(prev => {
+                if ('id' in playerToSave) {
+                    return prev.map(p => p.id === savedPlayer.id ? savedPlayer : p);
+                } else {
+                    return [...prev, savedPlayer];
+                }
+            });
+            setEditingPlayer(null);
+            toast({ title: "Player Saved", description: `${savedPlayer.name} has been updated.` });
+        } catch (error) {
+            console.error("Failed to save player", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save player details." });
+        }
+    };
+
+    const handleDeleteRequest = async (player: MasterPlayer) => {
+        if (player.id === currentUser?.id) {
+            toast({ variant: "destructive", title: "Action Not Allowed", description: "You cannot delete yourself." });
+            return;
+        }
+
+        setPlayerToDelete(player);
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeletePlayerOtp({ 
+                playerToDeleteName: player.name,
+                whatsappConfig
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                toast({ title: "OTP Sent", description: `An OTP has been sent to the super admin for verification.` });
+            } else {
+                throw new Error(result.error || "Failed to send OTP.");
+            }
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "OTP Error", description: e.message });
+            setPlayerToDelete(null); // Abort deletion
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!playerToDelete || otp !== sentOtp) {
+            toast({ variant: "destructive", title: "Invalid OTP", description: "The entered OTP is incorrect." });
+            return;
+        }
+        setIsDeleting(true);
+        try {
+            await deleteMasterPlayer(playerToDelete.id);
+            setMasterPlayers(prev => prev.filter(p => p.id !== playerToDelete.id));
+            toast({ title: "Player Deleted", description: `${playerToDelete.name} has been removed.` });
+            setPlayerToDelete(null);
+            setOtp("");
+            setSentOtp("");
+        } catch (error) {
+            console.error("Failed to delete player", error);
+            toast({ variant: "destructive", title: "Delete Error", description: "Could not delete player." });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    if (playerToDelete) {
+      return (
+        <Dialog open={!!playerToDelete} onOpenChange={() => setPlayerToDelete(null)}>
+           <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Confirm Deletion of {playerToDelete.name}</DialogTitle>
+                    <DialogDescription>Enter the OTP sent to the Super Admin's WhatsApp to confirm.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-2">
+                    <Label htmlFor="delete-otp">Admin OTP</Label>
+                    <Input id="delete-otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setPlayerToDelete(null)}>Cancel</Button>
+                    <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+                      {isDeleting ? <Loader2 className="animate-spin" /> : "Confirm & Delete"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )
+    }
+
+    if (editingPlayer) {
+        return <EditPlayerDialog isOpen={!!editingPlayer} onOpenChange={() => setEditingPlayer(null)} player={editingPlayer} onSave={handleSavePlayer} />
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Manage Master Players</DialogTitle>
+                    <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <ScrollArea className="h-96">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>WhatsApp Number</TableHead>
+                                    <TableHead>Group</TableHead>
+                                    <TableHead>Admin</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {masterPlayers.map(p => (
+                                    <TableRow key={p.id}>
+                                        <TableCell className="font-medium">{p.name}</TableCell>
+                                        <TableCell>{p.whatsappNumber}</TableCell>
+                                        <TableCell>{p.group || 'N/A'}</TableCell>
+                                        <TableCell>{p.isAdmin ? <Check className="h-5 w-5 text-green-600" /> : <X className="h-5 w-5 text-destructive" />}</TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex gap-2 justify-end">
+                                                <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp}>
+                                                  {isSendingOtp ? <Loader2 className="animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </div>
+                <DialogFooter>
+                    <Button onClick={() => setEditingPlayer({ id: '', name: '', whatsappNumber: '', group: '', isAdmin: false })}>
+                        <UserPlus className="mr-2 h-4 w-4" /> Add New Player
+                    </Button>
+                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const EditPlayerDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  player: MasterPlayer;
+  onSave: (player: MasterPlayer | Omit<MasterPlayer, 'id'>) => void;
+}> = ({ isOpen, onOpenChange, player, onSave }) => {
+    const [editedPlayer, setEditedPlayer] = useState(player);
+
+    useEffect(() => {
+        setEditedPlayer(player);
+    }, [player]);
+
+    const handleFieldChange = (field: keyof Omit<MasterPlayer, 'id'>, value: string | boolean) => {
+        setEditedPlayer(prev => ({...prev, [field]: value}));
+    };
+
+    const handleSave = () => {
+        onSave(editedPlayer);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{player.id ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Player Name</Label>
+                        <Input id="name" value={editedPlayer.name} onChange={e => handleFieldChange('name', e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                        <Input id="whatsapp" value={editedPlayer.whatsappNumber} onChange={e => handleFieldChange('whatsappNumber', e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="group">Group</Label>
+                        <Input id="group" value={editedPlayer.group} onChange={e => handleFieldChange('group', e.target.value)} />
+                    </div>
+                     <div className="flex items-center space-x-2">
+                        <Switch id="isAdmin" checked={editedPlayer.isAdmin} onCheckedChange={checked => handleFieldChange('isAdmin', checked)} />
+                        <Label htmlFor="isAdmin">Is Admin?</Label>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave}>Save Player</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const AddPlayerDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  masterPlayers: MasterPlayer[];
+  gamePlayers: Player[];
+  onAddPlayers: (players: MasterPlayer[]) => void;
+  toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, masterPlayers, gamePlayers, onAddPlayers, toast }) => {
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const gamePlayerNames = useMemo(() => gamePlayers.map(p => p.name), [gamePlayers]);
+
+  const availablePlayers = useMemo(() => {
+    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name));
+  }, [masterPlayers, gamePlayerNames]);
+
+  useEffect(() => {
+    // Reset selection when dialog opens
+    if (isOpen) {
+      setSelectedPlayerIds([]);
+    }
+  }, [isOpen]);
+
+  const handleSelectPlayer = (id: string, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedPlayerIds(prev => [...prev, id]);
+    } else {
+      setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
+    }
+  };
+
+  const handleAdd = () => {
+    const playersToAdd = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
+    if (playersToAdd.length === 0) {
+        toast({ variant: 'destructive', title: 'No players selected', description: 'Please select one or more players to add to the game.'})
+        return;
+    }
+    onAddPlayers(playersToAdd);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Players to Game</DialogTitle>
+          <DialogDescription>
+            Select players from your master list to add to the current game.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <ScrollArea className="h-72 border rounded-md p-2">
+            <div className="space-y-1">
+              {availablePlayers.map(player => (
+                <div key={player.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted">
+                  <Checkbox
+                    id={`add-${player.id}`}
+                    checked={selectedPlayerIds.includes(player.id)}
+                    onCheckedChange={checked => handleSelectPlayer(player.id, !!checked)}
+                  />
+                  <Label htmlFor={`add-${player.id}`} className="flex-1 cursor-pointer">
+                    {player.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+             {availablePlayers.length === 0 && <p className="text-center text-muted-foreground p-4">All players have been added.</p>}
+          </ScrollArea>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleAdd}>Add {selectedPlayerIds.length > 0 ? `(${selectedPlayerIds.length})` : ''} Player(s)</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const LoadGameDialog: FC<{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  gameHistory: GameHistory[];
+  onLoadGame: (gameId: string) => void;
+  onJoinGame: (gameId: string) => void;
+  onDeleteGame: (gameId: string) => void;
+  onNewGame: () => void;
+  whatsappConfig: WhatsappConfig;
+  toast: ReturnType<typeof useToast>['toast'];
+  currentUser: MasterPlayer | null;
+}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, onNewGame, whatsappConfig, toast, currentUser }) => {
+    const [otp, setOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
+
+    const handleDeleteRequest = async (game: GameHistory) => {
+        setGameToDelete(game);
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeleteGameOtp({ 
+                gameVenue: game.venue,
+                gameDate: format(new Date(game.timestamp), 'PPP'),
+                whatsappConfig
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                toast({ title: "OTP Sent", description: `An OTP has been sent to the super admin for verification.` });
+            } else {
+                throw new Error(result.error || "Failed to send OTP.");
+            }
+        } catch (e: any) {
+            toast({ variant: "destructive", title: "OTP Error", description: e.message });
+            setGameToDelete(null);
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+    
+    const confirmDelete = () => {
+        if (!gameToDelete || otp !== sentOtp) {
+            toast({ variant: "destructive", title: "Invalid OTP", description: "The entered OTP is incorrect." });
+            return;
+        }
+        onDeleteGame(gameToDelete.id);
+        setGameToDelete(null);
+        setOtp("");
+        setSentOtp("");
+    };
+
+    const handleGameAction = (game: GameHistory) => {
+        onOpenChange(false);
+        if(currentUser?.isAdmin) {
+            onLoadGame(game.id)
+        } else {
+            onJoinGame(game.id)
+        }
+    };
+
+    if (gameToDelete) {
+        return (
+            <Dialog open={!!gameToDelete} onOpenChange={() => setGameToDelete(null)}>
+                 <DialogContent>
+                      <DialogHeader>
+                          <DialogTitle>Confirm Deletion of Game</DialogTitle>
+                          <DialogDescription>Enter the OTP sent to the Super Admin's WhatsApp to confirm deleting the game at {gameToDelete.venue} on {format(new Date(gameToDelete.timestamp), 'PP')}.</DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4 space-y-2">
+                          <Label htmlFor="delete-game-otp">Admin OTP</Label>
+                          <Input id="delete-game-otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                      </div>
+                      <DialogFooter>
+                          <Button variant="outline" onClick={() => setGameToDelete(null)}>Cancel</Button>
+                          <Button variant="destructive" onClick={confirmDelete}>
+                              Confirm & Delete
+                          </Button>
+                      </DialogFooter>
+                  </DialogContent>
+            </Dialog>
+        )
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>{currentUser?.isAdmin ? "Load Previous Game" : "Join Game"}</DialogTitle>
+                    <DialogDescription>{currentUser?.isAdmin ? "Select a past game to review or continue it." : "Select a game to join."}</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96 pr-4">
+                    <div className="space-y-2">
+                        {gameHistory.length > 0 ? (
+                            gameHistory.map(game => {
+                                const isFinished = !!game.endTime;
+                                const isPlayerInGame = game.players.some(p => p.name === currentUser?.name);
+                                const canJoin = !isFinished && !isPlayerInGame && !currentUser?.isAdmin;
+
+                                return (
+                                <Card key={game.id} className={cn("cursor-pointer hover:border-primary", isFinished && "bg-muted/50")}>
+                                    <CardContent className="p-4 flex justify-between items-center">
+                                       <div onClick={() => (currentUser?.isAdmin || isPlayerInGame) && handleGameAction(game)}>
+                                            <p className="font-bold">{game.venue}</p>
+                                            <p className="text-sm text-muted-foreground">{format(new Date(game.timestamp), 'dd MMMM yyyy, p')}</p>
+                                            <Badge variant={isFinished ? 'secondary' : 'destructive'} className="mt-2">{isFinished ? 'Finished' : 'In Progress'}</Badge>
+                                       </div>
+                                       <div className="flex gap-2 items-center">
+                                           {(currentUser?.isAdmin || isPlayerInGame) && (
+                                             <Button size="sm" onClick={() => handleGameAction(game)}>
+                                                {currentUser?.isAdmin ? 'Load' : 'View'}
+                                            </Button>
+                                           )}
+                                            {canJoin && <Button size="sm" onClick={() => handleGameAction(game)}>Join</Button>}
+                                            {currentUser?.isAdmin && (
+                                                <Button size="icon" variant="ghost" onClick={() => handleDeleteRequest(game)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                       </div>
+                                    </CardContent>
+                                </Card>
+                            )})
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-muted-foreground">No game history found.</p>
+                                {currentUser?.isAdmin && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+};
+
 const ReportsDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
@@ -2490,6 +2994,3 @@ const BuyInRequestModalDialog: FC<{
         </Dialog>
     );
 };
-
-    
-    
