@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday, startOfToday, endOfToday, subMonths } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -162,7 +162,7 @@ export default function GameHistoryPage() {
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
   
   const playerReportData = useMemo<PlayerReportRow[]>(() => {
-    const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; totalProfitLoss: number }>();
+    const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; profitLoss: number }>();
     const selectedPlayerNames = masterPlayers.filter(p => selectedPlayerIds.includes(p.id)).map(p => p.name);
 
     filteredGames.forEach(game => {
@@ -177,13 +177,13 @@ export default function GameHistoryPage() {
                     gamesPlayed: 0,
                     totalBuyIn: 0,
                     totalChipReturn: 0,
-                    totalProfitLoss: 0,
+                    profitLoss: 0,
                 };
 
                 stats.gamesPlayed += 1;
                 stats.totalBuyIn += player.buyIn || 0;
                 stats.totalChipReturn += player.finalChips || 0;
-                stats.totalProfitLoss += player.profitLoss || 0;
+                stats.profitLoss += player.profitLoss || 0;
 
                 playerStats.set(player.name, stats);
             }
@@ -509,13 +509,17 @@ const PlayerReportTable: FC<{
     };
 
     const totals = useMemo(() => {
-        return playerReportData.reduce((acc, player) => {
+        const result = playerReportData.reduce((acc, player) => {
             acc.gamesPlayed += player.gamesPlayed;
             acc.totalBuyIn += player.totalBuyIn;
             acc.totalChipReturn += player.totalChipReturn;
-            acc.totalProfitLoss += player.profitLoss;
             return acc;
-        }, { gamesPlayed: 0, totalBuyIn: 0, totalChipReturn: 0, totalProfitLoss: 0 });
+        }, { gamesPlayed: 0, totalBuyIn: 0, totalChipReturn: 0 });
+        
+        return {
+            ...result,
+            totalProfitLoss: result.totalChipReturn - result.totalBuyIn,
+        }
     }, [playerReportData]);
 
     return (
@@ -761,4 +765,5 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[] }> = ({ data }) => {
         </ChartContainer>
     );
 };
+
 
