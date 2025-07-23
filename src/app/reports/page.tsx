@@ -444,7 +444,14 @@ const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
 };
 
 const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
-    if (data.length === 0) return <ChartContainer title="Buy-in vs. Profit/Loss per Game"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    const chartData = useMemo(() => {
+        return data.filter(d => 
+            typeof d.totalBuyIn === 'number' && !isNaN(d.totalBuyIn) &&
+            typeof d.profitLoss === 'number' && !isNaN(d.profitLoss)
+        );
+    }, [data]);
+
+    if (chartData.length === 0) return <ChartContainer title="Buy-in vs. Profit/Loss per Game"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Buy-in vs. Profit/Loss per Game">
@@ -455,7 +462,7 @@ const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
                 <ZAxis dataKey="venue" name="Venue" />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name) => (name === "Venue" ? value : `₹${value}`)} />
                 <Legend />
-                <Scatter name="Games" data={data} fill="#ef4444" />
+                <Scatter name="Games" data={chartData} fill="#ef4444" />
             </ScatterChart>
         </ChartContainer>
     );
