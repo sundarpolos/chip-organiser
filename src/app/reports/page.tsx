@@ -14,7 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYesterday, startOfToday, endOfToday, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -196,7 +196,7 @@ export default function GameHistoryPage() {
         gamesPlayed: p.gamesPlayed,
         totalBuyIn: p.totalBuyIn || 0,
         totalChipReturn: p.totalChipReturn || 0,
-        profitLoss: p.totalProfitLoss || 0,
+        profitLoss: p.profitLoss || 0,
     })).sort((a,b) => b.profitLoss - a.profitLoss);
   }, [filteredGames, masterPlayers, selectedPlayerIds]);
 
@@ -505,11 +505,21 @@ const PlayerReportTable: FC<{
                 }
                 return null;
             })
-            .filter(details => details !== null);
+            .filter((details): details is NonNullable<typeof details> => details !== null);
     };
 
+    const totals = useMemo(() => {
+        return playerReportData.reduce((acc, player) => {
+            acc.gamesPlayed += player.gamesPlayed;
+            acc.totalBuyIn += player.totalBuyIn;
+            acc.totalChipReturn += player.totalChipReturn;
+            acc.totalProfitLoss += player.profitLoss;
+            return acc;
+        }, { gamesPlayed: 0, totalBuyIn: 0, totalChipReturn: 0, totalProfitLoss: 0 });
+    }, [playerReportData]);
+
     return (
-       <div className="w-full">
+       <div className="w-full overflow-x-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -556,7 +566,7 @@ const PlayerReportTable: FC<{
                                                             </TableRow>
                                                         </TableHeader>
                                                         <TableBody>
-                                                            {playerGames.map((game: any, index: number) => (
+                                                            {playerGames.map((game, index: number) => (
                                                                 <TableRow key={index}>
                                                                     <TableCell>{game.date}</TableCell>
                                                                     <TableCell>{game.venue}</TableCell>
@@ -582,6 +592,17 @@ const PlayerReportTable: FC<{
                         </TableRow>
                     )}
                 </TableBody>
+                 <TableFooter>
+                    <TableRow className="font-bold bg-muted hover:bg-muted">
+                        <TableCell colSpan={2}>Grand Total</TableCell>
+                        <TableCell>{totals.gamesPlayed}</TableCell>
+                        <TableCell className="font-mono">₹{totals.totalBuyIn.toFixed(0)}</TableCell>
+                        <TableCell className="font-mono">₹{totals.totalChipReturn.toFixed(0)}</TableCell>
+                        <TableCell className={cn('font-mono', totals.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
+                            ₹{totals.totalProfitLoss.toFixed(0)}
+                        </TableCell>
+                    </TableRow>
+                </TableFooter>
             </Table>
         </div>
     )
