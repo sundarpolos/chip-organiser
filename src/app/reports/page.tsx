@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -316,7 +316,15 @@ const DateRangePicker: FC<{
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="flex w-auto flex-row" align="start">
+                <div className="flex flex-col gap-2 border-r pr-4 mr-4">
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: startOfDay(new Date()), to: new Date() })}>Today</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) })}>Yesterday</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: startOfWeek(new Date()), to: endOfWeek(new Date()) })}>This Week</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: startOfWeek(subDays(new Date(), 7)), to: endOfWeek(subDays(new Date(), 7)) })}>Last Week</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => onDateChange({ from: startOfMonth(subDays(new Date(), 30)), to: endOfMonth(subDays(new Date(), 30)) })}>Last Month</Button>
+                </div>
                 <Calendar
                     initialFocus
                     mode="range"
