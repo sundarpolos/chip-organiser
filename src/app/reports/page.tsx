@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
 
 
@@ -121,7 +120,7 @@ export default function GameHistoryPage() {
             profitLoss: totalChipReturn - totalBuyIn,
          }
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
 
@@ -141,7 +140,7 @@ export default function GameHistoryPage() {
         `Rs. ${g.profitLoss.toFixed(0)}`,
       ]),
       startY: 30,
-      headStyles: { fillColor: [22, 163, 74] },
+      headStyles: { fillColor: [79, 70, 229] },
     });
     
     doc.save(`chip-maestro-game-history-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -239,44 +238,26 @@ export default function GameHistoryPage() {
                 <Badge variant="secondary">{filteredGames.length} games</Badge>
               </div>
           </CardHeader>
-          <CardContent>
-             <Tabs defaultValue="table">
-                <TabsList>
-                  <TabsTrigger value="table">Table</TabsTrigger>
-                  <TabsTrigger value="bar">Bar Chart</TabsTrigger>
-                  <TabsTrigger value="line">Line Chart</TabsTrigger>
-                  <TabsTrigger value="pie">Pie Chart</TabsTrigger>
-                  <TabsTrigger value="scatter">Scatter Plot</TabsTrigger>
-                  <TabsTrigger value="stacked">Stacked Bar</TabsTrigger>
-                </TabsList>
-                <TabsContent value="table" className="mt-4">
-                  <DataTable
-                    columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']}
-                    data={filteredGames.map(g => [
-                      g.date,
-                      g.venue,
-                      g.totalBuyIn.toFixed(0),
-                      g.totalChipReturn.toFixed(0),
-                      g.profitLoss.toFixed(0),
-                    ])}
-                  />
-                </TabsContent>
-                <TabsContent value="bar">
-                  <VenueBarChart data={filteredGames} />
-                </TabsContent>
-                <TabsContent value="line">
-                  <BuyInLineChart data={filteredGames} />
-                </TabsContent>
-                 <TabsContent value="pie">
-                  <VenuePieChart data={filteredGames} />
-                </TabsContent>
-                 <TabsContent value="scatter">
-                  <ProfitScatterPlot data={filteredGames} />
-                </TabsContent>
-                 <TabsContent value="stacked">
-                  <VenueStackedBarChart data={filteredGames} />
-                </TabsContent>
-              </Tabs>
+          <CardContent className="space-y-8">
+              <DataTable
+                columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']}
+                data={filteredGames.map(g => [
+                  g.date,
+                  g.venue,
+                  g.totalBuyIn.toFixed(0),
+                  g.totalChipReturn.toFixed(0),
+                  g.profitLoss.toFixed(0),
+                ])}
+              />
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <VenueBarChart data={filteredGames} />
+                <BuyInLineChart data={filteredGames} />
+                <VenuePieChart data={filteredGames} />
+                <ProfitScatterPlot data={filteredGames} />
+                <VenueStackedBarChart data={filteredGames} />
+              </div>
+
           </CardContent>
       </Card>
 
@@ -349,42 +330,48 @@ const DataTable: FC<{
     data: (string | number)[][],
 }> = ({ columns, data }) => {
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    {columns.map(col => <TableHead key={col}>{col}</TableHead>)}
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {data.length > 0 ? (
-                    data.map((row, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                            {row.map((cell, cellIndex) => (
-                                <TableCell key={cellIndex} className={cn(cellIndex > 1 ? 'font-mono' : 'font-medium')}>
-                                    {cell}
-                                </TableCell>
-                            ))}
-                        </TableRow>
-                    ))
-                ) : (
+       <ScrollArea className="h-96">
+            <Table>
+                <TableHeader>
                     <TableRow>
-                        <TableCell colSpan={columns.length} className="h-24 text-center">
-                            No results found for the selected filters.
-                        </TableCell>
+                        {columns.map(col => <TableHead key={col}>{col}</TableHead>)}
                     </TableRow>
-                )}
-            </TableBody>
-        </Table>
+                </TableHeader>
+                <TableBody>
+                    {data.length > 0 ? (
+                        data.map((row, rowIndex) => (
+                            <TableRow key={rowIndex}>
+                                {row.map((cell, cellIndex) => (
+                                    <TableCell key={cellIndex} className={cn(cellIndex > 1 ? 'font-mono' : 'font-medium', cellIndex === 4 && (Number(cell) >= 0 ? 'text-green-600' : 'text-red-600'))}>
+                                        {cellIndex > 1 ? `₹${cell}` : cell}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        ))
+                    ) : (
+                        <TableRow>
+                            <TableCell colSpan={columns.length} className="h-24 text-center">
+                                No results found for the selected filters.
+                            </TableCell>
+                        </TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </ScrollArea>
     )
 }
 
 const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="w-full h-96">
-    <h3 className="text-lg font-medium text-center mb-4">{title}</h3>
-    <ResponsiveContainer width="100%" height="100%">
-      {children}
-    </ResponsiveContainer>
-  </div>
+  <Card className="h-96">
+    <CardHeader>
+        <CardTitle className="text-center text-lg">{title}</CardTitle>
+    </CardHeader>
+    <CardContent>
+        <ResponsiveContainer width="100%" height={300}>
+            {children}
+        </ResponsiveContainer>
+    </CardContent>
+  </Card>
 );
 
 const VenueBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
@@ -396,34 +383,35 @@ const VenueBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, totalBuyIn]) => ({ name, totalBuyIn }));
     }, [data]);
 
-    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Bar Chart.</p>
+    if (chartData.length === 0) return <ChartContainer title="Total Buy-ins per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Total Buy-ins per Venue">
             <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                <Tooltip formatter={(value) => `₹${value}`} />
                 <Legend />
-                <Bar dataKey="totalBuyIn" fill="#8884d8" name="Total Buy-in" />
+                <Bar dataKey="totalBuyIn" fill="#4f46e5" name="Total Buy-in" />
             </BarChart>
         </ChartContainer>
     );
 };
 
 const BuyInLineChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
-     if (data.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Line Chart.</p>
+    const chartData = [...data].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    if (data.length === 0) return <ChartContainer title="Total Buy-ins Over Time"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Total Buy-ins Over Time">
-            <LineChart data={data}>
+            <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }}/>
+                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                <Tooltip formatter={(value) => `₹${value}`} />
                 <Legend />
-                <Line type="monotone" dataKey="totalBuyIn" stroke="#82ca9d" name="Total Buy-in" />
+                <Line type="monotone" dataKey="totalBuyIn" stroke="#10b981" name="Total Buy-in" />
             </LineChart>
         </ChartContainer>
     );
@@ -438,12 +426,12 @@ const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, value]) => ({ name, value }));
     }, [data]);
     
-    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Pie Chart.</p>
+    if (chartData.length === 0) return <ChartContainer title="Games per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Games per Venue">
             <PieChart>
-                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label>
+                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                     {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -456,18 +444,18 @@ const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
 };
 
 const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
-    if (data.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Scatter Plot.</p>
+    if (data.length === 0) return <ChartContainer title="Buy-in vs. Profit/Loss per Game"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Buy-in vs. Profit/Loss per Game">
             <ScatterChart>
                 <CartesianGrid />
-                <XAxis type="number" dataKey="totalBuyIn" name="Total Buy-in" unit="Rs" />
-                <YAxis type="number" dataKey="profitLoss" name="Profit/Loss" unit="Rs" />
+                <XAxis type="number" dataKey="totalBuyIn" name="Total Buy-in" unit="₹" tickFormatter={(value) => `${value / 1000}k`} />
+                <YAxis type="number" dataKey="profitLoss" name="Profit/Loss" unit="₹" tickFormatter={(value) => `${value / 1000}k`} />
                 <ZAxis dataKey="venue" name="Venue" />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name) => (name === "Venue" ? value : `₹${value}`)} />
                 <Legend />
-                <Scatter name="Games" data={data} fill="#8884d8" />
+                <Scatter name="Games" data={data} fill="#ef4444" />
             </ScatterChart>
         </ChartContainer>
     );
@@ -486,20 +474,19 @@ const VenueStackedBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
         return Array.from(venueData.entries()).map(([name, values]) => ({ name, ...values }));
     }, [data]);
 
-    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Stacked Bar Chart.</p>
+    if (chartData.length === 0) return <ChartContainer title="Buy-ins vs. Returns per Venue"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
 
     return (
         <ChartContainer title="Buy-ins vs. Returns per Venue">
-            <BarChart data={chartData} layout="vertical">
+            <BarChart data={chartData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" width={100} />
-                <Tooltip />
+                <XAxis type="number" tickFormatter={(value) => `₹${value / 1000}k`} />
+                <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(value) => `₹${value}`}/>
                 <Legend />
-                <Bar dataKey="totalBuyIn" stackId="a" fill="#8884d8" name="Total Buy-in" />
-                <Bar dataKey="totalChipReturn" stackId="a" fill="#82ca9d" name="Total Chip Return" />
+                <Bar dataKey="totalBuyIn" stackId="a" fill="#8b5cf6" name="Total Buy-in" />
+                <Bar dataKey="totalChipReturn" stackId="a" fill="#3b82f6" name="Total Chip Return" />
             </BarChart>
         </ChartContainer>
     );
 };
-
