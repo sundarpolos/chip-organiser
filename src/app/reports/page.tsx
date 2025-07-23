@@ -306,7 +306,7 @@ const DateRangePicker: FC<{
                         defaultMonth={date?.from}
                         selected={date}
                         onSelect={onDateChange}
-                        numberOfMonths={2}
+                        numberOfMonths={1}
                     />
                 </div>
             </PopoverContent>
