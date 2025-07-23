@@ -173,8 +173,8 @@ const AdminView: FC<{
     }
 
     return (
-        <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-            <section className="md:col-span-3 mb-8 md:mb-0">
+        <main className="grid grid-cols-1 md:gap-8">
+            <section className="mb-8 md:mb-0">
                 <Card>
                     <CardContent className="pt-6">
                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -266,49 +266,6 @@ const PlayerView: FC<{
 };
 
 
-const SummaryView: FC<{ activeGame: GameHistory | null }> = ({ activeGame }) => {
-    const calculatedPlayers = useMemo(() => {
-        if (!activeGame || !activeGame.players) return [];
-        return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            return {
-                ...p,
-                totalBuyIns,
-                profitLoss: p.finalChips - totalBuyIns,
-            }
-        });
-    }, [activeGame]);
-
-    const transfers = useMemo(() => {
-        if (!calculatedPlayers) return [];
-        return calculateInterPlayerTransfers(calculatedPlayers);
-    }, [calculatedPlayers]);
-
-    const totalBuyInLog = useMemo(() => {
-        if (!activeGame) return [];
-        return (activeGame.players || []).flatMap(p => (p.buyIns || []).map(b => ({
-            playerName: p.name || "Unnamed",
-            amount: b.amount,
-            timestamp: b.timestamp,
-            status: b.status,
-        }))).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    }, [activeGame]);
-
-    const grandTotalBuyIn = useMemo(() => totalBuyInLog?.reduce((sum, item) => sum + (item.status === 'verified' ? item.amount : 0), 0), [totalBuyInLog]);
-
-    return (
-        <aside className="md:col-span-1">
-            <SummaryCard
-                activeGame={activeGame}
-                calculatedPlayers={calculatedPlayers}
-                transfers={transfers}
-                buyInLog={totalBuyInLog}
-                grandTotal={grandTotalBuyIn}
-            />
-        </aside>
-    );
-};
-
 const EditableVenue: FC<{
     venue: string;
     masterVenues: MasterVenue[];
@@ -370,6 +327,49 @@ const EditableVenue: FC<{
             )}
         </h1>
     );
+};
+
+const EditableDate: FC<{
+  date: string;
+  onDateChange: (newDate: Date) => void;
+  isAdmin: boolean;
+}> = ({ date, onDateChange, isAdmin }) => {
+  const [selectedDate, setSelectedDate] = useState(new Date(date));
+
+  useEffect(() => {
+    setSelectedDate(new Date(date));
+  }, [date]);
+
+  const handleDateSelect = (newDate: Date | undefined) => {
+    if (newDate) {
+      const originalTime = new Date(date);
+      const updatedDate = set(newDate, {
+        hours: originalTime.getHours(),
+        minutes: originalTime.getMinutes(),
+        seconds: originalTime.getSeconds(),
+      });
+      setSelectedDate(updatedDate);
+      onDateChange(updatedDate);
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" disabled={!isAdmin} className="px-2 h-auto py-0">
+            {format(selectedDate, "dd MMMM yyyy")}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={handleDateSelect}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 
@@ -863,6 +863,14 @@ export default function ChipMaestroPage() {
     setActiveGame(updatedGame);
     toast({ title: "Venue Updated", description: `The game venue has been changed to ${newVenue}.` });
   };
+  
+  const handleDateChange = async (newDate: Date) => {
+    if (!activeGame) return;
+    const updatedGame = { ...activeGame, timestamp: newDate.toISOString() };
+    await saveGameHistory(updatedGame);
+    setActiveGame(updatedGame);
+    toast({ title: "Date Updated", description: `The game date has been changed.` });
+  };
 
   const handleRunAnomalyDetection = async (player: Player) => {
     setAnomalyPlayer(player);
@@ -989,7 +997,9 @@ export default function ChipMaestroPage() {
                     {activeGame.players.length}
                 </Badge>
              )}
-            {activeGame && <span>{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</span>}
+            {activeGame && (
+                <EditableDate date={activeGame.timestamp} onDateChange={handleDateChange} isAdmin={isAdmin}/>
+            )}
             {activeGame?.startTime && (
                 <div className="flex items-center gap-1">
                     <TimerIcon className="h-4 w-4" />
@@ -1032,13 +1042,13 @@ export default function ChipMaestroPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild disabled={!isAdmin}>
                    <Link href="/reports">
-                      <Database className="h-4 w-4 mr-2" />
-                      Bulk Reports
+                      <History className="h-4 w-4 mr-2" />
+                      Game History
                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isAdmin}>
-                  <MessageCircleCode className="h-4 w-4" />
-                  <Label htmlFor="otp-verification-toggle" className="ml-2 pr-2 flex-1">OTP Verification</Label>
+                  <MessageCircleCode className="h-4 w-4 mr-2" />
+                  <Label htmlFor="otp-verification-toggle" className="pr-2 flex-1">OTP Verification</Label>
                   <Switch
                       id="otp-verification-toggle"
                       checked={isOtpVerificationEnabled}

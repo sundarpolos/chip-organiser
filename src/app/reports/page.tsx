@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef, type FC } from 'react';
 import { getGameHistory } from '@/services/game-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
-import type { GameHistory, MasterPlayer, MasterVenue, CalculatedPlayer } from '@/lib/types';
+import type { GameHistory, MasterPlayer, MasterVenue } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,50 +14,25 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, Trash2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Loader2, CalendarIcon, Filter, FileDown } from 'lucide-react';
 import { format, subDays } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
-import {
-  ResponsiveContainer,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  Legend,
-  Bar,
-  Cell,
-} from 'recharts';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Badge } from '@/components/ui/badge';
 
-type AggregatedPlayerData = {
-  name: string;
-  gamesPlayed: number;
+
+type GameHistoryRow = {
+  id: string;
+  date: string;
+  venue: string;
   totalBuyIn: number;
   totalChipReturn: number;
-  totalProfitLoss: number;
-  avgProfitLoss: number;
 };
 
-type AggregatedVenueData = {
-  name: string;
-  gamesPlayed: number;
-  totalBuyIn: number;
-};
-
-type DailySummaryData = {
-    date: string;
-    totalBuyIn: number;
-    totalChipReturn: number;
-}
-
-export default function BulkReportsPage() {
+export default function GameHistoryPage() {
   const { toast } = useToast();
-  const reportRef = useRef<HTMLDivElement>(null);
 
   // Data state
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
@@ -101,7 +76,7 @@ export default function BulkReportsPage() {
   }, [toast]);
 
   // Memoized filtered data
-  const filteredData = useMemo(() => {
+  const filteredGames = useMemo<GameHistoryRow[]>(() => {
     const selectedPlayerNames = masterPlayers
       .filter(p => selectedPlayerIds.includes(p.id))
       .map(p => p.name);
@@ -110,132 +85,60 @@ export default function BulkReportsPage() {
       .filter(v => selectedVenueIds.includes(v.id))
       .map(v => v.name);
 
-    const filteredGames = allGames.filter(game => {
-      const gameDate = new Date(game.timestamp);
-      const isDateInRange = fromDate && toDate ? gameDate >= fromDate && gameDate <= toDate : true;
-      
-      const isVenueSelected = selectedVenueNames.includes(game.venue);
-      
-      const hasSelectedPlayer = game.players.some(p => selectedPlayerNames.includes(p.name));
+    return allGames
+      .filter(game => {
+        const gameDate = new Date(game.timestamp);
+        const startOfDayFromDate = fromDate ? new Date(fromDate.setHours(0, 0, 0, 0)) : null;
+        const endOfDayToDate = toDate ? new Date(toDate.setHours(23, 59, 59, 999)) : null;
 
-      return isDateInRange && isVenueSelected && hasSelectedPlayer;
-    });
-
-    // Aggregate player data
-    const playerStats: Record<string, AggregatedPlayerData> = {};
-    selectedPlayerNames.forEach(name => {
-      playerStats[name] = {
-        name: name,
-        gamesPlayed: 0,
-        totalBuyIn: 0,
-        totalChipReturn: 0,
-        totalProfitLoss: 0,
-        avgProfitLoss: 0,
-      };
-    });
-
-    filteredGames.forEach(game => {
-        game.players.forEach(p => {
-            if(playerStats[p.name]) {
-                const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-                const profitLoss = p.finalChips - totalBuyIns;
-                playerStats[p.name].gamesPlayed += 1;
-                playerStats[p.name].totalBuyIn += totalBuyIns;
-                playerStats[p.name].totalChipReturn += p.finalChips;
-                playerStats[p.name].totalProfitLoss += profitLoss;
-            }
-        })
-    });
-    
-    Object.values(playerStats).forEach(stat => {
-        if(stat.gamesPlayed > 0) {
-            stat.avgProfitLoss = stat.totalProfitLoss / stat.gamesPlayed;
-        }
-    })
-
-    // Aggregate venue data
-    const venueStats: Record<string, AggregatedVenueData> = {};
-    selectedVenueNames.forEach(name => {
-        venueStats[name] = {
-            name,
-            gamesPlayed: 0,
-            totalBuyIn: 0,
-        };
-    });
-
-    // Aggregate daily data
-    const dailyStats: Record<string, DailySummaryData> = {};
-    
-    filteredGames.forEach(game => {
-        if(venueStats[game.venue]) {
-            venueStats[game.venue].gamesPlayed += 1;
-            const gameBuyIn = game.players.reduce((sum, p) => {
-                 const playerBuyIn = (p.buyIns || []).reduce((playerSum, bi) => playerSum + (bi.status === 'verified' ? bi.amount : 0), 0);
-                 return sum + playerBuyIn;
-            }, 0);
-            venueStats[game.venue].totalBuyIn += gameBuyIn;
-        }
-
-        const gameDateKey = format(new Date(game.timestamp), 'yyyy-MM-dd');
-        if (!dailyStats[gameDateKey]) {
-            dailyStats[gameDateKey] = {
-                date: game.timestamp,
-                totalBuyIn: 0,
-                totalChipReturn: 0,
-            };
-        }
+        const isDateInRange = 
+            (!startOfDayFromDate || gameDate >= startOfDayFromDate) && 
+            (!endOfDayToDate || gameDate <= endOfDayToDate);
         
-        game.players.forEach(p => {
-            const playerBuyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            dailyStats[gameDateKey].totalBuyIn += playerBuyIn;
-            dailyStats[gameDateKey].totalChipReturn += p.finalChips;
-        });
+        const isVenueSelected = selectedVenueNames.includes(game.venue);
+        
+        const hasSelectedPlayer = game.players.some(p => selectedPlayerNames.includes(p.name));
 
-    });
-    
-    return {
-      players: Object.values(playerStats).sort((a, b) => b.totalProfitLoss - a.totalProfitLoss),
-      venues: Object.values(venueStats).sort((a, b) => b.gamesPlayed - a.gamesPlayed),
-      daily: Object.values(dailyStats).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-      totalGames: filteredGames.length,
-    };
+        return isDateInRange && isVenueSelected && hasSelectedPlayer;
+      })
+      .map(game => {
+         const totalBuyIn = game.players.reduce((sum, p) => {
+            return sum + (p.buyIns || []).reduce((playerSum, bi) => playerSum + (bi.status === 'verified' ? bi.amount : 0), 0);
+         }, 0);
+         const totalChipReturn = game.players.reduce((sum, p) => sum + p.finalChips, 0);
+
+         return {
+            id: game.id,
+            date: format(new Date(game.timestamp), 'dd MMMM yyyy'),
+            venue: game.venue,
+            totalBuyIn,
+            totalChipReturn,
+         }
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
 
   const handleExportPdf = () => {
     const doc = new jsPDF();
-    doc.text("Bulk Game Report", 14, 16);
+    doc.text("Game History Report", 14, 16);
     doc.setFontSize(10);
-    doc.text(`Filters applied: ${filteredData.totalGames} games`, 14, 22);
+    doc.text(`Filters applied: ${filteredGames.length} games`, 14, 22);
 
-    // Player Performance Table
     (doc as any).autoTable({
-      head: [['Player', 'Games', 'Total Buy-in', 'Total Chip Return', 'Total P/L', 'Avg P/L']],
-      body: filteredData.players.map(p => [
-        p.name,
-        p.gamesPlayed,
-        p.totalBuyIn.toFixed(0),
-        p.totalChipReturn.toFixed(0),
-        p.totalProfitLoss.toFixed(0),
-        p.avgProfitLoss.toFixed(0),
+      head: [['Date', 'Venue', 'Total Buy-in', 'Total Chip Return']],
+      body: filteredGames.map(g => [
+        g.date,
+        g.venue,
+        `Rs. ${g.totalBuyIn.toFixed(0)}`,
+        `Rs. ${g.totalChipReturn.toFixed(0)}`,
       ]),
       startY: 30,
       headStyles: { fillColor: [22, 163, 74] },
     });
     
-    // Venue Performance Table
-    (doc as any).autoTable({
-      head: [['Venue', 'Games Played', 'Total Pot']],
-      body: filteredData.venues.map(v => [
-          v.name,
-          v.gamesPlayed,
-          v.totalBuyIn.toFixed(0)
-      ]),
-      startY: (doc as any).autoTable.previous.finalY + 10,
-      headStyles: { fillColor: [37, 99, 235] },
-    });
-    
-    doc.save(`chip-maestro-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
+    doc.save(`chip-maestro-game-history-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    toast({ title: 'Report Exported', description: 'Your game history has been downloaded as a PDF.' });
   };
 
 
@@ -250,9 +153,9 @@ export default function BulkReportsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-        <h1 className="text-3xl font-bold">Bulk Reports</h1>
+        <h1 className="text-3xl font-bold">Game History</h1>
         <div className="flex gap-2">
-            <Button onClick={handleExportPdf} disabled={filteredData.totalGames === 0}><FileDown className="mr-2"/>Export PDF</Button>
+            <Button onClick={handleExportPdf} disabled={filteredGames.length === 0}><FileDown className="mr-2"/>Export PDF</Button>
         </div>
       </div>
       
@@ -315,90 +218,27 @@ export default function BulkReportsPage() {
             </div>
         </CardContent>
       </Card>
-
-      <div ref={reportRef} className="space-y-6">
-        <Card>
+      
+      <Card>
           <CardHeader>
-            <CardTitle>Aggregated Player Performance</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle>Games List</CardTitle>
+                <Badge variant="secondary">{filteredGames.length}</Badge>
+              </div>
           </CardHeader>
           <CardContent>
-             <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={filteredData.players} margin={{ top: 5, right: 20, left: -10, bottom: 50 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" angle={-45} textAnchor="end" interval={0} />
-                    <YAxis />
-                    <RechartsTooltip
-                        content={({ payload }) => {
-                            if (!payload || !payload.length) return null;
-                            const data = payload[0].payload;
-                            return (
-                                <div className="bg-background border p-2 rounded-md shadow-lg text-sm">
-                                    <p className="font-bold">{data.name}</p>
-                                    <p className={data.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                        Total P/L: {data.totalProfitLoss.toFixed(0)}
-                                    </p>
-                                    <p className="text-muted-foreground">Games: {data.gamesPlayed}</p>
-                                </div>
-                            );
-                        }}
-                    />
-                    <Legend verticalAlign="top" />
-                    <Bar dataKey="totalProfitLoss" name="Total Profit/Loss">
-                        {filteredData.players.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.totalProfitLoss >= 0 ? '#10b981' : '#ef4444'} />
-                        ))}
-                    </Bar>
-                </BarChart>
-            </ResponsiveContainer>
-            <DataTable
-              columns={['Player', 'Games Played', 'Total Buy-in', 'Total Chip Return', 'Total P/L', 'Avg P/L']}
-              data={filteredData.players.map(p => [
-                p.name,
-                p.gamesPlayed,
-                (p.totalBuyIn ?? 0).toFixed(0),
-                (p.totalChipReturn ?? 0).toFixed(0),
-                (p.totalProfitLoss ?? 0).toFixed(0),
-                (p.avgProfitLoss ?? 0).toFixed(0),
+              <DataTable
+              columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return']}
+              data={filteredGames.map(g => [
+                g.date,
+                g.venue,
+                g.totalBuyIn.toFixed(0),
+                g.totalChipReturn.toFixed(0),
               ])}
             />
           </CardContent>
-        </Card>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Aggregated Venue Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-             <DataTable
-              columns={['Venue', 'Games Played', 'Total Pot Size']}
-              data={filteredData.venues.map(v => [
-                v.name,
-                v.gamesPlayed,
-                `₹${v.totalBuyIn.toFixed(0)}`,
-              ])}
-            />
-          </CardContent>
-        </Card>
-        
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                Daily Summary
-                {filteredData.totalGames > 0 && <Badge variant="secondary">{filteredData.totalGames}</Badge>}
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <DataTable
-                columns={['Date', 'Total Buy-in', 'Total Chip Return']}
-                data={filteredData.daily.map(d => [
-                    format(new Date(d.date), 'dd MMMM yyyy'),
-                    (d.totalBuyIn ?? 0).toFixed(0),
-                    (d.totalChipReturn ?? 0).toFixed(0),
-                ])}
-                />
-            </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
@@ -479,7 +319,7 @@ const DataTable: FC<{
                     data.map((row, rowIndex) => (
                         <TableRow key={rowIndex}>
                             {row.map((cell, cellIndex) => (
-                                <TableCell key={cellIndex} className={cn(typeof cell === 'number' || (typeof cell === 'string' && !isNaN(Number(cell))) ? 'font-medium' : '')}>
+                                <TableCell key={cellIndex} className={cn(cellIndex > 1 ? 'font-mono' : 'font-medium')}>
                                     {cell}
                                 </TableCell>
                             ))}
@@ -488,7 +328,7 @@ const DataTable: FC<{
                 ) : (
                     <TableRow>
                         <TableCell colSpan={columns.length} className="h-24 text-center">
-                            No results found.
+                            No results found for the selected filters.
                         </TableCell>
                     </TableRow>
                 )}
@@ -496,5 +336,3 @@ const DataTable: FC<{
         </Table>
     )
 }
-
-    
