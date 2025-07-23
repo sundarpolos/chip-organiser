@@ -293,7 +293,7 @@ const DateRangePicker: FC<{
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
                 <div className="flex">
-                    <div className="p-2 space-y-1">
+                    <div className="p-2 space-y-1 border-r">
                         <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: new Date(), to: new Date() })}>Today</Button>
                         <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 6), to: new Date() })}>Last 7 days</Button>
                         <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 days</Button>
