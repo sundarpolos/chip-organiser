@@ -194,9 +194,9 @@ export default function GameHistoryPage() {
         id: p.id,
         name: p.name,
         gamesPlayed: p.gamesPlayed,
-        totalBuyIn: p.totalBuyIn,
-        totalChipReturn: p.totalChipReturn,
-        profitLoss: p.totalProfitLoss,
+        totalBuyIn: p.totalBuyIn || 0,
+        totalChipReturn: p.totalChipReturn || 0,
+        profitLoss: p.totalProfitLoss || 0,
     })).sort((a,b) => b.profitLoss - a.profitLoss);
   }, [filteredGames, masterPlayers, selectedPlayerIds]);
 
@@ -408,7 +408,7 @@ const DateRangePicker: FC<{
                         defaultMonth={date?.from}
                         selected={date}
                         onSelect={onDateChange}
-                        numberOfMonths={1}
+                        numberOfMonths={2}
                     />
                 </div>
             </PopoverContent>
@@ -498,9 +498,9 @@ const PlayerReportTable: FC<{
                     return {
                         date: game.date,
                         venue: game.venue,
-                        buyIn: playerInGame.buyIn,
-                        chipReturn: playerInGame.finalChips,
-                        profitLoss: playerInGame.profitLoss,
+                        buyIn: playerInGame.buyIn || 0,
+                        chipReturn: playerInGame.finalChips || 0,
+                        profitLoss: playerInGame.profitLoss || 0,
                     };
                 }
                 return null;
@@ -509,7 +509,7 @@ const PlayerReportTable: FC<{
     };
 
     return (
-       <ScrollArea className="h-96">
+       <div className="w-full">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -583,7 +583,7 @@ const PlayerReportTable: FC<{
                     )}
                 </TableBody>
             </Table>
-        </ScrollArea>
+        </div>
     )
 }
 
