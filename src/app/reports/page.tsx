@@ -337,7 +337,7 @@ export default function GameHistoryPage() {
                   <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
               </CardHeader>
               <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 gap-8">
                       {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
                       {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
                       {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
@@ -511,6 +511,15 @@ const PlayerReportTable: FC<{
     filteredGames: any[],
 }> = ({ playerReportData, filteredGames }) => {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
+    
+    useEffect(() => {
+        // When filtered data changes, expand all rows by default
+        if (playerReportData.length > 0) {
+            setExpandedRows(playerReportData.map(p => p.id));
+        } else {
+            setExpandedRows([]);
+        }
+    }, [playerReportData]);
 
     const toggleRow = (playerId: string) => {
         setExpandedRows(prev => 
