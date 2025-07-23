@@ -154,17 +154,10 @@ export default function MergePlayersPage() {
 
       const updatedGames = await Promise.all(updatedGamesPromises);
       setGameHistory(updatedGames);
-      
-      // Delete the secondary players from the master list
-      const deletePromises = secondaryPlayerIds.map(id => deleteMasterPlayer(id));
-      await Promise.all(deletePromises);
-      
-      // Update the local master players state
-      setMasterPlayers(prev => prev.filter(p => !secondaryPlayerIds.includes(p.id)));
 
       toast({
         title: 'Merge Successful!',
-        description: `All records for ${secondaryPlayerNames.join(', ')} have been merged into ${primaryPlayer.name} and old records deleted.`,
+        description: `All game records for ${secondaryPlayerNames.join(', ')} have been reassigned to ${primaryPlayer.name}. The original player entries were not deleted.`,
       });
 
     } catch (error) {
