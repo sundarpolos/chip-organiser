@@ -2130,8 +2130,18 @@ const LoadGameDialog: FC<{
   whatsappConfig: WhatsappConfig;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string }) => void;
   currentUser: MasterPlayer | null;
-}> = ({ isOpen, onOpenChange, gameHistory, onLoadGame, onJoinGame, onDeleteGame, onNewGame, whatsappConfig, toast, currentUser }) => {
-
+}> = ({
+  isOpen,
+  onOpenChange,
+  gameHistory,
+  onLoadGame,
+  onJoinGame,
+  onDeleteGame,
+  onNewGame,
+  whatsappConfig,
+  toast,
+  currentUser,
+}) => {
   const isAdmin = currentUser?.isAdmin;
 
   const sortedHistory = useMemo(
@@ -2144,7 +2154,10 @@ const LoadGameDialog: FC<{
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Load Previous Game</DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Load Previous Game</DialogTitle>
+            {gameHistory.length > 0 && <Badge variant="secondary">{gameHistory.length}</Badge>}
+          </div>
           <DialogDescription>
             Select a game from your history to load or delete.
           </DialogDescription>
@@ -3126,4 +3139,5 @@ const BuyInRequestModalDialog: FC<{
     );
 };
 
+    
     
