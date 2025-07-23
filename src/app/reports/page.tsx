@@ -20,6 +20,7 @@ import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfYeste
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { DateRange } from 'react-day-picker';
@@ -47,6 +48,8 @@ const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6"
 
 export default function GameHistoryPage() {
   const { toast } = useToast();
+  const reportCardRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Data state
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
@@ -200,27 +203,42 @@ export default function GameHistoryPage() {
     setChartVisibility(prev => ({ ...prev, [chartName]: isVisible }));
   };
 
-  const handleExportPdf = () => {
-    const doc = new jsPDF();
-    doc.text("Player Report", 14, 16);
-    doc.setFontSize(10);
-    doc.text(`Filters applied: ${playerReportData.length} players`, 14, 22);
-
-    (doc as any).autoTable({
-      head: [['Player', 'Games Played', 'Total Buy-in', 'Total Returns', 'Total P/L']],
-      body: playerReportData.map(p => [
-        p.name,
-        p.gamesPlayed,
-        `Rs. ${p.totalBuyIn.toFixed(0)}`,
-        `Rs. ${p.totalChipReturn.toFixed(0)}`,
-        `Rs. ${p.profitLoss.toFixed(0)}`,
-      ]),
-      startY: 30,
-      headStyles: { fillColor: [79, 70, 229] },
-    });
+  const handleExportPdf = async () => {
+    if (!reportCardRef.current) {
+        toast({ variant: "destructive", title: "Export Error", description: "Report content not found." });
+        return;
+    }
     
-    doc.save(`chip-maestro-player-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-    toast({ title: 'Report Exported', description: 'Your player report has been downloaded as a PDF.' });
+    setIsExporting(true);
+    try {
+        const canvas = await html2canvas(reportCardRef.current, {
+            scale: 2, // Higher scale for better quality before compression
+            useCORS: true,
+            backgroundColor: null, // Use transparent background for dark mode compatibility
+        });
+        
+        // Compress the image by using JPEG format with a quality setting
+        const imgData = canvas.toDataURL('image/jpeg', 0.7); // Quality 0.7 for good compression
+        
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+        
+        const filename = `chip-maestro-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        
+        pdf.save(filename);
+        toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
+
+    } catch (error) {
+        console.error("Failed to export PDF:", error);
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
+    } finally {
+        setIsExporting(false);
+    }
   };
 
 
@@ -237,7 +255,10 @@ export default function GameHistoryPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <h1 className="text-3xl font-bold">Game History & Reports</h1>
         <div className="flex gap-2">
-            <Button onClick={handleExportPdf} disabled={playerReportData.length === 0}><FileDown className="mr-2"/>Export PDF</Button>
+            <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
+                {isExporting ? <Loader2 className="mr-2 animate-spin"/> : <FileDown className="mr-2"/>}
+                Export PDF
+            </Button>
         </div>
       </div>
       
@@ -283,7 +304,7 @@ export default function GameHistoryPage() {
         </CardContent>
       </Card>
       
-      <Card>
+      <Card ref={reportCardRef} className="p-4 bg-background">
           <CardHeader>
               <div className="flex items-center gap-2">
                 <CardTitle>Player Report</CardTitle>
@@ -512,16 +533,12 @@ const DataTable: FC<{
 }
 
 const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <Card className="h-96">
-    <CardHeader>
-        <CardTitle className="text-center text-lg">{title}</CardTitle>
-    </CardHeader>
-    <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-            {children}
-        </ResponsiveContainer>
-    </CardContent>
-  </Card>
+  <div className="h-96">
+    <h3 className="text-center text-lg font-semibold mb-2">{title}</h3>
+    <ResponsiveContainer width="100%" height={300}>
+        {children}
+    </ResponsiveContainer>
+  </div>
 );
 
 const VenueBarChart: FC<{ data: GameHistory[] }> = ({ data }) => {
