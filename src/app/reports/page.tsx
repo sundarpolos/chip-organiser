@@ -298,15 +298,11 @@ export default function GameHistoryPage() {
         </CardContent>
       </Card>
       
-      <div ref={reportContainerRef} className="space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold">Game History & Reports</h1>
-            {dateRange?.from && (
-                <p className="text-muted-foreground mt-1">
-                    {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-                </p>
-            )}
+            
           </div>
           <div className="flex gap-2">
               <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
@@ -316,46 +312,53 @@ export default function GameHistoryPage() {
           </div>
         </div>
         
-        <Card>
-            <CardHeader>
-                <div className="flex items-center gap-2">
-                    <CardTitle>Player Report</CardTitle>
-                    <Badge variant="secondary">{playerReportData.length} players</Badge>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <PlayerReportTable
-                    playerReportData={playerReportData}
-                    filteredGames={filteredGames}
-                />
-            </CardContent>
-        </Card>
+        <div ref={reportContainerRef} className='space-y-6'>
+          {dateRange?.from && (
+              <p className="text-muted-foreground mt-1">
+                  {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+              </p>
+          )}
+          <Card>
+              <CardHeader>
+                  <div className="flex items-center gap-2">
+                      <CardTitle>Player Report</CardTitle>
+                      <Badge variant="secondary">{playerReportData.length} players</Badge>
+                  </div>
+              </CardHeader>
+              <CardContent>
+                  <PlayerReportTable
+                      playerReportData={playerReportData}
+                      filteredGames={filteredGames}
+                  />
+              </CardContent>
+          </Card>
 
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
-                    {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
-                    {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
-                    {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} dateRange={dateRange} />}
-                    {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} dateRange={dateRange} />}
-                </div>
-            </CardContent>
-        </Card>
-        
-        {chartVisibility.playerProfitBar && (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Total Player Profit/Loss</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <PlayerProfitBarChart data={playerReportData} dateRange={dateRange} />
-                </CardContent>
-            </Card>
-        )}
+          <Card>
+              <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
+                      {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
+                      {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
+                      {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} dateRange={dateRange} />}
+                      {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} dateRange={dateRange} />}
+                  </div>
+              </CardContent>
+          </Card>
+          
+          {chartVisibility.playerProfitBar && (
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Total Player Profit/Loss</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <PlayerProfitBarChart data={playerReportData} dateRange={dateRange} />
+                  </CardContent>
+              </Card>
+          )}
+        </div>
       </div>
 
     </div>
@@ -509,6 +512,10 @@ const PlayerReportTable: FC<{
     filteredGames: any[],
 }> = ({ playerReportData, filteredGames }) => {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
+
+    useEffect(() => {
+        setExpandedRows(playerReportData.map(p => p.id));
+    }, [playerReportData]);
 
     const toggleRow = (playerId: string) => {
         setExpandedRows(prev => 
