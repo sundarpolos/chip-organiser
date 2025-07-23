@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -32,6 +32,12 @@ type GameHistoryRow = {
   totalBuyIn: number;
   totalChipReturn: number;
   profitLoss: number;
+  players: {
+    name: string;
+    buyIn: number;
+    finalChips: number;
+    profitLoss: number;
+  }[];
 };
 
 type ChartVisibilityState = {
@@ -40,6 +46,7 @@ type ChartVisibilityState = {
     venuePie: boolean;
     profitScatter: boolean;
     venueStackedBar: boolean;
+    playerProfitBar: boolean;
 }
 
 const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"];
@@ -68,6 +75,7 @@ export default function GameHistoryPage() {
     venuePie: true,
     profitScatter: true,
     venueStackedBar: true,
+    playerProfitBar: true,
   });
 
   // Load all data on component mount
@@ -126,10 +134,21 @@ export default function GameHistoryPage() {
         return isDateInRange && isVenueSelected && hasSelectedPlayer;
       })
       .map(game => {
-         const totalBuyIn = game.players.reduce((sum, p) => {
-            return sum + (p.buyIns || []).reduce((playerSum, bi) => playerSum + (bi.status === 'verified' ? bi.amount : 0), 0);
-         }, 0);
-         const totalChipReturn = game.players.reduce((sum, p) => sum + p.finalChips, 0);
+         const gamePlayers = game.players
+            .filter(p => selectedPlayerNames.includes(p.name))
+            .map(p => {
+                const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                const finalChips = p.finalChips;
+                return {
+                    name: p.name,
+                    buyIn: buyIn,
+                    finalChips: finalChips,
+                    profitLoss: finalChips - buyIn
+                }
+            });
+            
+         const totalBuyIn = gamePlayers.reduce((sum, p) => sum + p.buyIn, 0);
+         const totalChipReturn = gamePlayers.reduce((sum, p) => sum + p.finalChips, 0);
 
          return {
             id: game.id,
@@ -138,6 +157,7 @@ export default function GameHistoryPage() {
             totalBuyIn,
             totalChipReturn,
             profitLoss: totalChipReturn - totalBuyIn,
+            players: gamePlayers,
          }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -194,7 +214,7 @@ export default function GameHistoryPage() {
             <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters & Display Options</CardTitle>
         </CardHeader>
         <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-b pb-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 border-b pb-4 mb-4">
                 <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
                 <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
                 <div className="space-y-2">
@@ -202,7 +222,7 @@ export default function GameHistoryPage() {
                     <DateRangePicker date={dateRange} onDateChange={setDateRange} />
                 </div>
             </div>
-             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 <div className="flex items-center space-x-2">
                     <Checkbox id="cb-venueBar" checked={chartVisibility.venueBar} onCheckedChange={(c) => handleChartVisibilityChange('venueBar', !!c)} />
                     <Label htmlFor="cb-venueBar" className="flex items-center gap-2"><BarChart2 className="h-4 w-4" /> Bar Chart</Label>
@@ -222,6 +242,10 @@ export default function GameHistoryPage() {
                  <div className="flex items-center space-x-2">
                     <Checkbox id="cb-venueStackedBar" checked={chartVisibility.venueStackedBar} onCheckedChange={(c) => handleChartVisibilityChange('venueStackedBar', !!c)} />
                     <Label htmlFor="cb-venueStackedBar" className="flex items-center gap-2"><GanttChart className="h-4 w-4" /> Stacked Bar</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-playerProfitBar" checked={chartVisibility.playerProfitBar} onCheckedChange={(c) => handleChartVisibilityChange('playerProfitBar', !!c)} />
+                    <Label htmlFor="cb-playerProfitBar" className="flex items-center gap-2"><User className="h-4 w-4" /> Player P/L</Label>
                 </div>
             </div>
         </CardContent>
@@ -252,6 +276,7 @@ export default function GameHistoryPage() {
                 {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
                 {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
                 {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
+                {chartVisibility.playerProfitBar && <PlayerProfitBarChart data={filteredGames} />}
               </div>
 
           </CardContent>
@@ -292,23 +317,14 @@ const DateRangePicker: FC<{
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-                <div className="flex">
-                    <div className="p-2 space-y-1 border-r">
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: new Date(), to: new Date() })}>Today</Button>
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 6), to: new Date() })}>Last 7 days</Button>
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: subDays(new Date(), 29), to: new Date() })}>Last 30 days</Button>
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>This Month</Button>
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => onDateChange({ from: startOfMonth(subDays(new Date(), 30)), to: endOfMonth(subDays(new Date(), 30)) })}>Last Month</Button>
-                    </div>
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={date?.from}
-                        selected={date}
-                        onSelect={onDateChange}
-                        numberOfMonths={1}
-                    />
-                </div>
+                <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from}
+                    selected={date}
+                    onSelect={onDateChange}
+                    numberOfMonths={1}
+                />
             </PopoverContent>
         </Popover>
     )
@@ -392,7 +408,7 @@ const DataTable: FC<{
                             <TableRow key={rowIndex}>
                                 {row.map((cell, cellIndex) => (
                                     <TableCell key={cellIndex} className={cn(cellIndex > 1 ? 'font-mono' : 'font-medium', cellIndex === 4 && (Number(cell) >= 0 ? 'text-green-600' : 'text-red-600'))}>
-                                        {cellIndex > 1 ? `₹${cell}` : cell}
+                                        {cellIndex > 1 && cellIndex < 5 ? `₹${cell}` : cell}
                                     </TableCell>
                                 ))}
                             </TableRow>
@@ -542,6 +558,37 @@ const VenueStackedBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
                 <Legend />
                 <Bar dataKey="totalBuyIn" stackId="a" fill="#8b5cf6" name="Total Buy-in" />
                 <Bar dataKey="totalChipReturn" stackId="a" fill="#3b82f6" name="Total Chip Return" />
+            </BarChart>
+        </ChartContainer>
+    );
+};
+
+const PlayerProfitBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+    const chartData = useMemo(() => {
+        const playerData = new Map<string, number>();
+        data.forEach(game => {
+            game.players.forEach(player => {
+                playerData.set(player.name, (playerData.get(player.name) || 0) + player.profitLoss);
+            });
+        });
+        return Array.from(playerData.entries()).map(([name, profitLoss]) => ({ name, profitLoss }));
+    }, [data]);
+
+    if (chartData.length === 0) return <ChartContainer title="Total Player Profit/Loss"><p className="text-center text-muted-foreground pt-20">No data available.</p></ChartContainer>
+    
+    return (
+        <ChartContainer title="Total Player Profit/Loss">
+            <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
+                <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
+                <Legend />
+                <Bar dataKey="profitLoss" name="Total P/L">
+                    {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.profitLoss >= 0 ? '#10b981' : '#ef4444'} />
+                    ))}
+                </Bar>
             </BarChart>
         </ChartContainer>
     );
