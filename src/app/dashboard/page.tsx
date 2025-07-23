@@ -174,7 +174,7 @@ const AdminView: FC<{
 
     return (
         <main className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
-            <section className="md:col-span-2 mb-8 md:mb-0">
+            <section className="md:col-span-3 mb-8 md:mb-0">
                 <Card>
                     <CardContent className="pt-6">
                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -213,7 +213,6 @@ const AdminView: FC<{
                     </CardFooter>
                 </Card>
             </section>
-            <SummaryView activeGame={activeGame} />
         </main>
     );
 };
@@ -1026,15 +1025,15 @@ export default function ChipMaestroPage() {
                 </DropdownMenuItem>
                  <DropdownMenuItem asChild disabled={!isAdmin}>
                    <Link href="/merge">
-                      <Merge className="h-4 w-4" />
-                      <span className="ml-2">Merge Players</span>
+                      <Merge className="h-4 w-4 mr-2" />
+                      Merge Players
                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild disabled={!isAdmin}>
                    <Link href="/reports">
-                      <Database className="h-4 w-4" />
-                      <span className="ml-2">Bulk Reports</span>
+                      <Database className="h-4 w-4 mr-2" />
+                      Bulk Reports
                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isAdmin}>
@@ -1049,16 +1048,16 @@ export default function ChipMaestroPage() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setImportGameModalOpen(true)} disabled={!isAdmin}>
-                  <Upload className="h-4 w-4" />
-                  <span className="ml-2">Import Game</span>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Game
                 </DropdownMenuItem>
                  <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)} disabled={!isAdmin}>
                   <WhatsappIcon />
                   <span className="ml-2">Group Message</span>
                 </DropdownMenuItem>
                  <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)} disabled={!isAdmin}>
-                  <Settings className="h-4 w-4" />
-                  <span className="ml-2">WA Settings</span>
+                  <Settings className="h-4 w-4 mr-2" />
+                  WA Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
