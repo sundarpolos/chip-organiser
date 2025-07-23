@@ -126,16 +126,16 @@ export default function GameHistoryPage() {
             
             const isVenueSelected = selectedVenueNames.includes(game.venue);
             
-            const hasSelectedPlayer = game.players.some(p => selectedPlayerNames.includes(p.name));
+            const hasSelectedPlayer = (game.players || []).some(p => selectedPlayerNames.includes(p.name));
 
             return isDateInRange && isVenueSelected && hasSelectedPlayer;
         })
         .map(game => {
-            const gamePlayers = game.players
+            const gamePlayers = (game.players || [])
                 .filter(p => selectedPlayerNames.includes(p.name))
                 .map(p => {
-                    const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-                    const finalChips = p.finalChips;
+                    const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? (bi.amount || 0) : 0), 0);
+                    const finalChips = p.finalChips || 0;
                     return {
                         name: p.name,
                         buyIn: buyIn,
@@ -166,7 +166,7 @@ export default function GameHistoryPage() {
     const selectedPlayerNames = masterPlayers.filter(p => selectedPlayerIds.includes(p.id)).map(p => p.name);
 
     filteredGames.forEach(game => {
-        game.players.forEach(player => {
+        (game.players || []).forEach(player => {
             if (selectedPlayerNames.includes(player.name)) {
                 const masterPlayer = masterPlayers.find(mp => mp.name === player.name);
                 if (!masterPlayer) return;
@@ -181,9 +181,9 @@ export default function GameHistoryPage() {
                 };
 
                 stats.gamesPlayed += 1;
-                stats.totalBuyIn += player.buyIn;
-                stats.totalChipReturn += player.finalChips;
-                stats.totalProfitLoss += player.profitLoss;
+                stats.totalBuyIn += player.buyIn || 0;
+                stats.totalChipReturn += player.finalChips || 0;
+                stats.totalProfitLoss += player.profitLoss || 0;
 
                 playerStats.set(player.name, stats);
             }
@@ -196,7 +196,7 @@ export default function GameHistoryPage() {
         gamesPlayed: p.gamesPlayed,
         totalBuyIn: p.totalBuyIn,
         totalChipReturn: p.totalChipReturn,
-        profitLoss: p.profitLoss,
+        profitLoss: p.totalProfitLoss,
     })).sort((a,b) => b.profitLoss - a.profitLoss);
   }, [filteredGames, masterPlayers, selectedPlayerIds]);
 
@@ -369,6 +369,38 @@ const DateRangePicker: FC<{
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 flex" align="start">
+                <div className="flex flex-col gap-2 border-r p-2">
+                    <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfToday(), to: endOfToday() }); setIsOpen(false); }}
+                    >Today</Button>
+                    <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfYesterday(), to: endOfYesterday() }); setIsOpen(false); }}
+                    >Yesterday</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: subDays(new Date(), 6), to: new Date() }); setIsOpen(false); }}
+                    >Last 7 days</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: subDays(new Date(), 29), to: new Date() }); setIsOpen(false); }}
+                    >Last 30 days</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }); setIsOpen(false); }}
+                    >This Month</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }); setIsOpen(false); }}
+                    >Last Month</Button>
+                </div>
                 <div className="flex flex-col">
                     <Calendar
                         initialFocus
@@ -376,7 +408,7 @@ const DateRangePicker: FC<{
                         defaultMonth={date?.from}
                         selected={date}
                         onSelect={onDateChange}
-                        numberOfMonths={2}
+                        numberOfMonths={1}
                     />
                 </div>
             </PopoverContent>
@@ -461,7 +493,7 @@ const PlayerReportTable: FC<{
     const getPlayerGameDetails = (playerName: string) => {
         return filteredGames
             .map(game => {
-                const playerInGame = game.players.find((p: any) => p.name === playerName);
+                const playerInGame = (game.players || []).find((p: any) => p.name === playerName);
                 if (playerInGame) {
                     return {
                         date: game.date,
@@ -568,7 +600,7 @@ const VenueBarChart: FC<{ data: any[] }> = ({ data }) => {
     const chartData = useMemo(() => {
         const venueData = new Map<string, number>();
         data.forEach(game => {
-            venueData.set(game.venue, (venueData.get(game.venue) || 0) + game.totalBuyIn);
+            venueData.set(game.venue, (venueData.get(game.venue) || 0) + (game.totalBuyIn || 0));
         });
         return Array.from(venueData.entries()).map(([name, totalBuyIn]) => ({ name, totalBuyIn }));
     }, [data]);
@@ -664,8 +696,8 @@ const VenueStackedBarChart: FC<{ data: any[] }> = ({ data }) => {
         const venueData = new Map<string, { totalBuyIn: number; totalChipReturn: number }>();
         data.forEach(game => {
             const current = venueData.get(game.venue) || { totalBuyIn: 0, totalChipReturn: 0 };
-            current.totalBuyIn += game.totalBuyIn;
-            current.totalChipReturn += game.totalChipReturn;
+            current.totalBuyIn += game.totalBuyIn || 0;
+            current.totalChipReturn += game.totalChipReturn || 0;
             venueData.set(game.venue, current);
         });
         return Array.from(venueData.entries()).map(([name, values]) => ({ name, ...values }));
