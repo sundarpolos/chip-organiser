@@ -8,14 +8,14 @@ import { getMasterVenues } from '@/services/venue-service';
 import type { GameHistory, MasterPlayer, MasterVenue } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -33,6 +33,14 @@ type GameHistoryRow = {
   profitLoss: number;
 };
 
+type ChartVisibilityState = {
+    venueBar: boolean;
+    buyInLine: boolean;
+    venuePie: boolean;
+    profitScatter: boolean;
+    venueStackedBar: boolean;
+}
+
 const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"];
 
 export default function GameHistoryPage() {
@@ -49,6 +57,15 @@ export default function GameHistoryPage() {
   const [selectedVenueIds, setSelectedVenueIds] = useState<string[]>([]);
   const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 30));
   const [toDate, setToDate] = useState<Date | undefined>(new Date());
+  
+  // Chart visibility state
+  const [chartVisibility, setChartVisibility] = useState<ChartVisibilityState>({
+    venueBar: true,
+    buyInLine: true,
+    venuePie: true,
+    profitScatter: true,
+    venueStackedBar: true,
+  });
 
   // Load all data on component mount
   useEffect(() => {
@@ -123,6 +140,10 @@ export default function GameHistoryPage() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
+  
+  const handleChartVisibilityChange = (chartName: keyof ChartVisibilityState, isVisible: boolean) => {
+    setChartVisibility(prev => ({ ...prev, [chartName]: isVisible }));
+  };
 
   const handleExportPdf = () => {
     const doc = new jsPDF();
@@ -167,65 +188,89 @@ export default function GameHistoryPage() {
       
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters & Display Options</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
-            <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="from-date">From</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                id="from-date"
-                                variant="outline"
-                                className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {fromDate ? format(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={fromDate}
-                                onSelect={setFromDate}
-                                disabled={(date) => toDate ? date > toDate : false}
-                                initialFocus
-                                captionLayout="dropdown-buttons"
-                                fromYear={1990}
-                                toYear={2030}
-                            />
-                        </PopoverContent>
-                    </Popover>
+        <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-b pb-4 mb-4">
+                <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
+                <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="from-date">From</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="from-date"
+                                    variant="outline"
+                                    className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {fromDate ? format(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={fromDate}
+                                    onSelect={setFromDate}
+                                    disabled={(date) => toDate ? date > toDate : false}
+                                    initialFocus
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={1990}
+                                    toYear={2030}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="to-date">To</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    id="to-date"
+                                    variant="outline"
+                                    className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {toDate ? format(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={toDate}
+                                    onSelect={setToDate}
+                                    disabled={(date) => fromDate ? date < fromDate : false}
+                                    initialFocus
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={1990}
+                                    toYear={2030}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="to-date">To</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                id="to-date"
-                                variant="outline"
-                                className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {toDate ? format(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={toDate}
-                                onSelect={setToDate}
-                                disabled={(date) => fromDate ? date < fromDate : false}
-                                initialFocus
-                                captionLayout="dropdown-buttons"
-                                fromYear={1990}
-                                toYear={2030}
-                            />
-                        </PopoverContent>
-                    </Popover>
+            </div>
+             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-venueBar" checked={chartVisibility.venueBar} onCheckedChange={(c) => handleChartVisibilityChange('venueBar', !!c)} />
+                    <Label htmlFor="cb-venueBar" className="flex items-center gap-2"><BarChart2 className="h-4 w-4" /> Bar Chart</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-buyInLine" checked={chartVisibility.buyInLine} onCheckedChange={(c) => handleChartVisibilityChange('buyInLine', !!c)} />
+                    <Label htmlFor="cb-buyInLine" className="flex items-center gap-2"><AreaChart className="h-4 w-4" /> Line Chart</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-venuePie" checked={chartVisibility.venuePie} onCheckedChange={(c) => handleChartVisibilityChange('venuePie', !!c)} />
+                    <Label htmlFor="cb-venuePie" className="flex items-center gap-2"><PieChartIcon className="h-4 w-4" /> Pie Chart</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-profitScatter" checked={chartVisibility.profitScatter} onCheckedChange={(c) => handleChartVisibilityChange('profitScatter', !!c)} />
+                    <Label htmlFor="cb-profitScatter" className="flex items-center gap-2"><ScatterChartIcon className="h-4 w-4" /> Scatter Plot</Label>
+                </div>
+                 <div className="flex items-center space-x-2">
+                    <Checkbox id="cb-venueStackedBar" checked={chartVisibility.venueStackedBar} onCheckedChange={(c) => handleChartVisibilityChange('venueStackedBar', !!c)} />
+                    <Label htmlFor="cb-venueStackedBar" className="flex items-center gap-2"><GanttChart className="h-4 w-4" /> Stacked Bar</Label>
                 </div>
             </div>
         </CardContent>
@@ -251,11 +296,11 @@ export default function GameHistoryPage() {
               />
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <VenueBarChart data={filteredGames} />
-                <BuyInLineChart data={filteredGames} />
-                <VenuePieChart data={filteredGames} />
-                <ProfitScatterPlot data={filteredGames} />
-                <VenueStackedBarChart data={filteredGames} />
+                {chartVisibility.venueBar && <VenueBarChart data={filteredGames} />}
+                {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} />}
+                {chartVisibility.venuePie && <VenuePieChart data={filteredGames} />}
+                {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} />}
+                {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} />}
               </div>
 
           </CardContent>
