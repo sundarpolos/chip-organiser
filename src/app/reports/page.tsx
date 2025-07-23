@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
 
 
 type GameHistoryRow = {
@@ -29,7 +31,10 @@ type GameHistoryRow = {
   venue: string;
   totalBuyIn: number;
   totalChipReturn: number;
+  profitLoss: number;
 };
+
+const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"];
 
 export default function GameHistoryPage() {
   const { toast } = useToast();
@@ -113,9 +118,10 @@ export default function GameHistoryPage() {
             venue: game.venue,
             totalBuyIn,
             totalChipReturn,
+            profitLoss: totalChipReturn - totalBuyIn,
          }
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, fromDate, toDate]);
 
@@ -126,12 +132,13 @@ export default function GameHistoryPage() {
     doc.text(`Filters applied: ${filteredGames.length} games`, 14, 22);
 
     (doc as any).autoTable({
-      head: [['Date', 'Venue', 'Total Buy-in', 'Total Chip Return']],
+      head: [['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']],
       body: filteredGames.map(g => [
         g.date,
         g.venue,
         `Rs. ${g.totalBuyIn.toFixed(0)}`,
         `Rs. ${g.totalChipReturn.toFixed(0)}`,
+        `Rs. ${g.profitLoss.toFixed(0)}`,
       ]),
       startY: 30,
       headStyles: { fillColor: [22, 163, 74] },
@@ -166,7 +173,7 @@ export default function GameHistoryPage() {
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
             <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
-             <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label htmlFor="from-date">From</Label>
                     <Popover>
@@ -187,6 +194,9 @@ export default function GameHistoryPage() {
                                 onSelect={setFromDate}
                                 disabled={(date) => toDate ? date > toDate : false}
                                 initialFocus
+                                captionLayout="dropdown-buttons"
+                                fromYear={1990}
+                                toYear={2030}
                             />
                         </PopoverContent>
                     </Popover>
@@ -211,6 +221,9 @@ export default function GameHistoryPage() {
                                 onSelect={setToDate}
                                 disabled={(date) => fromDate ? date < fromDate : false}
                                 initialFocus
+                                captionLayout="dropdown-buttons"
+                                fromYear={1990}
+                                toYear={2030}
                             />
                         </PopoverContent>
                     </Popover>
@@ -222,20 +235,48 @@ export default function GameHistoryPage() {
       <Card>
           <CardHeader>
               <div className="flex items-center gap-2">
-                <CardTitle>Games List</CardTitle>
-                <Badge variant="secondary">{filteredGames.length}</Badge>
+                <CardTitle>Results</CardTitle>
+                <Badge variant="secondary">{filteredGames.length} games</Badge>
               </div>
           </CardHeader>
           <CardContent>
-              <DataTable
-              columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return']}
-              data={filteredGames.map(g => [
-                g.date,
-                g.venue,
-                g.totalBuyIn.toFixed(0),
-                g.totalChipReturn.toFixed(0),
-              ])}
-            />
+             <Tabs defaultValue="table">
+                <TabsList>
+                  <TabsTrigger value="table">Table</TabsTrigger>
+                  <TabsTrigger value="bar">Bar Chart</TabsTrigger>
+                  <TabsTrigger value="line">Line Chart</TabsTrigger>
+                  <TabsTrigger value="pie">Pie Chart</TabsTrigger>
+                  <TabsTrigger value="scatter">Scatter Plot</TabsTrigger>
+                  <TabsTrigger value="stacked">Stacked Bar</TabsTrigger>
+                </TabsList>
+                <TabsContent value="table" className="mt-4">
+                  <DataTable
+                    columns={['Date', 'Venue', 'Total Buy-in', 'Total Chip Return', 'P/L']}
+                    data={filteredGames.map(g => [
+                      g.date,
+                      g.venue,
+                      g.totalBuyIn.toFixed(0),
+                      g.totalChipReturn.toFixed(0),
+                      g.profitLoss.toFixed(0),
+                    ])}
+                  />
+                </TabsContent>
+                <TabsContent value="bar">
+                  <VenueBarChart data={filteredGames} />
+                </TabsContent>
+                <TabsContent value="line">
+                  <BuyInLineChart data={filteredGames} />
+                </TabsContent>
+                 <TabsContent value="pie">
+                  <VenuePieChart data={filteredGames} />
+                </TabsContent>
+                 <TabsContent value="scatter">
+                  <ProfitScatterPlot data={filteredGames} />
+                </TabsContent>
+                 <TabsContent value="stacked">
+                  <VenueStackedBarChart data={filteredGames} />
+                </TabsContent>
+              </Tabs>
           </CardContent>
       </Card>
 
@@ -336,3 +377,129 @@ const DataTable: FC<{
         </Table>
     )
 }
+
+const ChartContainer: FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="w-full h-96">
+    <h3 className="text-lg font-medium text-center mb-4">{title}</h3>
+    <ResponsiveContainer width="100%" height="100%">
+      {children}
+    </ResponsiveContainer>
+  </div>
+);
+
+const VenueBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+    const chartData = useMemo(() => {
+        const venueData = new Map<string, number>();
+        data.forEach(game => {
+            venueData.set(game.venue, (venueData.get(game.venue) || 0) + game.totalBuyIn);
+        });
+        return Array.from(venueData.entries()).map(([name, totalBuyIn]) => ({ name, totalBuyIn }));
+    }, [data]);
+
+    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Bar Chart.</p>
+
+    return (
+        <ChartContainer title="Total Buy-ins per Venue">
+            <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="totalBuyIn" fill="#8884d8" name="Total Buy-in" />
+            </BarChart>
+        </ChartContainer>
+    );
+};
+
+const BuyInLineChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+     if (data.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Line Chart.</p>
+
+    return (
+        <ChartContainer title="Total Buy-ins Over Time">
+            <LineChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="totalBuyIn" stroke="#82ca9d" name="Total Buy-in" />
+            </LineChart>
+        </ChartContainer>
+    );
+};
+
+const VenuePieChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+    const chartData = useMemo(() => {
+        const venueData = new Map<string, number>();
+        data.forEach(game => {
+            venueData.set(game.venue, (venueData.get(game.venue) || 0) + 1);
+        });
+        return Array.from(venueData.entries()).map(([name, value]) => ({ name, value }));
+    }, [data]);
+    
+    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Pie Chart.</p>
+
+    return (
+        <ChartContainer title="Games per Venue">
+            <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} label>
+                    {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+            </PieChart>
+        </ChartContainer>
+    );
+};
+
+const ProfitScatterPlot: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+    if (data.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Scatter Plot.</p>
+
+    return (
+        <ChartContainer title="Buy-in vs. Profit/Loss per Game">
+            <ScatterChart>
+                <CartesianGrid />
+                <XAxis type="number" dataKey="totalBuyIn" name="Total Buy-in" unit="Rs" />
+                <YAxis type="number" dataKey="profitLoss" name="Profit/Loss" unit="Rs" />
+                <ZAxis dataKey="venue" name="Venue" />
+                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                <Legend />
+                <Scatter name="Games" data={data} fill="#8884d8" />
+            </ScatterChart>
+        </ChartContainer>
+    );
+};
+
+
+const VenueStackedBarChart: FC<{ data: GameHistoryRow[] }> = ({ data }) => {
+    const chartData = useMemo(() => {
+        const venueData = new Map<string, { totalBuyIn: number; totalChipReturn: number }>();
+        data.forEach(game => {
+            const current = venueData.get(game.venue) || { totalBuyIn: 0, totalChipReturn: 0 };
+            current.totalBuyIn += game.totalBuyIn;
+            current.totalChipReturn += game.totalChipReturn;
+            venueData.set(game.venue, current);
+        });
+        return Array.from(venueData.entries()).map(([name, values]) => ({ name, ...values }));
+    }, [data]);
+
+    if (chartData.length === 0) return <p className="text-center text-muted-foreground py-10">No data for Stacked Bar Chart.</p>
+
+    return (
+        <ChartContainer title="Buy-ins vs. Returns per Venue">
+            <BarChart data={chartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="name" width={100} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="totalBuyIn" stackId="a" fill="#8884d8" name="Total Buy-in" />
+                <Bar dataKey="totalChipReturn" stackId="a" fill="#82ca9d" name="Total Chip Return" />
+            </BarChart>
+        </ChartContainer>
+    );
+};
+
