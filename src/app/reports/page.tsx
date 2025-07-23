@@ -203,32 +203,11 @@ export default function BulkReportsPage() {
         });
 
     });
-
-    const detailedLog = filteredGames
-      .flatMap(game =>
-        game.players
-          .filter(p => selectedPlayerNames.includes(p.name))
-          .map(p => {
-              const buyIn = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-              const pl = p.finalChips - buyIn;
-              return {
-                gameId: game.id,
-                gameDate: game.timestamp,
-                venue: game.venue,
-                playerName: p.name,
-                buyIn: buyIn,
-                chipReturn: p.finalChips || 0,
-                pl: pl,
-              }
-           })
-      )
-      .sort((a, b) => new Date(b.gameDate).getTime() - new Date(a.gameDate).getTime());
-
+    
     return {
       players: Object.values(playerStats).sort((a, b) => b.totalProfitLoss - a.totalProfitLoss),
       venues: Object.values(venueStats).sort((a, b) => b.gamesPlayed - a.gamesPlayed),
       daily: Object.values(dailyStats).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-      log: detailedLog,
       totalGames: filteredGames.length,
     };
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
@@ -265,20 +244,6 @@ export default function BulkReportsPage() {
       startY: (doc as any).autoTable.previous.finalY + 10,
       headStyles: { fillColor: [37, 99, 235] },
     });
-
-    // Detailed Log
-    (doc as any).autoTable({
-      head: [['Date', 'Venue', 'Player', 'Buy-in', 'Chip Return', 'P/L']],
-      body: filteredData.log.map(l => [
-        format(new Date(l.gameDate), 'dd/MM/yy'),
-        l.venue,
-        l.playerName,
-        (l.buyIn || 0).toFixed(0),
-        (l.chipReturn || 0).toFixed(0),
-        (l.pl || 0).toFixed(0),
-      ]),
-      startY: (doc as any).autoTable.previous.finalY + 10,
-    });
     
     doc.save(`chip-maestro-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
@@ -298,7 +263,7 @@ export default function BulkReportsPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <h1 className="text-3xl font-bold">Bulk Reports</h1>
         <div className="flex gap-2">
-            <Button onClick={handleExportPdf} disabled={filteredData.log.length === 0}><FileDown className="mr-2"/>Export PDF</Button>
+            <Button onClick={handleExportPdf} disabled={filteredData.totalGames === 0}><FileDown className="mr-2"/>Export PDF</Button>
         </div>
       </div>
       
@@ -331,7 +296,7 @@ export default function BulkReportsPage() {
                             format(dateRange.from, "LLL dd, y")
                         )
                         ) : (
-                        <span>Pick a date</span>
+                        <span>Pick a date range</span>
                         )}
                     </Button>
                     </PopoverTrigger>
@@ -424,35 +389,13 @@ export default function BulkReportsPage() {
               data={filteredData.daily.map(d => [
                 format(new Date(d.date), 'dd MMMM yyyy'),
                 d.gamesCount,
-                d.totalBuyIn.toFixed(0),
-                d.totalChipReturn.toFixed(0),
-                d.totalProfitLoss.toFixed(0),
+                (d.totalBuyIn ?? 0).toFixed(0),
+                (d.totalChipReturn ?? 0).toFixed(0),
+                (d.totalProfitLoss ?? 0).toFixed(0),
               ])}
             />
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Detailed Game Log ({filteredData.log.length} entries)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-96">
-                <DataTable
-                columns={['Date', 'Venue', 'Player', 'Buy-in', 'Chip Return', 'P/L']}
-                data={filteredData.log.map(l => [
-                    format(new Date(l.gameDate), 'dd/MM/yy'),
-                    l.venue,
-                    l.playerName,
-                    (l.buyIn ?? 0).toFixed(0),
-                    (l.chipReturn ?? 0).toFixed(0),
-                    (l.pl ?? 0).toFixed(0),
-                ])}
-                />
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
       </div>
     </div>
   );
@@ -530,16 +473,26 @@ const DataTable: FC<{
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {data.map((row, rowIndex) => (
-                    <TableRow key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                            <TableCell key={cellIndex} className={cn(typeof cell === 'number' || (typeof cell === 'string' && !isNaN(Number(cell))) ? 'font-medium' : '')}>
-                                {cell}
-                            </TableCell>
-                        ))}
+                {data.length > 0 ? (
+                    data.map((row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                                <TableCell key={cellIndex} className={cn(typeof cell === 'number' || (typeof cell === 'string' && !isNaN(Number(cell))) ? 'font-medium' : '')}>
+                                    {cell}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={columns.length} className="h-24 text-center">
+                            No results found.
+                        </TableCell>
                     </TableRow>
-                ))}
+                )}
             </TableBody>
         </Table>
     )
 }
+
+    
