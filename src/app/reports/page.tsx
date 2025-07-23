@@ -274,7 +274,7 @@ export default function BulkReportsPage() {
                                 className={cn("w-full justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
                             >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {fromDate ? format(fromDate, "LLL dd, y") : <span>Pick a date</span>}
+                                {fromDate ? format(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -298,7 +298,7 @@ export default function BulkReportsPage() {
                                 className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}
                             >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {toDate ? format(toDate, "LLL dd, y") : <span>Pick a date</span>}
+                                {toDate ? format(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -496,3 +496,5 @@ const DataTable: FC<{
         </Table>
     )
 }
+
+    
