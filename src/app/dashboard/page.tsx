@@ -1462,18 +1462,17 @@ const PlayerCard: FC<{
                 <Label className="text-lg mb-2">Buy-ins</Label>
                 <div className="space-y-2">
                     {(player.buyIns || []).map((buyIn) => (
-                      <div key={buyIn.id}>
-                        <BuyInRow 
-                            buyIn={buyIn}
-                            player={player}
-                            onUpdateBuyIn={handleUpdateBuyIn}
-                            onRemoveBuyIn={removeBuyIn}
-                            isOtpEnabled={isOtpEnabled}
-                            whatsappConfig={whatsappConfig}
-                            isAdmin={isAdmin}
-                            toast={toast}
-                        />
-                      </div>
+                      <BuyInRow 
+                          key={buyIn.id}
+                          buyIn={buyIn}
+                          player={player}
+                          onUpdateBuyIn={handleUpdateBuyIn}
+                          onRemoveBuyIn={removeBuyIn}
+                          isOtpEnabled={isOtpEnabled}
+                          whatsappConfig={whatsappConfig}
+                          isAdmin={isAdmin}
+                          toast={toast}
+                      />
                     ))}
                     <div className="flex gap-2">
                          {isCurrentUser && !isAdmin ? (
