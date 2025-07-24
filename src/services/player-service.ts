@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/firebase";
 import { MasterPlayer } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, addDoc, writeBatch } from "firebase/firestore";
+import { getGameHistory } from "./game-service";
 
 const MASTER_PLAYERS_COLLECTION = "masterPlayers";
 
@@ -15,10 +16,37 @@ export async function getMasterPlayers(): Promise<MasterPlayer[]> {
     return players;
 }
 
-export async function saveMasterPlayer(player: Omit<MasterPlayer, 'id'> | MasterPlayer): Promise<MasterPlayer> {
+export async function saveMasterPlayer(
+    player: Omit<MasterPlayer, 'id'> | MasterPlayer,
+    options: { updateGames: boolean, oldName?: string } = { updateGames: false }
+): Promise<MasterPlayer> {
+    
     if ('id' in player) {
         // This is an update
         const docRef = doc(db, MASTER_PLAYERS_COLLECTION, player.id);
+        
+        if (options.updateGames && options.oldName && options.oldName !== player.name) {
+            const batch = writeBatch(db);
+            const allGames = await getGameHistory();
+            
+            allGames.forEach(game => {
+                let gameWasModified = false;
+                const updatedPlayers = game.players.map(p => {
+                    if (p.name === options.oldName) {
+                        gameWasModified = true;
+                        return { ...p, name: player.name };
+                    }
+                    return p;
+                });
+                
+                if (gameWasModified) {
+                    const gameDocRef = doc(db, "gameHistory", game.id);
+                    batch.update(gameDocRef, { players: updatedPlayers });
+                }
+            });
+            await batch.commit();
+        }
+
         await setDoc(docRef, player, { merge: true });
         return player;
     } else {

@@ -920,7 +920,7 @@ export default function ChipMaestroPage() {
                 group: p.group || "",
                 isAdmin: false,
             };
-            return await saveMasterPlayer(newPlayer);
+            return await saveMasterPlayer(newPlayer, { updateGames: false });
         });
     
     try {
@@ -1134,6 +1134,8 @@ export default function ChipMaestroPage() {
         currentUser={currentUser}
         whatsappConfig={whatsappConfig}
         toast={toast}
+        gameHistory={gameHistory}
+        setGameHistory={setGameHistory}
       />
        <AddPlayerDialog
         isOpen={isAddPlayerModalOpen}
@@ -1635,7 +1637,9 @@ const ManagePlayersDialog: FC<{
   currentUser: MasterPlayer | null;
   whatsappConfig: WhatsappConfig;
   toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast }) => {
+  gameHistory: GameHistory[];
+  setGameHistory: React.Dispatch<React.SetStateAction<GameHistory[]>>;
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast, gameHistory, setGameHistory }) => {
     const [editablePlayers, setEditablePlayers] = useState<MasterPlayer[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -1644,12 +1648,15 @@ const ManagePlayersDialog: FC<{
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [isSorted, setIsSorted] = useState(false);
+    
+    // Store original players to compare for name changes
+    const originalPlayersRef = useRef<MasterPlayer[]>([]);
 
     useEffect(() => {
         if (isOpen) {
-            // Deep copy players for local editing state
             const sorted = masterPlayers.sort((a,b) => a.name.localeCompare(b.name));
             setEditablePlayers(JSON.parse(JSON.stringify(sorted)));
+            originalPlayersRef.current = JSON.parse(JSON.stringify(sorted));
             setIsSorted(false);
         }
     }, [isOpen, masterPlayers]);
@@ -1658,14 +1665,12 @@ const ManagePlayersDialog: FC<{
         const playersCopy = [...editablePlayers];
         if (isSorted) {
           playersCopy.sort((a, b) => {
-            const groupA = a.group || 'zzzz'; // Put players without a group at the end
+            const groupA = a.group || 'zzzz';
             const groupB = b.group || 'zzzz';
             if (groupA < groupB) return -1;
             if (groupA > groupB) return 1;
             return a.name.localeCompare(b.name);
           });
-        } else {
-          playersCopy.sort((a, b) => a.name.localeCompare(b.name));
         }
         return playersCopy;
       }, [editablePlayers, isSorted]);
@@ -1690,24 +1695,37 @@ const ManagePlayersDialog: FC<{
     const handleSaveAll = async () => {
         setIsSaving(true);
         try {
-            const savePromises = editablePlayers.map(player => {
-                 // Distinguish between new and existing players
-                 if (player.id.startsWith('new-')) {
-                     if (!player.name) return null; // Skip empty new rows
-                     const { id, ...newPlayer } = player;
-                     return saveMasterPlayer(newPlayer);
-                 }
-                 return saveMasterPlayer(player);
-            }).filter(Boolean);
+            const nameChangeTasks: Promise<any>[] = [];
 
-            const savedPlayers = await Promise.all(savePromises as Promise<MasterPlayer>[]);
+            const savePromises = editablePlayers.map(player => {
+                // Skip empty new rows
+                if (player.id.startsWith('new-') && !player.name) return null;
+
+                const originalPlayer = originalPlayersRef.current.find(p => p.id === player.id);
+                const nameHasChanged = originalPlayer && originalPlayer.name !== player.name;
+                 
+                // Distinguish between new and existing players
+                if (player.id.startsWith('new-')) {
+                     const { id, ...newPlayer } = player;
+                     return saveMasterPlayer(newPlayer, { updateGames: false });
+                } else {
+                     return saveMasterPlayer(player, { updateGames: nameHasChanged, oldName: originalPlayer?.name });
+                }
+            }).filter(Boolean);
             
-            // Update the master list in the main component
-            const finalMasterPlayers = await getMasterPlayers();
+            await Promise.all(savePromises);
+            
+            // Refresh local data after all saves are complete
+            const [finalMasterPlayers, finalGameHistory] = await Promise.all([
+                getMasterPlayers(),
+                getGameHistory()
+            ]);
             setMasterPlayers(finalMasterPlayers);
+            setGameHistory(finalGameHistory);
 
             toast({ title: "Players Saved", description: "All changes have been saved successfully." });
             onOpenChange(false);
+
         } catch (error) {
             console.error("Failed to save players", error);
             toast({ variant: "destructive", title: "Save Error", description: "Could not save all player details." });
@@ -1722,9 +1740,21 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        // Handle deleting a newly added (but not yet saved) player row
         if (player.id.startsWith('new-')) {
             setEditablePlayers(prev => prev.filter(p => p.id !== player.id));
+            return;
+        }
+
+        // Check if player has game history
+        const hasHistory = gameHistory.some(game => game.players.some(p => p.name === player.name));
+
+        if (hasHistory) {
+            toast({
+                variant: 'destructive',
+                title: 'Deletion Blocked',
+                description: `${player.name} has existing game records. Please use the 'Merge Players' feature to safely handle this player.`,
+                duration: 9000,
+            });
             return;
         }
 
@@ -2157,6 +2187,7 @@ const ReportsDialog: FC<{
 
             pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
             
+            if (!activeGame) throw new Error("Active game is null");
             const venueName = activeGame.venue.replace(/\s/g, '_');
             const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
             const playerCount = activeGame.players.length;
@@ -2206,7 +2237,7 @@ const ReportsDialog: FC<{
                         </DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="flex-1 -mx-6">
+                <ScrollArea className="flex-1 -mx-2 md:-mx-6">
                     <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
                         
                          {/* Player Summary & Accumulative Report */}
@@ -2224,7 +2255,7 @@ const ReportsDialog: FC<{
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
-                                            <TableRow key={p.id}>
+                                            <TableRow key={p.id} className="text-xs md:text-sm">
                                                 <TableCell className="font-medium text-center">{p.name}</TableCell>
                                                 <TableCell className="text-center">₹{p.totalBuyIns}</TableCell>
                                                 <TableCell className="text-center">₹{p.finalChips}</TableCell>
@@ -2233,7 +2264,7 @@ const ReportsDialog: FC<{
                                         ))}
                                     </TableBody>
                                     <TableFoot>
-                                        <TableRow className="font-bold border-t-2 border-foreground">
+                                        <TableRow className="font-bold border-t-2 border-foreground text-xs md:text-sm">
                                             <TableCell className="text-center">Accumulative Report</TableCell>
                                             <TableCell className="text-center">₹{grandTotalBuyin}</TableCell>
                                             <TableCell className="text-center">₹{grandTotalChips}</TableCell>
