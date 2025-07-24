@@ -2122,22 +2122,29 @@ const ReportsDialog: FC<{
         }
     };
 
-    if (!activeGame) return null;
-    
-    const { players } = activeGame;
+    const sortedStandings = useMemo(() => {
+      if (!calculatedPlayers) return [];
+      return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
+    }, [calculatedPlayers]);
 
-    const pieChartData = players
-        .filter(p => p.finalChips > 0)
-        .map(p => ({ name: p.name, value: p.finalChips }));
-
-    const sortedStandings = [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
     const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
+        if (!calculatedPlayers) return { grandTotalBuyin: 0, grandTotalChips: 0, grandTotalProfitLoss: 0 };
         return {
             grandTotalBuyin: calculatedPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0),
             grandTotalChips: calculatedPlayers.reduce((sum, p) => sum + p.finalChips, 0),
             grandTotalProfitLoss: calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0)
         };
     }, [calculatedPlayers]);
+
+    const pieChartData = useMemo(() => {
+      if (!activeGame) return [];
+      return (activeGame.players || [])
+        .filter(p => p.finalChips > 0)
+        .map(p => ({ name: p.name, value: p.finalChips }));
+    }, [activeGame]);
+
+
+    if (!activeGame) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
