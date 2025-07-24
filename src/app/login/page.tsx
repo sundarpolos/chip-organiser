@@ -127,7 +127,7 @@ export default function LoginPage() {
         src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
       />
       <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
-      <Card className="w-full max-w-sm mx-auto bg-background/[.35] backdrop-blur-sm">
+      <Card className="w-full max-w-sm mx-auto bg-background/[.25] backdrop-blur-sm">
         <CardHeader className="text-center">
             <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
                 <KeyRound className="h-8 w-8 text-primary-foreground" />
