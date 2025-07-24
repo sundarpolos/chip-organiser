@@ -2097,6 +2097,18 @@ const ReportsDialog: FC<{
         };
     }, [calculatedPlayers]);
     
+    const sortedStandings = useMemo(() => {
+        if (!calculatedPlayers) return [];
+        return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
+    }, [calculatedPlayers]);
+      
+    const pieChartData = useMemo(() => {
+        if (!activeGame) return [];
+        return (activeGame.players || [])
+          .filter(p => p.finalChips > 0)
+          .map(p => ({ name: p.name, value: p.finalChips }));
+    }, [activeGame]);
+
     useEffect(() => {
         if (!isOpen) {
             setIsBuyInLogExpanded(false);
@@ -2138,18 +2150,6 @@ const ReportsDialog: FC<{
             setIsExporting(false);
         }
     };
-
-    const sortedStandings = useMemo(() => {
-      if (!calculatedPlayers) return [];
-      return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
-    }, [calculatedPlayers]);
-
-    const pieChartData = useMemo(() => {
-      if (!activeGame) return [];
-      return (activeGame.players || [])
-        .filter(p => p.finalChips > 0)
-        .map(p => ({ name: p.name, value: p.finalChips }));
-    }, [activeGame]);
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
@@ -2195,28 +2195,28 @@ const ReportsDialog: FC<{
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-center md:text-left">Player</TableHead>
-                                            <TableHead className="text-center md:text-right">Buy-in</TableHead>
-                                            <TableHead className="text-center md:text-right">Chip Return</TableHead>
-                                            <TableHead className="text-center md:text-right">P/L</TableHead>
+                                            <TableHead className="text-center">Player</TableHead>
+                                            <TableHead className="text-center">Buy-in</TableHead>
+                                            <TableHead className="text-center">Chip Return</TableHead>
+                                            <TableHead className="text-center">P/L</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
                                             <TableRow key={p.id}>
-                                                <TableCell className="font-medium text-center md:text-left">{p.name}</TableCell>
-                                                <TableCell className="text-center md:text-right">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="text-center md:text-right">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`text-center md:text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                <TableCell className="font-medium text-center">{p.name}</TableCell>
+                                                <TableCell className="text-center">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="text-center">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`text-center font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFoot>
                                         <TableRow className="font-bold border-t-2 border-foreground">
-                                            <TableCell className="text-center md:text-left">Accumulative Report</TableCell>
-                                            <TableCell className="text-center md:text-right">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="text-center md:text-right">₹{grandTotalChips}</TableCell>
-                                            <TableCell className="text-center md:text-right">₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                            <TableCell className="text-center">Accumulative Report</TableCell>
+                                            <TableCell className="text-center">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="text-center">₹{grandTotalChips}</TableCell>
+                                            <TableCell className="text-center">₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
@@ -3019,4 +3019,5 @@ const BuyInRequestModalDialog: FC<{
     );
 };
 
+    
     
