@@ -2161,7 +2161,7 @@ const ReportsDialog: FC<{
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-4xl w-full md:w-[90vw] max-h-[90vh]">
+            <DialogContent className="max-w-md md:max-w-4xl w-full flex flex-col h-full md:h-auto max-h-[95vh] md:max-h-[90vh]">
                 <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="space-y-1">
                         <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
@@ -2187,8 +2187,8 @@ const ReportsDialog: FC<{
                         </DialogClose>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="max-h-[calc(85vh-80px)] pr-6">
-                    <div ref={reportContentRef} className="p-4 bg-background space-y-6">
+                <ScrollArea className="flex-1 -mx-6">
+                    <div ref={reportContentRef} className="px-6 py-4 bg-background space-y-6">
                         
                          {/* Player Summary & Accumulative Report */}
                         <Card>
