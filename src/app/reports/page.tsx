@@ -312,51 +312,52 @@ export default function GameHistoryPage() {
         </div>
         
         <div ref={reportContainerRef} className='space-y-6'>
-          {dateRange?.from && (
-              <p className="text-muted-foreground mt-1">
-                  {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-              </p>
-          )}
-          <Card>
-              <CardHeader>
-                  <div className="flex items-center gap-2">
-                      <CardTitle>Player Report</CardTitle>
-                      <Badge variant="secondary">{playerReportData.length} players</Badge>
-                  </div>
-              </CardHeader>
-              <CardContent>
-                  <PlayerReportTable
-                      playerReportData={playerReportData}
-                      filteredGames={filteredGames}
-                  />
-              </CardContent>
-          </Card>
+            {dateRange?.from && (
+                <p className="text-muted-foreground mt-1">
+                    {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
+                </p>
+            )}
+            
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <CardTitle>Player Report</CardTitle>
+                        <Badge variant="secondary">{playerReportData.length} players</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <PlayerReportTable
+                        playerReportData={playerReportData}
+                        filteredGames={filteredGames}
+                    />
+                </CardContent>
+            </Card>
 
-          <Card>
-              <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="grid grid-cols-1 gap-8">
-                      {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
-                      {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
-                      {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
-                      {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} dateRange={dateRange} />}
-                      {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} dateRange={dateRange} />}
-                  </div>
-              </CardContent>
-          </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><BarChart className="h-5 w-5"/> Charts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 gap-8">
+                        {chartVisibility.venueBar && <VenueBarChart data={filteredGames} dateRange={dateRange} />}
+                        {chartVisibility.buyInLine && <BuyInLineChart data={filteredGames} dateRange={dateRange} />}
+                        {chartVisibility.venuePie && <VenuePieChart data={filteredGames} dateRange={dateRange} />}
+                        {chartVisibility.profitScatter && <ProfitScatterPlot data={filteredGames} dateRange={dateRange} />}
+                        {chartVisibility.venueStackedBar && <VenueStackedBarChart data={filteredGames} dateRange={dateRange} />}
+                    </div>
+                </CardContent>
+            </Card>
           
-          {chartVisibility.playerProfitBar && (
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Total Player Profit/Loss</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                      <PlayerProfitBarChart data={playerReportData} dateRange={dateRange} />
-                  </CardContent>
-              </Card>
-          )}
+            {chartVisibility.playerProfitBar && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Total Player Profit/Loss</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <PlayerProfitBarChart data={playerReportData} dateRange={dateRange} />
+                    </CardContent>
+                </Card>
+            )}
         </div>
       </div>
 
@@ -398,8 +399,8 @@ const DateRangePicker: FC<{
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 flex" align="start">
-                <div className="flex flex-col gap-2 border-r p-2">
+            <PopoverContent className="w-auto p-0 flex flex-col sm:flex-row" align="start">
+                <div className="flex flex-col gap-2 border-b sm:border-r sm:border-b-0 p-2">
                     <Button
                         variant="ghost"
                         className="justify-start"
@@ -439,6 +440,16 @@ const DateRangePicker: FC<{
                         selected={date}
                         onSelect={onDateChange}
                         numberOfMonths={2}
+                        className="hidden sm:block"
+                    />
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={onDateChange}
+                        numberOfMonths={1}
+                        className="block sm:hidden"
                     />
                 </div>
             </PopoverContent>
@@ -603,7 +614,7 @@ const PlayerReportTable: FC<{
                                     {isExpanded && (
                                         <TableRow>
                                             <TableCell colSpan={6} className="p-0 bg-muted/50">
-                                                <div className="p-4">
+                                                <div className="p-4 overflow-x-auto">
                                                     <h4 className="font-semibold mb-2">Game Details for {player.name}</h4>
                                                     <Table>
                                                         <TableHeader>
@@ -659,7 +670,7 @@ const PlayerReportTable: FC<{
 }
 
 const ChartContainer: FC<{ title: string; children: React.ReactNode; dateRange: DateRange | undefined; }> = ({ title, children, dateRange }) => (
-  <div className="h-96">
+  <div className="h-96 w-full">
     <h3 className="text-center text-lg font-semibold">{title}</h3>
     {dateRange?.from && (
         <p className="text-center text-xs text-muted-foreground mb-2">
@@ -809,7 +820,7 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange |
     const maxVal = Math.max(maxAbsProfitLoss, ...customTicks);
 
     return (
-        <div className="h-96">
+        <div className="h-96 w-full">
             {dateRange?.from && (
                 <p className="text-center text-xs text-muted-foreground mb-2">
                     {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
