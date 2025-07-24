@@ -311,12 +311,14 @@ export default function GameHistoryPage() {
           </div>
         </div>
         
-        <div ref={reportContainerRef} className='space-y-6'>
-            {dateRange?.from && (
-                <p className="text-muted-foreground mt-1">
+        <div ref={reportContainerRef} className='space-y-6 bg-background p-0 md:p-4'>
+            <p className="text-muted-foreground mt-1 text-center md:text-left">
+                {dateRange?.from && (
+                    <>
                     {format(dateRange.from, "LLL dd, yyyy")} - {dateRange.to ? format(dateRange.to, "LLL dd, yyyy") : 'Present'}
-                </p>
-            )}
+                    </>
+                )}
+            </p>
             
             <Card>
                 <CardHeader>
@@ -843,3 +845,5 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange |
         </div>
     );
 };
+
+    

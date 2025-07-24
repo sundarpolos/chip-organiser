@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -2065,6 +2066,7 @@ const ReportsDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, onSettleUp }) => {
     const reportContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [isBuyInLogExpanded, setIsBuyInLogExpanded] = useState(false);
     const { toast } = useToast();
 
     const calculatedPlayers = useMemo(() => {
@@ -2086,6 +2088,12 @@ const ReportsDialog: FC<{
             .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     }, [activeGame]);
     
+    useEffect(() => {
+        if (!isOpen) {
+            setIsBuyInLogExpanded(false);
+        }
+    }, [isOpen]);
+
     const handleExportPdf = async () => {
         if (!activeGame || !reportContentRef.current) return;
         
@@ -2143,8 +2151,11 @@ const ReportsDialog: FC<{
         .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
 
+    const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
-    if (!activeGame) return null;
+    if (!activeGame) {
+        return null;
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -2260,26 +2271,31 @@ const ReportsDialog: FC<{
                         <Card>
                              <CardHeader><CardTitle>Buy-in Log</CardTitle></CardHeader>
                              <CardContent>
-                                 <ScrollArea className="h-48">
-                                     <Table>
-                                         <TableHeader>
-                                             <TableRow>
-                                                 <TableHead>Player</TableHead>
-                                                 <TableHead>Amount</TableHead>
-                                                 <TableHead className="text-right">Time</TableHead>
+                                 <Table>
+                                     <TableHeader>
+                                         <TableRow>
+                                             <TableHead>Player</TableHead>
+                                             <TableHead>Amount</TableHead>
+                                             <TableHead className="text-right">Time</TableHead>
+                                         </TableRow>
+                                     </TableHeader>
+                                     <TableBody>
+                                         {logsToShow.map((log) => (
+                                             <TableRow key={log.id}>
+                                                 <TableCell className="font-medium">{log.playerName}</TableCell>
+                                                 <TableCell>₹{log.amount}</TableCell>
+                                                 <TableCell className="text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
-                                         </TableHeader>
-                                         <TableBody>
-                                             {buyInLog.map((log) => (
-                                                 <TableRow key={log.id}>
-                                                     <TableCell className="font-medium">{log.playerName}</TableCell>
-                                                     <TableCell>₹{log.amount}</TableCell>
-                                                     <TableCell className="text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
-                                                 </TableRow>
-                                             ))}
-                                         </TableBody>
-                                     </Table>
-                                 </ScrollArea>
+                                         ))}
+                                     </TableBody>
+                                 </Table>
+                                 {buyInLog.length > 5 && (
+                                     <div className="text-center mt-4">
+                                         <Button variant="link" onClick={() => setIsBuyInLogExpanded(!isBuyInLogExpanded)}>
+                                             {isBuyInLogExpanded ? 'Show Less' : `Show All ${buyInLog.length} Entries`}
+                                         </Button>
+                                     </div>
+                                 )}
                              </CardContent>
                         </Card>
                     </div>
