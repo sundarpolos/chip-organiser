@@ -132,7 +132,7 @@ export default function LoginPage() {
             <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
                 <KeyRound className="h-8 w-8 text-primary-foreground" />
             </div>
-          <CardTitle>Chip Maestro Login</CardTitle>
+          <CardTitle>Smart Club Game Login</CardTitle>
           <CardDescription>
             {isOtpSent ? `Enter the OTP sent to ${selectedPlayer?.name}.` : 'Select your name to receive an OTP.'}
           </CardDescription>
