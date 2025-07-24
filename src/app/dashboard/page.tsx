@@ -2026,7 +2026,12 @@ const LoadGameDialog: FC<{
         if(currentUser?.isAdmin) {
             onLoadGame(game.id)
         } else {
-            onJoinGame(game.id)
+            const isPlayerInGame = game.players.some(p => p.name === currentUser?.name);
+            if (isPlayerInGame) {
+                onLoadGame(game.id); // Non-admin can view if they were in the game
+            } else {
+                onJoinGame(game.id); // Otherwise, they join if game is active
+            }
         }
     };
 
@@ -2057,8 +2062,8 @@ const LoadGameDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{currentUser?.isAdmin ? "Load Previous Game" : "Join Game"}</DialogTitle>
-                    <DialogDescription>{currentUser?.isAdmin ? "Select a past game to review or continue it." : "Select a game to join."}</DialogDescription>
+                    <DialogTitle>{currentUser?.isAdmin ? "Load Previous Game" : "Join or View Game"}</DialogTitle>
+                    <DialogDescription>{currentUser?.isAdmin ? "Select a past game to review or continue it." : "Select a game to join, or view a past game you played in."}</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="h-96 pr-4">
                     <div className="space-y-2">
@@ -2255,27 +2260,27 @@ const ReportsDialog: FC<{
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="text-center">Player</TableHead>
-                                            <TableHead className="text-center">Buy-in</TableHead>
-                                            <TableHead className="text-center">Chip Return</TableHead>
-                                            <TableHead className="text-center">P/L</TableHead>
+                                            <TableHead className="text-center md:text-right">Buy-in</TableHead>
+                                            <TableHead className="text-center md:text-right">Chip Return</TableHead>
+                                            <TableHead className="text-center md:text-right">P/L</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
                                             <TableRow key={p.id} className="text-xs md:text-sm">
                                                 <TableCell className="font-medium text-center">{p.name}</TableCell>
-                                                <TableCell className="text-center">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="text-center">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`text-center font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                <TableCell className="text-center md:text-right">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="text-center md:text-right">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`text-center md:text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFoot>
                                         <TableRow className="font-bold border-t-2 border-foreground text-xs md:text-sm">
                                             <TableCell className="text-center">Accumulative Report</TableCell>
-                                            <TableCell className="text-center">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="text-center">₹{grandTotalChips}</TableCell>
-                                            <TableCell className={`text-center ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                            <TableCell className="text-center md:text-right">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="text-center md:text-right">₹{grandTotalChips}</TableCell>
+                                            <TableCell className={`text-center md:text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
@@ -2336,16 +2341,16 @@ const ReportsDialog: FC<{
                                      <TableHeader>
                                          <TableRow>
                                              <TableHead className="text-center">Player</TableHead>
-                                             <TableHead className="text-center">Amount</TableHead>
-                                             <TableHead className="text-center">Time</TableHead>
+                                             <TableHead className="text-center md:text-right">Amount</TableHead>
+                                             <TableHead className="text-center md:text-right">Time</TableHead>
                                          </TableRow>
                                      </TableHeader>
                                      <TableBody>
                                          {logsToShow.map((log) => (
                                              <TableRow key={log.id}>
                                                  <TableCell className="font-medium text-center">{log.playerName}</TableCell>
-                                                 <TableCell className="text-center">₹{log.amount}</TableCell>
-                                                 <TableCell className="text-center">{format(new Date(log.timestamp), 'p')}</TableCell>
+                                                 <TableCell className="text-center md:text-right">₹{log.amount}</TableCell>
+                                                 <TableCell className="text-center md:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
                                          ))}
                                      </TableBody>
