@@ -2108,6 +2108,11 @@ const ReportsDialog: FC<{
           .filter(p => p.finalChips > 0)
           .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
+    
+    const allHooksCalled = useRef(true);
+    if (!activeGame) {
+        allHooksCalled.current = false;
+    }
 
     useEffect(() => {
         if (isOpen) {
@@ -2155,13 +2160,13 @@ const ReportsDialog: FC<{
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
-    if (!activeGame) {
+    if (!allHooksCalled.current) {
         return null;
     }
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-4xl w-full flex flex-col h-full md:h-auto max-h-[95vh] md:max-h-[90vh]">
+            <DialogContent className="max-w-md md:max-w-4xl w-full flex flex-col h-full max-h-[95vh]">
                 <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="space-y-1">
                         <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
@@ -2188,7 +2193,7 @@ const ReportsDialog: FC<{
                     </div>
                 </DialogHeader>
                 <ScrollArea className="flex-1 -mx-6">
-                    <div ref={reportContentRef} className="px-6 py-4 bg-background space-y-6">
+                    <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
                         
                          {/* Player Summary & Accumulative Report */}
                         <Card>
@@ -2279,7 +2284,7 @@ const ReportsDialog: FC<{
                                      <TableHeader>
                                          <TableRow>
                                              <TableHead className="text-center sm:text-left">Player</TableHead>
-                                             <TableHead className="text-center sm:text-left">Amount</TableHead>
+                                             <TableHead className="text-center">Amount</TableHead>
                                              <TableHead className="text-center sm:text-right">Time</TableHead>
                                          </TableRow>
                                      </TableHeader>
@@ -2287,7 +2292,7 @@ const ReportsDialog: FC<{
                                          {logsToShow.map((log) => (
                                              <TableRow key={log.id}>
                                                  <TableCell className="font-medium text-center sm:text-left">{log.playerName}</TableCell>
-                                                 <TableCell className="text-center sm:text-left">₹{log.amount}</TableCell>
+                                                 <TableCell className="text-center">₹{log.amount}</TableCell>
                                                  <TableCell className="text-center sm:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
                                          ))}
