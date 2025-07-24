@@ -86,6 +86,7 @@ import {
   Check,
   Info,
   Merge,
+  SortAsc,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -1643,6 +1644,24 @@ const ManagePlayersDialog: FC<{
     const [sentOtp, setSentOtp] = useState("");
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+    const [isSorted, setIsSorted] = useState(false);
+
+    const sortedPlayers = useMemo(() => {
+        const playersCopy = [...masterPlayers];
+        if (isSorted) {
+          playersCopy.sort((a, b) => {
+            const groupA = a.group || 'zzzz'; // Put players without a group at the end
+            const groupB = b.group || 'zzzz';
+            if (groupA < groupB) return -1;
+            if (groupA > groupB) return 1;
+            // If groups are the same, sort by name
+            return a.name.localeCompare(b.name);
+          });
+        } else {
+          playersCopy.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return playersCopy;
+      }, [masterPlayers, isSorted]);
 
     const handleSavePlayer = async (playerToSave: Omit<MasterPlayer, 'id'> | MasterPlayer) => {
         try {
@@ -1744,6 +1763,12 @@ const ManagePlayersDialog: FC<{
                     <DialogTitle>Manage Master Players</DialogTitle>
                     <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
                 </DialogHeader>
+                <div className="flex justify-end mb-4">
+                    <Button onClick={() => setIsSorted(!isSorted)} variant="outline">
+                        <SortAsc className="mr-2"/>
+                        {isSorted ? "Un-sort by Group" : "Sort by Group"}
+                    </Button>
+                </div>
                 <div className="py-4">
                     <ScrollArea className="h-96">
                         <Table>
@@ -1757,7 +1782,7 @@ const ManagePlayersDialog: FC<{
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {masterPlayers.map(p => (
+                                {sortedPlayers.map(p => (
                                     <TableRow key={p.id}>
                                         <TableCell className="font-medium">{p.name}</TableCell>
                                         <TableCell>{p.whatsappNumber}</TableCell>
@@ -2072,7 +2097,6 @@ const ReportsDialog: FC<{
     const [isExporting, setIsExporting] = useState(false);
     const [isBuyInLogExpanded, setIsBuyInLogExpanded] = useState(false);
     const { toast } = useToast();
-    const allHooksCalled = useRef(true);
 
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
@@ -2114,10 +2138,6 @@ const ReportsDialog: FC<{
           .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
     
-    if (!activeGame) {
-        allHooksCalled.current = false;
-    }
-
     useEffect(() => {
         if (isOpen) {
             // Default to not expanded unless there are 5 or fewer items
@@ -2164,7 +2184,7 @@ const ReportsDialog: FC<{
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
-    if (!allHooksCalled.current || !activeGame) {
+    if (!activeGame) {
         return null;
     }
     
@@ -2287,17 +2307,17 @@ const ReportsDialog: FC<{
                                  <Table>
                                      <TableHeader>
                                          <TableRow>
-                                             <TableHead className="text-center sm:text-left">Player</TableHead>
+                                             <TableHead className="text-center">Player</TableHead>
                                              <TableHead className="text-center">Amount</TableHead>
-                                             <TableHead className="text-center sm:text-right">Time</TableHead>
+                                             <TableHead className="text-center">Time</TableHead>
                                          </TableRow>
                                      </TableHeader>
                                      <TableBody>
                                          {logsToShow.map((log) => (
                                              <TableRow key={log.id}>
-                                                 <TableCell className="font-medium text-center sm:text-left">{log.playerName}</TableCell>
+                                                 <TableCell className="font-medium text-center">{log.playerName}</TableCell>
                                                  <TableCell className="text-center">₹{log.amount}</TableCell>
-                                                 <TableCell className="text-center sm:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
+                                                 <TableCell className="text-center">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
                                          ))}
                                      </TableBody>
