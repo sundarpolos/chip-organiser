@@ -2080,6 +2080,11 @@ const ReportsDialog: FC<{
             }
         });
     }, [activeGame]);
+
+    const sortedStandings = useMemo(() => {
+        if (!calculatedPlayers) return [];
+        return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
+    }, [calculatedPlayers]);
     
     const buyInLog = useMemo(() => {
         if (!activeGame) return [];
@@ -2096,11 +2101,6 @@ const ReportsDialog: FC<{
             grandTotalProfitLoss: calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0)
         };
     }, [calculatedPlayers]);
-    
-    const sortedStandings = useMemo(() => {
-        if (!calculatedPlayers) return [];
-        return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
-    }, [calculatedPlayers]);
       
     const pieChartData = useMemo(() => {
         if (!activeGame) return [];
@@ -2110,10 +2110,12 @@ const ReportsDialog: FC<{
     }, [activeGame]);
 
     useEffect(() => {
-        if (!isOpen) {
-            setIsBuyInLogExpanded(false);
+        if (isOpen) {
+            // Default to not expanded unless there are 5 or fewer items
+            setIsBuyInLogExpanded(buyInLog.length <= 5);
         }
-    }, [isOpen]);
+    }, [isOpen, buyInLog.length]);
+
 
     const handleExportPdf = async () => {
         if (!activeGame || !reportContentRef.current) return;
@@ -2156,10 +2158,10 @@ const ReportsDialog: FC<{
     if (!activeGame) {
         return null;
     }
-
+    
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-6xl w-full md:w-[90vw] max-h-[90vh]">
+            <DialogContent className="max-w-md md:max-w-4xl w-full md:w-[90vw] max-h-[90vh]">
                 <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
                     <div className="space-y-1">
                         <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
@@ -2195,28 +2197,28 @@ const ReportsDialog: FC<{
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-center">Player</TableHead>
-                                            <TableHead className="text-center">Buy-in</TableHead>
-                                            <TableHead className="text-center">Chip Return</TableHead>
-                                            <TableHead className="text-center">P/L</TableHead>
+                                            <TableHead className="text-xs sm:text-sm text-center">Player</TableHead>
+                                            <TableHead className="text-xs sm:text-sm text-center">Buy-in</TableHead>
+                                            <TableHead className="text-xs sm:text-sm text-center">Chip Return</TableHead>
+                                            <TableHead className="text-xs sm:text-sm text-center">P/L</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
                                             <TableRow key={p.id}>
-                                                <TableCell className="font-medium text-center">{p.name}</TableCell>
-                                                <TableCell className="text-center">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="text-center">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`text-center font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                <TableCell className="font-medium text-xs sm:text-sm text-center">{p.name}</TableCell>
+                                                <TableCell className="text-xs sm:text-sm text-center">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="text-xs sm:text-sm text-center">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`text-center font-bold text-xs sm:text-sm ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFoot>
                                         <TableRow className="font-bold border-t-2 border-foreground">
-                                            <TableCell className="text-center">Accumulative Report</TableCell>
-                                            <TableCell className="text-center">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="text-center">₹{grandTotalChips}</TableCell>
-                                            <TableCell className="text-center">₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm text-center">Accumulative Report</TableCell>
+                                            <TableCell className="text-xs sm:text-sm text-center">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="text-xs sm:text-sm text-center">₹{grandTotalChips}</TableCell>
+                                            <TableCell className={`text-center text-xs sm:text-sm ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
@@ -2224,17 +2226,17 @@ const ReportsDialog: FC<{
                         </Card>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Player Performance */}
-                            <Card>
-                                <CardHeader><CardTitle>Player Performance (P/L vs Buy-ins)</CardTitle></CardHeader>
+                             {/* Player Performance */}
+                             <Card>
+                                <CardHeader><CardTitle className="text-base sm:text-xl">Player Performance</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                     {sortedStandings.map(p => {
                                         const progressValue = p.totalBuyIns > 0 ? ((p.profitLoss + p.totalBuyIns) / p.totalBuyIns) * 100 : 0;
                                         return (
                                             <div key={p.id}>
                                                 <div className="flex justify-between items-baseline mb-1">
-                                                    <span className="font-medium">{p.name}</span>
-                                                    <span className={`font-semibold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                    <span className="font-medium text-xs sm:text-sm">{p.name}</span>
+                                                    <span className={`font-semibold text-xs sm:text-sm ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                         P/L: ₹{p.profitLoss.toFixed(0)}
                                                     </span>
                                                 </div>
@@ -2243,7 +2245,7 @@ const ReportsDialog: FC<{
                                                 <TooltipTrigger asChild>
                                                     <Progress 
                                                         value={progressValue}
-                                                        className={cn("h-4", p.profitLoss < 0 && "[&>div]:bg-destructive")}
+                                                        className={cn("h-3 sm:h-4", p.profitLoss < 0 && "[&>div]:bg-destructive")}
                                                     />
                                                 </TooltipTrigger>
                                                 <TooltipContent>
@@ -2260,9 +2262,11 @@ const ReportsDialog: FC<{
 
                              {/* Final Chip Distribution */}
                             <Card>
-                                <CardHeader><CardTitle>Final Chip Distribution</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base sm:text-xl">Final Chip Distribution</CardTitle></CardHeader>
                                 <CardContent>
-                                    <ChipDistributionChart data={pieChartData} />
+                                    <div className="h-[250px] sm:h-[300px]">
+                                        <ChipDistributionChart data={pieChartData} />
+                                    </div>
                                 </CardContent>
                             </Card>
                         </div>
@@ -2274,17 +2278,17 @@ const ReportsDialog: FC<{
                                  <Table>
                                      <TableHeader>
                                          <TableRow>
-                                             <TableHead className="text-center md:text-left">Player</TableHead>
-                                             <TableHead className="text-center md:text-left">Amount</TableHead>
-                                             <TableHead className="text-center md:text-right">Time</TableHead>
+                                             <TableHead className="text-center sm:text-left">Player</TableHead>
+                                             <TableHead className="text-center sm:text-left">Amount</TableHead>
+                                             <TableHead className="text-center sm:text-right">Time</TableHead>
                                          </TableRow>
                                      </TableHeader>
                                      <TableBody>
                                          {logsToShow.map((log) => (
                                              <TableRow key={log.id}>
-                                                 <TableCell className="font-medium text-center md:text-left">{log.playerName}</TableCell>
-                                                 <TableCell className="text-center md:text-left">₹{log.amount}</TableCell>
-                                                 <TableCell className="text-center md:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
+                                                 <TableCell className="font-medium text-center sm:text-left">{log.playerName}</TableCell>
+                                                 <TableCell className="text-center sm:text-left">₹{log.amount}</TableCell>
+                                                 <TableCell className="text-center sm:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
                                          ))}
                                      </TableBody>
