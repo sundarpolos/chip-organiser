@@ -941,7 +941,7 @@ export default function ChipMaestroPage() {
         return {
             id: p.id,
             name: p.name,
-            whatsappNumber: p.whatsappNumber,
+            whatsappNumber: p.whatsappNumber || "",
             group: p.group || '',
             buyIns: (p.buyIns || []).map(b => ({
                 id: b.id,
@@ -2067,22 +2067,29 @@ const LoadGameDialog: FC<{
                                 const isFinished = !!game.endTime;
                                 const isPlayerInGame = game.players.some(p => p.name === currentUser?.name);
                                 const canJoin = !isFinished && !isPlayerInGame && !currentUser?.isAdmin;
+                                const canView = isPlayerInGame && !currentUser?.isAdmin;
 
                                 return (
-                                <Card key={game.id} className={cn("cursor-pointer hover:border-primary", isFinished && "bg-muted/50")}>
+                                <Card key={game.id} className="hover:border-primary">
                                     <CardContent className="p-4 flex justify-between items-center">
-                                       <div onClick={() => (currentUser?.isAdmin || isPlayerInGame) && handleGameAction(game)}>
+                                       <div 
+                                        className={cn("flex-1", (currentUser?.isAdmin || isPlayerInGame) && "cursor-pointer")}
+                                        onClick={() => (currentUser?.isAdmin || isPlayerInGame) && handleGameAction(game)}
+                                       >
                                             <p className="font-bold">{game.venue}</p>
                                             <p className="text-sm text-muted-foreground">{format(new Date(game.timestamp), 'dd MMMM yyyy, p')}</p>
                                             <Badge variant={isFinished ? 'secondary' : 'destructive'} className="mt-2">{isFinished ? 'Finished' : 'In Progress'}</Badge>
                                        </div>
                                        <div className="flex gap-2 items-center">
-                                           {(currentUser?.isAdmin || isPlayerInGame) && (
-                                             <Button size="sm" onClick={() => handleGameAction(game)}>
-                                                {currentUser?.isAdmin ? 'Load' : 'View'}
-                                            </Button>
+                                           {currentUser?.isAdmin && (
+                                             <Button size="sm" onClick={() => handleGameAction(game)}>Load</Button>
                                            )}
-                                            {canJoin && <Button size="sm" onClick={() => handleGameAction(game)}>Join</Button>}
+                                            {canView && (
+                                               <Button size="sm" onClick={() => handleGameAction(game)}>View</Button>
+                                            )}
+                                            {canJoin && (
+                                                <Button size="sm" onClick={() => handleGameAction(game)}>Join</Button>
+                                            )}
                                             {currentUser?.isAdmin && (
                                                 <Button size="icon" variant="ghost" onClick={() => handleDeleteRequest(game)}>
                                                     <Trash2 className="h-4 w-4" />
@@ -3075,3 +3082,4 @@ const BuyInRequestModalDialog: FC<{
 
     
 
+    
