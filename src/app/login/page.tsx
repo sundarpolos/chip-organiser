@@ -134,7 +134,7 @@ export default function LoginPage() {
             </div>
           <CardTitle>Smart Club Game Login</CardTitle>
           <CardDescription>
-            {isOtpSent ? `Enter the OTP sent to ${selectedPlayer?.name}.` : 'Select your name to receive an OTP.'}
+            {isOtpSent ? `Enter the OTP sent to ${selectedPlayer?.name}.` : 'Select your name to receive WhatsApp OTP.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
