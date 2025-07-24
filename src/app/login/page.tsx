@@ -117,8 +117,17 @@ export default function LoginPage() {
   const selectedPlayer = masterPlayers.find(p => p.id === selectedPlayerId);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-100 dark:bg-slate-900 p-4">
-      <Card className="w-full max-w-sm mx-auto">
+    <div className="relative flex min-h-screen items-center justify-center p-4">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute top-0 left-0 w-full h-full object-cover -z-20"
+        src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
+      />
+      <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
+      <Card className="w-full max-w-sm mx-auto bg-background/80 backdrop-blur-sm">
         <CardHeader className="text-center">
             <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
                 <KeyRound className="h-8 w-8 text-primary-foreground" />
