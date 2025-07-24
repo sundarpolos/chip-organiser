@@ -140,7 +140,7 @@ export default function LoginPage() {
         <CardContent className="space-y-4">
           {!isOtpSent ? (
             <div className="space-y-2">
-              <Label htmlFor="player-select">Player Name</Label>
+              <Label htmlFor="player-select" className="text-center w-full block">Player Name</Label>
                <Select onValueChange={setSelectedPlayerId} value={selectedPlayerId} disabled={isLoadingPlayers}>
                 <SelectTrigger id="player-select">
                   <SelectValue placeholder={isLoadingPlayers ? "Loading players..." : "Select your name"} />
