@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -425,7 +424,6 @@ export default function ChipMaestroPage() {
 
   
   // Specific Modal Content State
-  const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null)
   const [anomalyPlayer, setAnomalyPlayer] = useState<Player | null>(null);
   const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
   const [isAnomalyLoading, setAnomalyLoading] = useState(false);
@@ -1638,7 +1636,8 @@ const ManagePlayersDialog: FC<{
   whatsappConfig: WhatsappConfig;
   toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast }) => {
-    const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
+    const [editablePlayers, setEditablePlayers] = useState<MasterPlayer[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
@@ -1646,44 +1645,86 @@ const ManagePlayersDialog: FC<{
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [isSorted, setIsSorted] = useState(false);
 
+    useEffect(() => {
+        if (isOpen) {
+            // Deep copy players for local editing state
+            const sorted = masterPlayers.sort((a,b) => a.name.localeCompare(b.name));
+            setEditablePlayers(JSON.parse(JSON.stringify(sorted)));
+            setIsSorted(false);
+        }
+    }, [isOpen, masterPlayers]);
+
     const sortedPlayers = useMemo(() => {
-        const playersCopy = [...masterPlayers];
+        const playersCopy = [...editablePlayers];
         if (isSorted) {
           playersCopy.sort((a, b) => {
             const groupA = a.group || 'zzzz'; // Put players without a group at the end
             const groupB = b.group || 'zzzz';
             if (groupA < groupB) return -1;
             if (groupA > groupB) return 1;
-            // If groups are the same, sort by name
             return a.name.localeCompare(b.name);
           });
         } else {
           playersCopy.sort((a, b) => a.name.localeCompare(b.name));
         }
         return playersCopy;
-      }, [masterPlayers, isSorted]);
+      }, [editablePlayers, isSorted]);
 
-    const handleSavePlayer = async (playerToSave: Omit<MasterPlayer, 'id'> | MasterPlayer) => {
+    const handleFieldChange = (playerId: string, field: keyof Omit<MasterPlayer, 'id'>, value: string | boolean) => {
+        setEditablePlayers(prev => 
+            prev.map(p => p.id === playerId ? { ...p, [field]: value } : p)
+        );
+    };
+
+    const addNewPlayerRow = () => {
+        const newPlayer: MasterPlayer = {
+            id: `new-${Date.now()}`,
+            name: '',
+            whatsappNumber: '',
+            group: '',
+            isAdmin: false,
+        };
+        setEditablePlayers(prev => [newPlayer, ...prev]);
+    };
+
+    const handleSaveAll = async () => {
+        setIsSaving(true);
         try {
-            const savedPlayer = await saveMasterPlayer(playerToSave);
-            setMasterPlayers(prev => {
-                if ('id' in playerToSave && playerToSave.id) {
-                    return prev.map(p => p.id === savedPlayer.id ? savedPlayer : p);
-                } else {
-                    return [...prev, savedPlayer];
-                }
-            });
-            setEditingPlayer(null);
-            toast({ title: "Player Saved", description: `${savedPlayer.name} has been updated.` });
+            const savePromises = editablePlayers.map(player => {
+                 // Distinguish between new and existing players
+                 if (player.id.startsWith('new-')) {
+                     if (!player.name) return null; // Skip empty new rows
+                     const { id, ...newPlayer } = player;
+                     return saveMasterPlayer(newPlayer);
+                 }
+                 return saveMasterPlayer(player);
+            }).filter(Boolean);
+
+            const savedPlayers = await Promise.all(savePromises as Promise<MasterPlayer>[]);
+            
+            // Update the master list in the main component
+            const finalMasterPlayers = await getMasterPlayers();
+            setMasterPlayers(finalMasterPlayers);
+
+            toast({ title: "Players Saved", description: "All changes have been saved successfully." });
+            onOpenChange(false);
         } catch (error) {
-            console.error("Failed to save player", error);
-            toast({ variant: "destructive", title: "Save Error", description: "Could not save player details." });
+            console.error("Failed to save players", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save all player details." });
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleDeleteRequest = async (player: MasterPlayer) => {
         if (player.id === currentUser?.id) {
             toast({ variant: "destructive", title: "Action Not Allowed", description: "You cannot delete yourself." });
+            return;
+        }
+
+        // Handle deleting a newly added (but not yet saved) player row
+        if (player.id.startsWith('new-')) {
+            setEditablePlayers(prev => prev.filter(p => p.id !== player.id));
             return;
         }
 
@@ -1702,7 +1743,7 @@ const ManagePlayersDialog: FC<{
             }
         } catch (e: any) {
             toast({ variant: "destructive", title: "OTP Error", description: e.message });
-            setPlayerToDelete(null); // Abort deletion
+            setPlayerToDelete(null);
         } finally {
             setIsSendingOtp(false);
         }
@@ -1717,6 +1758,8 @@ const ManagePlayersDialog: FC<{
         try {
             await deleteMasterPlayer(playerToDelete.id);
             setMasterPlayers(prev => prev.filter(p => p.id !== playerToDelete.id));
+            setEditablePlayers(prev => prev.filter(p => p.id !== playerToDelete.id));
+
             toast({ title: "Player Deleted", description: `${playerToDelete.name} has been removed.` });
             setPlayerToDelete(null);
             setOtp("");
@@ -1752,18 +1795,17 @@ const ManagePlayersDialog: FC<{
       )
     }
 
-    if (editingPlayer) {
-        return <EditPlayerDialog isOpen={!!editingPlayer} onOpenChange={() => setEditingPlayer(null)} player={editingPlayer} onSave={handleSavePlayer} />
-    }
-
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Manage Master Players</DialogTitle>
-                    <DialogDescription>Add, edit, or remove players from your master list.</DialogDescription>
+                    <DialogDescription>Add, edit, or remove players from your master list. All changes can be saved at once.</DialogDescription>
                 </DialogHeader>
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-between items-center mb-4">
+                    <Button onClick={addNewPlayerRow} variant="outline">
+                        <UserPlus className="mr-2 h-4 w-4" /> Add New Player
+                    </Button>
                     <Button onClick={() => setIsSorted(!isSorted)} variant="outline">
                         <SortAsc className="mr-2"/>
                         {isSorted ? "Un-sort by Group" : "Sort by Group"}
@@ -1774,27 +1816,32 @@ const ManagePlayersDialog: FC<{
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>WhatsApp Number</TableHead>
-                                    <TableHead>Group</TableHead>
-                                    <TableHead>Admin</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
+                                    <TableHead className="w-1/4">Name</TableHead>
+                                    <TableHead className="w-1/4">WhatsApp Number</TableHead>
+                                    <TableHead className="w-1/4">Group</TableHead>
+                                    <TableHead className="w-[100px]">Admin</TableHead>
+                                    <TableHead className="w-[50px] text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {sortedPlayers.map(p => (
                                     <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.name}</TableCell>
-                                        <TableCell>{p.whatsappNumber}</TableCell>
-                                        <TableCell>{p.group || 'N/A'}</TableCell>
-                                        <TableCell>{p.isAdmin ? <Check className="h-5 w-5 text-green-600" /> : <X className="h-5 w-5 text-destructive" />}</TableCell>
+                                        <TableCell>
+                                            <Input value={p.name} onChange={e => handleFieldChange(p.id, 'name', e.target.value)} className="h-8" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Input value={p.whatsappNumber} onChange={e => handleFieldChange(p.id, 'whatsappNumber', e.target.value)} className="h-8"/>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Input value={p.group} onChange={e => handleFieldChange(p.id, 'group', e.target.value)} className="h-8"/>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
+                                        </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex gap-2 justify-end">
-                                                <Button size="sm" variant="outline" onClick={() => setEditingPlayer(p)}><Pencil className="h-4 w-4" /></Button>
-                                                <Button size="sm" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp}>
-                                                  {isSendingOtp ? <Loader2 className="animate-spin"/> : <Trash2 className="h-4 w-4" />}
-                                                </Button>
-                                            </div>
+                                            <Button size="icon" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp} className="h-8 w-8">
+                                                {isSendingOtp && playerToDelete?.id === p.id ? <Loader2 className="animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -1803,67 +1850,11 @@ const ManagePlayersDialog: FC<{
                     </ScrollArea>
                 </div>
                 <DialogFooter>
-                    <Button onClick={() => setEditingPlayer({ id: '', name: '', whatsappNumber: '', group: '', isAdmin: false })}>
-                        <UserPlus className="mr-2 h-4 w-4" /> Add New Player
-                    </Button>
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
-const EditPlayerDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  player: MasterPlayer;
-  onSave: (player: MasterPlayer | Omit<MasterPlayer, 'id'>) => void;
-}> = ({ isOpen, onOpenChange, player, onSave }) => {
-    const [editedPlayer, setEditedPlayer] = useState(player);
-
-    useEffect(() => {
-        setEditedPlayer(player);
-    }, [player]);
-
-    const handleFieldChange = (field: keyof Omit<MasterPlayer, 'id' | 'isAdmin'>, value: string) => {
-        setEditedPlayer(prev => ({...prev, [field]: value}));
-    };
-    
-    const handleAdminChange = (isAdmin: boolean) => {
-        setEditedPlayer(prev => ({...prev, isAdmin}));
-    };
-
-    const handleSave = () => {
-        onSave(editedPlayer);
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{player.id ? 'Edit Player' : 'Add New Player'}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">Player Name</Label>
-                        <Input id="name" value={editedPlayer.name} onChange={e => handleFieldChange('name', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="whatsapp">WhatsApp Number</Label>
-                        <Input id="whatsapp" value={editedPlayer.whatsappNumber} onChange={e => handleFieldChange('whatsappNumber', e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="group">Group</Label>
-                        <Input id="group" value={editedPlayer.group} onChange={e => handleFieldChange('group', e.target.value)} />
-                    </div>
-                     <div className="flex items-center space-x-2">
-                        <Switch id="isAdmin" checked={editedPlayer.isAdmin} onCheckedChange={handleAdminChange} />
-                        <Label htmlFor="isAdmin">Is Admin?</Label>
-                    </div>
-                </div>
-                <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSave}>Save Player</Button>
+                    <Button onClick={handleSaveAll} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Save All Changes
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -2140,7 +2131,6 @@ const ReportsDialog: FC<{
     
     useEffect(() => {
         if (isOpen) {
-            // Default to not expanded unless there are 5 or fewer items
             setIsBuyInLogExpanded(buyInLog.length <= 5);
         }
     }, [isOpen, buyInLog.length]);
@@ -3052,5 +3042,4 @@ const BuyInRequestModalDialog: FC<{
     );
 };
 
-    
     
