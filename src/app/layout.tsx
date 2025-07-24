@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Chip Maestro',
+  title: 'Smart Club Organiser',
   description: 'Interactive Chip Organiser for your poker games.',
 };
 

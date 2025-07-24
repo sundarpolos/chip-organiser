@@ -986,7 +986,7 @@ export default function ChipMaestroPage() {
                 isAdmin={isAdmin}
               />
             ) : (
-              <h1 className="text-2xl font-bold truncate">Chip Maestro</h1>
+              <h1 className="text-2xl font-bold truncate">Smart Club Organiser</h1>
             )}
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && activeGame.players.length > 0 && (

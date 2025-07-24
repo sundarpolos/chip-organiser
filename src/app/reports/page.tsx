@@ -232,7 +232,7 @@ export default function GameHistoryPage() {
 
         pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
         
-        const filename = `chip-maestro-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        const filename = `smart-club-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
         
         pdf.save(filename);
         toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });

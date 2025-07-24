@@ -77,7 +77,7 @@ const sendLoginOtpFlow = ai.defineFlow(
 
 
       const otp = generateOtp();
-      const message = `Your Chip Maestro login code is ${otp}. This code will expire in 10 minutes.`;
+      const message = `Your Smart Club Organiser login code is ${otp}. This code will expire in 10 minutes.`;
 
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
