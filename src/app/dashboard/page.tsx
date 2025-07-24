@@ -793,14 +793,9 @@ export default function ChipMaestroPage() {
   const handleLoadGame = async (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad && currentUser) {
-      if (isAdmin) {
         await loadGameIntoState(gameToLoad);
         setLoadGameModalOpen(false);
         toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
-      } else {
-        await loadGameIntoState(gameToLoad);
-        setLoadGameModalOpen(false);
-      }
     }
   };
 
@@ -2023,15 +2018,11 @@ const LoadGameDialog: FC<{
 
     const handleGameAction = (game: GameHistory) => {
         onOpenChange(false);
-        if(currentUser?.isAdmin) {
-            onLoadGame(game.id)
+        const isFinished = !!game.endTime;
+        if (isFinished) {
+            onLoadGame(game.id);
         } else {
-            const isPlayerInGame = game.players.some(p => p.name === currentUser?.name);
-            if (isPlayerInGame) {
-                onLoadGame(game.id); // Non-admin can view if they were in the game
-            } else {
-                onJoinGame(game.id); // Otherwise, they join if game is active
-            }
+            onJoinGame(game.id);
         }
     };
 
@@ -2062,39 +2053,26 @@ const LoadGameDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{currentUser?.isAdmin ? "Load Previous Game" : "Join or View Game"}</DialogTitle>
-                    <DialogDescription>{currentUser?.isAdmin ? "Select a past game to review or continue it." : "Select a game to join, or view a past game you played in."}</DialogDescription>
+                    <DialogTitle>Join or View Game</DialogTitle>
+                    <DialogDescription>Select a past game to review, or an active game to join.</DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="h-96 pr-4">
                     <div className="space-y-2">
                         {gameHistory.length > 0 ? (
                             gameHistory.map(game => {
                                 const isFinished = !!game.endTime;
-                                const isPlayerInGame = game.players.some(p => p.name === currentUser?.name);
-                                const canJoin = !isFinished && !isPlayerInGame && !currentUser?.isAdmin;
-                                const canView = isPlayerInGame && !currentUser?.isAdmin;
+                                const buttonText = isFinished ? (currentUser?.isAdmin ? "Load" : "View") : "Join";
 
                                 return (
                                 <Card key={game.id} className="hover:border-primary">
                                     <CardContent className="p-4 flex justify-between items-center">
-                                       <div 
-                                        className={cn("flex-1", (currentUser?.isAdmin || isPlayerInGame) && "cursor-pointer")}
-                                        onClick={() => (currentUser?.isAdmin || isPlayerInGame) && handleGameAction(game)}
-                                       >
+                                       <div className="flex-1 cursor-pointer" onClick={() => handleGameAction(game)}>
                                             <p className="font-bold">{game.venue}</p>
                                             <p className="text-sm text-muted-foreground">{format(new Date(game.timestamp), 'dd MMMM yyyy, p')}</p>
                                             <Badge variant={isFinished ? 'secondary' : 'destructive'} className="mt-2">{isFinished ? 'Finished' : 'In Progress'}</Badge>
                                        </div>
                                        <div className="flex gap-2 items-center">
-                                           {currentUser?.isAdmin && (
-                                             <Button size="sm" onClick={() => handleGameAction(game)}>Load</Button>
-                                           )}
-                                            {canView && (
-                                               <Button size="sm" onClick={() => handleGameAction(game)}>View</Button>
-                                            )}
-                                            {canJoin && (
-                                                <Button size="sm" onClick={() => handleGameAction(game)}>Join</Button>
-                                            )}
+                                            <Button size="sm" onClick={() => handleGameAction(game)}>{buttonText}</Button>
                                             {currentUser?.isAdmin && (
                                                 <Button size="icon" variant="ghost" onClick={() => handleDeleteRequest(game)}>
                                                     <Trash2 className="h-4 w-4" />
