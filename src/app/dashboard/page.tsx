@@ -1648,7 +1648,7 @@ const ManagePlayersDialog: FC<{
         try {
             const savedPlayer = await saveMasterPlayer(playerToSave);
             setMasterPlayers(prev => {
-                if ('id' in playerToSave) {
+                if ('id' in playerToSave && playerToSave.id) {
                     return prev.map(p => p.id === savedPlayer.id ? savedPlayer : p);
                 } else {
                     return [...prev, savedPlayer];
@@ -1800,8 +1800,12 @@ const EditPlayerDialog: FC<{
         setEditedPlayer(player);
     }, [player]);
 
-    const handleFieldChange = (field: keyof Omit<MasterPlayer, 'id'>, value: string | boolean) => {
+    const handleFieldChange = (field: keyof Omit<MasterPlayer, 'id' | 'isAdmin'>, value: string) => {
         setEditedPlayer(prev => ({...prev, [field]: value}));
+    };
+    
+    const handleAdminChange = (isAdmin: boolean) => {
+        setEditedPlayer(prev => ({...prev, isAdmin}));
     };
 
     const handleSave = () => {
@@ -1828,7 +1832,7 @@ const EditPlayerDialog: FC<{
                         <Input id="group" value={editedPlayer.group} onChange={e => handleFieldChange('group', e.target.value)} />
                     </div>
                      <div className="flex items-center space-x-2">
-                        <Switch id="isAdmin" checked={editedPlayer.isAdmin} onCheckedChange={checked => handleFieldChange('isAdmin', checked)} />
+                        <Switch id="isAdmin" checked={editedPlayer.isAdmin} onCheckedChange={handleAdminChange} />
                         <Label htmlFor="isAdmin">Is Admin?</Label>
                     </div>
                 </div>
@@ -2068,6 +2072,7 @@ const ReportsDialog: FC<{
     const [isExporting, setIsExporting] = useState(false);
     const [isBuyInLogExpanded, setIsBuyInLogExpanded] = useState(false);
     const { toast } = useToast();
+    const allHooksCalled = useRef(true);
 
     const calculatedPlayers = useMemo(() => {
         if (!activeGame || !activeGame.players) return [];
@@ -2109,7 +2114,6 @@ const ReportsDialog: FC<{
           .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
     
-    const allHooksCalled = useRef(true);
     if (!activeGame) {
         allHooksCalled.current = false;
     }
@@ -2123,7 +2127,7 @@ const ReportsDialog: FC<{
 
 
     const handleExportPdf = async () => {
-        if (!activeGame || !reportContentRef.current) return;
+        if (!reportContentRef.current) return;
         
         setIsExporting(true);
         try {
@@ -2160,7 +2164,7 @@ const ReportsDialog: FC<{
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
-    if (!allHooksCalled.current) {
+    if (!allHooksCalled.current || !activeGame) {
         return null;
     }
     
@@ -2202,28 +2206,28 @@ const ReportsDialog: FC<{
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-xs sm:text-sm text-center">Player</TableHead>
-                                            <TableHead className="text-xs sm:text-sm text-center">Buy-in</TableHead>
-                                            <TableHead className="text-xs sm:text-sm text-center">Chip Return</TableHead>
-                                            <TableHead className="text-xs sm:text-sm text-center">P/L</TableHead>
+                                            <TableHead className="text-center">Player</TableHead>
+                                            <TableHead className="text-center">Buy-in</TableHead>
+                                            <TableHead className="text-center">Chip Return</TableHead>
+                                            <TableHead className="text-center">P/L</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
                                             <TableRow key={p.id}>
-                                                <TableCell className="font-medium text-xs sm:text-sm text-center">{p.name}</TableCell>
-                                                <TableCell className="text-xs sm:text-sm text-center">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="text-xs sm:text-sm text-center">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`text-center font-bold text-xs sm:text-sm ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                <TableCell className="font-medium text-center">{p.name}</TableCell>
+                                                <TableCell className="text-center">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="text-center">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`text-center font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFoot>
                                         <TableRow className="font-bold border-t-2 border-foreground">
-                                            <TableCell className="text-xs sm:text-sm text-center">Accumulative Report</TableCell>
-                                            <TableCell className="text-xs sm:text-sm text-center">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="text-xs sm:text-sm text-center">₹{grandTotalChips}</TableCell>
-                                            <TableCell className={`text-center text-xs sm:text-sm ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                            <TableCell className="text-center">Accumulative Report</TableCell>
+                                            <TableCell className="text-center">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="text-center">₹{grandTotalChips}</TableCell>
+                                            <TableCell className={`text-center ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
