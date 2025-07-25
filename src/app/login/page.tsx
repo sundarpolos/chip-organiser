@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -30,8 +31,9 @@ export default function LoginPage() {
     async function loadPlayers() {
       try {
         const players = await getMasterPlayers();
-        const playersWithWhatsapp = players.filter(p => p.whatsappNumber);
-        const sortedPlayers = playersWithWhatsapp.sort((a, b) => a.name.localeCompare(b.name));
+        // Filter for players who are active and have a WhatsApp number
+        const activePlayersWithWhatsapp = players.filter(p => (p.isActive ?? true) && p.whatsappNumber);
+        const sortedPlayers = activePlayersWithWhatsapp.sort((a, b) => a.name.localeCompare(b.name));
         setMasterPlayers(sortedPlayers);
       } catch (error) {
         console.error("Failed to load players", error);

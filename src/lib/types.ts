@@ -1,4 +1,5 @@
 
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -26,6 +27,7 @@ export interface MasterPlayer {
   whatsappNumber: string;
   isAdmin: boolean;
   isBanker: boolean;
+  isActive?: boolean;
 }
 
 export interface MasterVenue {

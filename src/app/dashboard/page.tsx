@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -1677,7 +1678,8 @@ const ManagePlayersDialog: FC<{
             name: '',
             whatsappNumber: '',
             isAdmin: false,
-            isBanker: false
+            isBanker: false,
+            isActive: true,
         };
         setEditablePlayers(prev => [newPlayer, ...prev]);
     };
@@ -1834,6 +1836,7 @@ const ManagePlayersDialog: FC<{
                                     <TableHead className="w-1/3">WhatsApp Number</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
                                     <TableHead className="w-[100px]">Banker</TableHead>
+                                    <TableHead className="w-[100px]">Active</TableHead>
                                     <TableHead className="w-[50px] text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -1851,6 +1854,9 @@ const ManagePlayersDialog: FC<{
                                         </TableCell>
                                          <TableCell className="text-center">
                                             <Switch checked={p.isBanker} onCheckedChange={checked => handleFieldChange(p.id, 'isBanker', checked)} />
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Switch checked={p.isActive ?? true} onCheckedChange={checked => handleFieldChange(p.id, 'isActive', checked)} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button size="icon" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp} className="h-8 w-8">
@@ -1887,7 +1893,7 @@ const AddPlayerDialog: FC<{
   const gamePlayerNames = useMemo(() => gamePlayers.map(p => p.name), [gamePlayers]);
 
   const availablePlayers = useMemo(() => {
-    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name));
+    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name) && (mp.isActive ?? true));
   }, [masterPlayers, gamePlayerNames]);
 
   useEffect(() => {
@@ -1940,7 +1946,7 @@ const AddPlayerDialog: FC<{
                 </div>
               ))}
             </div>
-             {availablePlayers.length === 0 && <p className="text-center text-muted-foreground p-4">All players have been added.</p>}
+             {availablePlayers.length === 0 && <p className="text-center text-muted-foreground p-4">All active players have been added.</p>}
           </ScrollArea>
         </div>
         <DialogFooter>
@@ -2050,7 +2056,7 @@ const LoadGameDialog: FC<{
                         {gameHistory.length > 0 ? (
                             gameHistory.map(game => {
                                 const isFinished = !!game.endTime;
-                                const buttonText = isFinished ? (currentUser?.isAdmin ? "Load" : "View") : "Join";
+                                const buttonText = isFinished ? "View" : "Join";
 
                                 return (
                                 <Card key={game.id} className="hover:border-primary">
@@ -3055,4 +3061,5 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 

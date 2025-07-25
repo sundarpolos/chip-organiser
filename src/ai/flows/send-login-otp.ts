@@ -1,4 +1,5 @@
 
+
 'use server';
 
 /**
@@ -63,6 +64,7 @@ const sendLoginOtpFlow = ai.defineFlow(
           whatsappNumber: whatsappNumber,
           isAdmin: isSuperAdminLogin, // Only super admin is admin on creation
           isBanker: isSuperAdminLogin, // Super admin is also a banker
+          isActive: true, // New users are active by default
         };
         user = await saveMasterPlayer(newUserPayload);
         isNewUser = true;
