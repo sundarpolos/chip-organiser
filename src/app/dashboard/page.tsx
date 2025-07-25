@@ -146,7 +146,7 @@ const AdminView: FC<{
     handleRunAnomalyDetection: (player: Player) => void;
     isOtpVerificationEnabled: boolean;
     whatsappConfig: WhatsappConfig;
-    isAdmin: boolean;
+    canEdit: boolean;
     currentUser: MasterPlayer | null;
     setAddPlayerModalOpen: (isOpen: boolean) => void;
     setSaveConfirmOpen: (isOpen: boolean) => void;
@@ -154,19 +154,19 @@ const AdminView: FC<{
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
     activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
-    isOtpVerificationEnabled, whatsappConfig, isAdmin, currentUser, setAddPlayerModalOpen,
+    isOtpVerificationEnabled, whatsappConfig, canEdit, currentUser, setAddPlayerModalOpen,
     setSaveConfirmOpen, setReportsModalOpen, toast
 }) => {
     
     const players = activeGame.players || [];
     
-    if (players.length === 0 && isAdmin) {
+    if (players.length === 0 && canEdit) {
         return (
              <Card>
                 <CardContent className="pt-6">
                     <div className="text-center py-10">
                         <p className="text-muted-foreground mb-4">No players in the game.</p>
-                        <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
+                        <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!canEdit}><Plus className="mr-2 h-4 w-4" />Add Players</Button>
                     </div>
                 </CardContent>
             </Card>
@@ -193,7 +193,7 @@ const AdminView: FC<{
                                         onRunAnomalyCheck={handleRunAnomalyDetection}
                                         isOtpEnabled={isOtpVerificationEnabled}
                                         whatsappConfig={whatsappConfig}
-                                        isAdmin={isAdmin}
+                                        canEdit={canEdit}
                                         currentUser={currentUser}
                                         toast={toast}
                                         activeGame={activeGame}
@@ -204,10 +204,10 @@ const AdminView: FC<{
                     </CardContent>
                     <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                         <div className="flex gap-2">
-                             <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!isAdmin}>
+                             <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!canEdit}>
                                 <Plus className="mr-2 h-4 w-4" />Add Player(s)
                             </Button>
-                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!isAdmin}><Save className="mr-2 h-4 w-4" />Save Game</Button>
+                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                         </div>
                         <div className="flex gap-2">
                             <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
@@ -429,6 +429,13 @@ export default function ChipMaestroPage() {
   const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
   const [isAnomalyLoading, setAnomalyLoading] = useState(false);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
+
+  const canEditGame = useMemo(() => {
+    if (!activeGame || !currentUser) return false;
+    if (isAdmin) return true;
+    const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
+    return gamePlayer?.isBanker === true;
+  }, [isAdmin, currentUser, activeGame]);
 
 
   // Load user data and check auth
@@ -1088,7 +1095,7 @@ export default function ChipMaestroPage() {
                 handleRunAnomalyDetection={handleRunAnomalyDetection}
                 isOtpVerificationEnabled={isOtpVerificationEnabled}
                 whatsappConfig={whatsappConfig}
-                isAdmin={isAdmin}
+                canEdit={canEditGame}
                 currentUser={currentUser}
                 setAddPlayerModalOpen={setAddPlayerModalOpen}
                 setSaveConfirmOpen={setSaveConfirmOpen}
@@ -1419,18 +1426,13 @@ const PlayerCard: FC<{
   onRunAnomalyCheck: (player: Player) => void;
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
-  isAdmin: boolean;
+  canEdit: boolean;
   currentUser: MasterPlayer | null;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
   activeGame: GameHistory;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, currentUser, toast, activeGame }) => {
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, canEdit, currentUser, toast, activeGame }) => {
   const isCurrentUser = player.name === currentUser?.name;
-  
-  const canEdit = useMemo(() => {
-    if (isAdmin) return true;
-    const gamePlayer = activeGame.players.find(p => p.name === currentUser?.name);
-    return gamePlayer?.isBanker === true;
-  }, [isAdmin, currentUser, activeGame.players]);
+  const isAdmin = currentUser?.isAdmin === true;
 
   const handleUpdateBuyIn = (buyInId: string, newValues: Partial<BuyIn>) => {
     const newBuyIns = (player.buyIns || []).map(b => 
@@ -1532,7 +1534,7 @@ const PlayerCard: FC<{
                         </TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
-                {isAdmin && (
+                {canEdit && (
                      <AlertDialog>
                       <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="icon">
@@ -3053,3 +3055,4 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
