@@ -1667,7 +1667,7 @@ const EditPlayerDialog: FC<{
         <Dialog open={!!player} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit Player: {player.name}</DialogTitle>
+                    <DialogTitle>Edit Player: {player?.name}</DialogTitle>
                     <DialogDescription>
                         Update the player's details below.
                     </DialogDescription>
@@ -3161,6 +3161,7 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
 
