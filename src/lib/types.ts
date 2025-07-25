@@ -10,7 +10,7 @@ export interface Player {
   id: string;
   name: string;
   whatsappNumber: string;
-  group?: string;
+  isBanker: boolean;
   buyIns: BuyIn[];
   finalChips: number;
 }
@@ -24,8 +24,8 @@ export interface MasterPlayer {
   id: string;
   name: string;
   whatsappNumber: string;
-  group?: string;
   isAdmin: boolean;
+  isBanker: boolean;
 }
 
 export interface MasterVenue {

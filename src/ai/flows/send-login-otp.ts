@@ -62,12 +62,14 @@ const sendLoginOtpFlow = ai.defineFlow(
           name: isSuperAdminLogin ? 'Sundar' : `Player ${whatsappNumber.slice(-4)}`, // Default name
           whatsappNumber: whatsappNumber,
           isAdmin: isSuperAdminLogin, // Only super admin is admin on creation
+          isBanker: isSuperAdminLogin, // Super admin is also a banker
         };
         user = await saveMasterPlayer(newUserPayload);
         isNewUser = true;
-      } else if (isSuperAdminLogin && !user.isAdmin) {
-        // If the super admin logs in and isn't an admin, make them one.
+      } else if (isSuperAdminLogin && (!user.isAdmin || !user.isBanker)) {
+        // If the super admin logs in and isn't admin/banker, make them so.
         user.isAdmin = true;
+        user.isBanker = true;
         await saveMasterPlayer(user);
       } else if (!isSuperAdminLogin && user.name === 'Sundar' && user.whatsappNumber !== SUPER_ADMIN_WHATSAPP) {
         // Edge case: demote a user named Sundar who is not the super admin.

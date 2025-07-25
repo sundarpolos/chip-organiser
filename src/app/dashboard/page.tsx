@@ -196,6 +196,7 @@ const AdminView: FC<{
                                         isAdmin={isAdmin}
                                         currentUser={currentUser}
                                         toast={toast}
+                                        activeGame={activeGame}
                                     />
                                 </TabsContent>
                             ))}
@@ -652,7 +653,7 @@ export default function ChipMaestroPage() {
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
-          group: playerToAdd.group,
+          isBanker: playerToAdd.isBanker,
           buyIns: [],
           finalChips: 0,
       }));
@@ -712,7 +713,7 @@ export default function ChipMaestroPage() {
         id: p.id,
         name: p.name,
         whatsappNumber: p.whatsappNumber,
-        group: p.group || '',
+        isBanker: p.isBanker,
         buyIns: p.buyIns.map(b => ({
             id: b.id,
             amount: b.amount,
@@ -768,14 +769,14 @@ export default function ChipMaestroPage() {
                 name: currentUser.name,
                 whatsappNumber: currentUser.whatsappNumber,
                 isAdmin: currentUser.isAdmin,
-                group: currentUser.group,
+                isBanker: currentUser.isBanker,
             };
             
             const newPlayer: Player = {
                 id: `player-${Date.now()}-${playerToAdd.id}`,
                 name: playerToAdd.name,
                 whatsappNumber: playerToAdd.whatsappNumber,
-                group: playerToAdd.group,
+                isBanker: playerToAdd.isBanker,
                 buyIns: [],
                 finalChips: 0,
             };
@@ -912,8 +913,8 @@ export default function ChipMaestroPage() {
             const newPlayer: Omit<MasterPlayer, 'id'> = {
                 name: p.name,
                 whatsappNumber: p.whatsappNumber || "",
-                group: p.group || "",
                 isAdmin: false,
+                isBanker: false,
             };
             return await saveMasterPlayer(newPlayer, { updateGames: false });
         });
@@ -937,7 +938,7 @@ export default function ChipMaestroPage() {
             id: p.id,
             name: p.name,
             whatsappNumber: p.whatsappNumber || "",
-            group: p.group || '',
+            isBanker: p.isBanker || false,
             buyIns: (p.buyIns || []).map(b => ({
                 id: b.id,
                 amount: b.amount,
@@ -1294,9 +1295,9 @@ const BuyInRow: FC<{
     onRemoveBuyIn: (buyInId: string) => void;
     isOtpEnabled: boolean;
     whatsappConfig: WhatsappConfig;
-    isAdmin: boolean;
+    canEdit: boolean;
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ buyIn, player, onUpdateBuyIn, onRemoveBuyIn, isOtpEnabled, whatsappConfig, isAdmin, toast }) => {
+}> = ({ buyIn, player, onUpdateBuyIn, onRemoveBuyIn, isOtpEnabled, whatsappConfig, canEdit, toast }) => {
     const [otp, setOtp] = useState("");
     const [sentOtp, setSentOtp] = useState("");
     const [isSending, setIsSending] = useState(false);
@@ -1372,7 +1373,7 @@ const BuyInRow: FC<{
             <div className="flex items-center gap-2">
                 <div className="flex-1 font-medium text-lg">₹{buyIn.amount}</div>
                 {getStatusIndicator()}
-                 {isAdmin && (
+                 {canEdit && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground">
@@ -1393,13 +1394,13 @@ const BuyInRow: FC<{
                 )}
             </div>
             
-            {isAdmin && isOtpEnabled && buyIn.status === 'requested' && (
+            {canEdit && isOtpEnabled && buyIn.status === 'requested' && (
                 <Button onClick={handleSendOtp} disabled={isSending} className="w-full h-9">
                     {isSending ? <Loader2 className="animate-spin" /> : <>Approve & Send OTP</>}
                 </Button>
             )}
 
-             {isAdmin && isOtpEnabled && buyIn.status === 'approved' && (
+             {canEdit && isOtpEnabled && buyIn.status === 'approved' && (
                 <div className="flex items-center gap-2">
                     <Input type="text" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-Digit OTP" className="h-9"/>
                     <Button onClick={handleConfirmOtp} disabled={isVerifying} className="h-9">
@@ -1421,8 +1422,15 @@ const PlayerCard: FC<{
   isAdmin: boolean;
   currentUser: MasterPlayer | null;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, currentUser, toast }) => {
+  activeGame: GameHistory;
+}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, isAdmin, currentUser, toast, activeGame }) => {
   const isCurrentUser = player.name === currentUser?.name;
+  
+  const canEdit = useMemo(() => {
+    if (isAdmin) return true;
+    const gamePlayer = activeGame.players.find(p => p.name === currentUser?.name);
+    return gamePlayer?.isBanker === true;
+  }, [isAdmin, currentUser, activeGame.players]);
 
   const handleUpdateBuyIn = (buyInId: string, newValues: Partial<BuyIn>) => {
     const newBuyIns = (player.buyIns || []).map(b => 
@@ -1479,15 +1487,15 @@ const PlayerCard: FC<{
                             onRemoveBuyIn={removeBuyIn}
                             isOtpEnabled={isOtpEnabled}
                             whatsappConfig={whatsappConfig}
-                            isAdmin={isAdmin}
+                            canEdit={canEdit}
                             toast={toast}
                         />
                       </div>
                     ))}
                     <div className="flex gap-2">
-                         {isCurrentUser && !isAdmin ? (
+                         {isCurrentUser && !canEdit ? (
                            <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
-                        ) : isAdmin ? (
+                        ) : canEdit ? (
                             <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
                         ): null}
                     </div>
@@ -1501,7 +1509,7 @@ const PlayerCard: FC<{
                 value={player.finalChips === 0 ? "" : player.finalChips}
                 onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
                 placeholder="Chip Count"
-                disabled={!isAdmin}
+                disabled={!canEdit}
             />
             </div>
         </div>
@@ -1652,23 +1660,8 @@ const ManagePlayersDialog: FC<{
             const sorted = masterPlayers.sort((a,b) => a.name.localeCompare(b.name));
             setEditablePlayers(JSON.parse(JSON.stringify(sorted)));
             originalPlayersRef.current = JSON.parse(JSON.stringify(sorted));
-            setIsSorted(false);
         }
     }, [isOpen, masterPlayers]);
-
-    const sortedPlayers = useMemo(() => {
-        const playersCopy = [...editablePlayers];
-        if (isSorted) {
-          playersCopy.sort((a, b) => {
-            const groupA = a.group || 'zzzz';
-            const groupB = b.group || 'zzzz';
-            if (groupA < groupB) return -1;
-            if (groupA > groupB) return 1;
-            return a.name.localeCompare(b.name);
-          });
-        }
-        return playersCopy;
-      }, [editablePlayers, isSorted]);
 
     const handleFieldChange = (playerId: string, field: keyof Omit<MasterPlayer, 'id'>, value: string | boolean) => {
         setEditablePlayers(prev => 
@@ -1681,8 +1674,8 @@ const ManagePlayersDialog: FC<{
             id: `new-${Date.now()}`,
             name: '',
             whatsappNumber: '',
-            group: '',
             isAdmin: false,
+            isBanker: false
         };
         setEditablePlayers(prev => [newPlayer, ...prev]);
     };
@@ -1690,8 +1683,6 @@ const ManagePlayersDialog: FC<{
     const handleSaveAll = async () => {
         setIsSaving(true);
         try {
-            const nameChangeTasks: Promise<any>[] = [];
-
             const savePromises = editablePlayers.map(player => {
                 // Skip empty new rows
                 if (player.id.startsWith('new-') && !player.name) return null;
@@ -1831,37 +1822,33 @@ const ManagePlayersDialog: FC<{
                     <Button onClick={addNewPlayerRow} variant="outline">
                         <UserPlus className="mr-2 h-4 w-4" /> Add New Player
                     </Button>
-                    <Button onClick={() => setIsSorted(!isSorted)} variant="outline">
-                        <SortAsc className="mr-2"/>
-                        {isSorted ? "Un-sort by Group" : "Sort by Group"}
-                    </Button>
                 </div>
                 <div className="py-4">
                     <ScrollArea className="h-96">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-1/4">Name</TableHead>
-                                    <TableHead className="w-1/4">WhatsApp Number</TableHead>
-                                    <TableHead className="w-1/4">Group</TableHead>
+                                    <TableHead className="w-1/3">Name</TableHead>
+                                    <TableHead className="w-1/3">WhatsApp Number</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
+                                    <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[50px] text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedPlayers.map(p => (
+                                {editablePlayers.map(p => (
                                     <TableRow key={p.id}>
                                         <TableCell>
-                                            <Input value={p.name} onChange={e => handleFieldChange(p.id, 'name', e.target.value)} className="h-8" />
+                                            <Input value={p.name} onChange={e => handleFieldChange(p.id, 'name', e.target.value)} className="h-8" readOnly={!p.id.startsWith('new-')} />
                                         </TableCell>
                                         <TableCell>
-                                            <Input value={p.whatsappNumber} onChange={e => handleFieldChange(p.id, 'whatsappNumber', e.target.value)} className="h-8"/>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input value={p.group} onChange={e => handleFieldChange(p.id, 'group', e.target.value)} className="h-8"/>
+                                            <Input value={p.whatsappNumber} onChange={e => handleFieldChange(p.id, 'whatsappNumber', e.target.value)} className="h-8" readOnly={!p.id.startsWith('new-')}/>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
+                                        </TableCell>
+                                         <TableCell className="text-center">
+                                            <Switch checked={p.isBanker} onCheckedChange={checked => handleFieldChange(p.id, 'isBanker', checked)} />
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button size="icon" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp} className="h-8 w-8">

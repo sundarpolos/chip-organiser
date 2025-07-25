@@ -76,21 +76,8 @@ export default function MergePlayersPage() {
   }, [toast]);
 
   const sortedPlayers = useMemo(() => {
-    const playersCopy = [...masterPlayers];
-    if (isSorted) {
-      playersCopy.sort((a, b) => {
-        const groupA = a.group || 'zzzz'; // Put players without a group at the end
-        const groupB = b.group || 'zzzz';
-        if (groupA < groupB) return -1;
-        if (groupA > groupB) return 1;
-        // If groups are the same, sort by name
-        return a.name.localeCompare(b.name);
-      });
-    } else {
-      playersCopy.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return playersCopy;
-  }, [masterPlayers, isSorted]);
+    return [...masterPlayers].sort((a, b) => a.name.localeCompare(b.name));
+  }, [masterPlayers]);
 
   const handleSelectPlayer = (id: string, isSelected: boolean) => {
     if (isSelected) {
@@ -202,10 +189,6 @@ export default function MergePlayersPage() {
               </CardDescription>
             </div>
              <div className="flex gap-2">
-                <Button onClick={() => setIsSorted(!isSorted)} variant="outline">
-                    <SortAsc className="mr-2"/>
-                    {isSorted ? "Un-sort by Group" : "Sort by Group"}
-                </Button>
                 <Button onClick={handleOpenMergeModal} disabled={selectedPlayerIds.length < 2}>
                     <Users className="mr-2" />
                     Merge Selected ({selectedPlayerIds.length})
@@ -223,9 +206,8 @@ export default function MergePlayersPage() {
                     checked={selectedPlayerIds.includes(player.id)}
                     onCheckedChange={checked => handleSelectPlayer(player.id, !!checked)}
                   />
-                  <Label htmlFor={`select-${player.id}`} className="flex-1 cursor-pointer grid grid-cols-2">
+                  <Label htmlFor={`select-${player.id}`} className="flex-1 cursor-pointer">
                     <span className="font-medium">{player.name}</span>
-                    <span className="text-muted-foreground">{player.group || 'No Group'}</span>
                   </Label>
                 </div>
               ))}
