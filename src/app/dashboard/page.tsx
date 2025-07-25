@@ -778,6 +778,7 @@ export default function ChipMaestroPage() {
                 whatsappNumber: currentUser.whatsappNumber,
                 isAdmin: currentUser.isAdmin,
                 isBanker: currentUser.isBanker,
+                isActive: currentUser.isActive,
             };
             
             const newPlayer: Player = {
@@ -923,6 +924,7 @@ export default function ChipMaestroPage() {
                 whatsappNumber: p.whatsappNumber || "",
                 isAdmin: false,
                 isBanker: false,
+                isActive: true,
             };
             return await saveMasterPlayer(newPlayer, { updateGames: false });
         });
@@ -1635,6 +1637,71 @@ const VenueDialog: FC<{
     );
 };
 
+const EditPlayerDialog: FC<{
+    player: MasterPlayer | null;
+    onOpenChange: (open: boolean) => void;
+    onSave: (player: MasterPlayer) => Promise<void>;
+}> = ({ player, onOpenChange, onSave }) => {
+    const [editablePlayer, setEditablePlayer] = useState<MasterPlayer | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (player) {
+            setEditablePlayer(JSON.parse(JSON.stringify(player)));
+        } else {
+            setEditablePlayer(null);
+        }
+    }, [player]);
+
+    const handleSave = async () => {
+        if (!editablePlayer) return;
+        setIsSaving(true);
+        await onSave(editablePlayer);
+        setIsSaving(false);
+        onOpenChange(false);
+    };
+
+    if (!editablePlayer) return null;
+
+    return (
+        <Dialog open={!!player} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Player: {player.name}</DialogTitle>
+                    <DialogDescription>
+                        Update the player's details below.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-player-name">Player Name</Label>
+                        <Input
+                            id="edit-player-name"
+                            value={editablePlayer.name}
+                            onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
+                        <Input
+                            id="edit-player-whatsapp"
+                            value={editablePlayer.whatsappNumber}
+                            onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 const ManagePlayersDialog: FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -1647,6 +1714,7 @@ const ManagePlayersDialog: FC<{
   setGameHistory: React.Dispatch<React.SetStateAction<GameHistory[]>>;
 }> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast, gameHistory, setGameHistory }) => {
     const [editablePlayers, setEditablePlayers] = useState<MasterPlayer[]>([]);
+    const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [otp, setOtp] = useState("");
@@ -1655,7 +1723,6 @@ const ManagePlayersDialog: FC<{
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [isSorted, setIsSorted] = useState(false);
     
-    // Store original players to compare for name changes
     const originalPlayersRef = useRef<MasterPlayer[]>([]);
 
     useEffect(() => {
@@ -1684,28 +1751,14 @@ const ManagePlayersDialog: FC<{
         setEditablePlayers(prev => [newPlayer, ...prev]);
     };
 
-    const handleSaveAll = async () => {
+    const handleSavePlayer = async (playerToSave: MasterPlayer) => {
         setIsSaving(true);
         try {
-            const savePromises = editablePlayers.map(player => {
-                // Skip empty new rows
-                if (player.id.startsWith('new-') && !player.name) return null;
-
-                const originalPlayer = originalPlayersRef.current.find(p => p.id === player.id);
-                const nameHasChanged = originalPlayer && originalPlayer.name !== player.name;
-                 
-                // Distinguish between new and existing players
-                if (player.id.startsWith('new-')) {
-                     const { id, ...newPlayer } = player;
-                     return saveMasterPlayer(newPlayer, { updateGames: false });
-                } else {
-                     return saveMasterPlayer(player, { updateGames: nameHasChanged, oldName: originalPlayer?.name });
-                }
-            }).filter(Boolean);
+            const originalPlayer = originalPlayersRef.current.find(p => p.id === playerToSave.id);
+            const nameHasChanged = originalPlayer && originalPlayer.name !== playerToSave.name;
             
-            await Promise.all(savePromises);
+            await saveMasterPlayer(playerToSave, { updateGames: nameHasChanged, oldName: originalPlayer?.name });
             
-            // Refresh local data after all saves are complete
             const [finalMasterPlayers, finalGameHistory] = await Promise.all([
                 getMasterPlayers(),
                 getGameHistory()
@@ -1713,7 +1766,45 @@ const ManagePlayersDialog: FC<{
             setMasterPlayers(finalMasterPlayers);
             setGameHistory(finalGameHistory);
 
-            toast({ title: "Players Saved", description: "All changes have been saved successfully." });
+            toast({ title: "Player Saved", description: `${playerToSave.name}'s details have been updated.` });
+        } catch (error) {
+            console.error("Failed to save player", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save player details." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSaveAll = async () => {
+        setIsSaving(true);
+        try {
+            // Filter out any changes to name/whatsapp from here, only save roles/status
+            const savePromises = editablePlayers.map(player => {
+                if (player.id.startsWith('new-') && !player.name) return null;
+
+                const originalPlayer = originalPlayersRef.current.find(p => p.id === player.id);
+
+                if (player.id.startsWith('new-')) {
+                     const { id, ...newPlayer } = player;
+                     return saveMasterPlayer(newPlayer, { updateGames: false });
+                } else {
+                     // Only save roles and status from this bulk action
+                     const playerToSave = {
+                        ...originalPlayer!, //we know it exists
+                        isAdmin: player.isAdmin,
+                        isBanker: player.isBanker,
+                        isActive: player.isActive
+                     }
+                     return saveMasterPlayer(playerToSave, { updateGames: false });
+                }
+            }).filter(Boolean);
+            
+            await Promise.all(savePromises as Promise<MasterPlayer>[]);
+            
+            const finalMasterPlayers = await getMasterPlayers();
+            setMasterPlayers(finalMasterPlayers);
+
+            toast({ title: "Players Saved", description: "Player roles and status have been updated." });
             onOpenChange(false);
 
         } catch (error) {
@@ -1735,7 +1826,6 @@ const ManagePlayersDialog: FC<{
             return;
         }
 
-        // Check if player has game history
         const hasHistory = gameHistory.some(game => game.players.some(p => p.name === player.name));
 
         if (hasHistory) {
@@ -1816,11 +1906,12 @@ const ManagePlayersDialog: FC<{
     }
 
     return (
+      <>
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Manage Master Players</DialogTitle>
-                    <DialogDescription>Add, edit, or remove players from your master list. All changes can be saved at once.</DialogDescription>
+                    <DialogDescription>Add new players or manage roles and status. Save all changes at once.</DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-between items-center mb-4">
                     <Button onClick={addNewPlayerRow} variant="outline">
@@ -1837,17 +1928,17 @@ const ManagePlayersDialog: FC<{
                                     <TableHead className="w-[100px]">Admin</TableHead>
                                     <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[100px]">Active</TableHead>
-                                    <TableHead className="w-[50px] text-right">Actions</TableHead>
+                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {editablePlayers.map(p => (
                                     <TableRow key={p.id}>
                                         <TableCell>
-                                            <Input value={p.name} onChange={e => handleFieldChange(p.id, 'name', e.target.value)} className="h-8" readOnly={!p.id.startsWith('new-')} />
+                                            <Input value={p.name} className="h-8" readOnly={!p.id.startsWith('new-')} onChange={e => p.id.startsWith('new-') && handleFieldChange(p.id, 'name', e.target.value)} />
                                         </TableCell>
                                         <TableCell>
-                                            <Input value={p.whatsappNumber} onChange={e => handleFieldChange(p.id, 'whatsappNumber', e.target.value)} className="h-8" readOnly={!p.id.startsWith('new-')}/>
+                                            <Input value={p.whatsappNumber} className="h-8" readOnly={!p.id.startsWith('new-')} onChange={e => p.id.startsWith('new-') && handleFieldChange(p.id, 'whatsappNumber', e.target.value)} />
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
@@ -1858,8 +1949,11 @@ const ManagePlayersDialog: FC<{
                                         <TableCell className="text-center">
                                             <Switch checked={p.isActive ?? true} onCheckedChange={checked => handleFieldChange(p.id, 'isActive', checked)} />
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button size="icon" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp} className="h-8 w-8">
+                                        <TableCell className="text-right flex justify-end gap-2">
+                                            <Button size="icon" variant="ghost" onClick={() => setPlayerToEdit(p)} disabled={p.id.startsWith('new-')} className="h-8 w-8">
+                                                <Pencil className="h-4 w-4" />
+                                            </Button>
+                                            <Button size="icon" variant="destructive" onClick={() => handleDeleteRequest(p)} disabled={isSendingOtp && playerToDelete?.id === p.id} className="h-8 w-8">
                                                 {isSendingOtp && playerToDelete?.id === p.id ? <Loader2 className="animate-spin"/> : <Trash2 className="h-4 w-4" />}
                                             </Button>
                                         </TableCell>
@@ -1873,11 +1967,17 @@ const ManagePlayersDialog: FC<{
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSaveAll} disabled={isSaving}>
                         {isSaving ? <Loader2 className="mr-2 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save All Changes
+                        Save Roles & Status
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <EditPlayerDialog 
+            player={playerToEdit}
+            onOpenChange={() => setPlayerToEdit(null)}
+            onSave={handleSavePlayer}
+        />
+      </>
     );
 };
 
@@ -2404,7 +2504,7 @@ const WhatsappDialog: FC<{
   const { toast } = useToast();
 
   const playersWithNumbers = useMemo(() => {
-    return masterPlayers.filter(p => p.whatsappNumber);
+    return masterPlayers.filter(p => p.whatsappNumber && p.isActive);
   }, [masterPlayers]);
 
   const handleSelectPlayer = (number: string, isSelected: boolean) => {
@@ -3061,5 +3161,6 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
