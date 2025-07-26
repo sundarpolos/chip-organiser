@@ -1540,7 +1540,7 @@ const PlayerCard: FC<{
                 {canEdit && (
                      <AlertDialog>
                       <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon">
+                          <Button variant="destructive" size="icon" disabled={!canEdit}>
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Remove Player</span>
                           </Button>
@@ -3161,6 +3161,7 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
 
