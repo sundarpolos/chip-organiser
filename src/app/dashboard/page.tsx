@@ -379,7 +379,7 @@ const EditableDate: FC<{
 };
 
 
-export default function ChipMaestroPage() {
+export default function DashboardPage() {
   const { toast } = useToast()
   const router = useRouter();
 
@@ -1661,41 +1661,43 @@ const EditPlayerDialog: FC<{
         onOpenChange(false);
     };
 
-    if (!editablePlayer) return null;
-
     return (
         <Dialog open={!!player} onOpenChange={onOpenChange}>
             <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Player: {player?.name}</DialogTitle>
-                    <DialogDescription>
-                        Update the player's details below.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-player-name">Player Name</Label>
-                        <Input
-                            id="edit-player-name"
-                            value={editablePlayer.name}
-                            onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
-                        <Input
-                            id="edit-player-whatsapp"
-                            value={editablePlayer.whatsappNumber}
-                            onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
-                        />
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
-                    </Button>
-                </DialogFooter>
+                {editablePlayer && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle>Edit Player: {player?.name}</DialogTitle>
+                            <DialogDescription>
+                                Update the player's details below.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-player-name">Player Name</Label>
+                                <Input
+                                    id="edit-player-name"
+                                    value={editablePlayer.name}
+                                    onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
+                                <Input
+                                    id="edit-player-whatsapp"
+                                    value={editablePlayer.whatsappNumber}
+                                    onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                            <Button onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                            </Button>
+                        </DialogFooter>
+                    </>
+                )}
             </DialogContent>
         </Dialog>
     );
@@ -3161,6 +3163,7 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
 
