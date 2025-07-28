@@ -1855,6 +1855,10 @@ const EditPlayerDialog: FC<{
         }
     }, [player]);
 
+    if (!editablePlayer) {
+        return null;
+    }
+
     const handleSave = async () => {
         if (!editablePlayer) return;
         setIsSaving(true);
@@ -1866,40 +1870,36 @@ const EditPlayerDialog: FC<{
     return (
         <Dialog open={!!player} onOpenChange={onOpenChange}>
             <DialogContent>
-                {editablePlayer && (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle>Edit Player: {editablePlayer.name}</DialogTitle>
-                            <DialogDescription>
-                                Update the player's details below.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="edit-player-name">Player Name</Label>
-                                <Input
-                                    id="edit-player-name"
-                                    value={editablePlayer.name}
-                                    onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
-                                <Input
-                                    id="edit-player-whatsapp"
-                                    value={editablePlayer.whatsappNumber}
-                                    onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                            <Button onClick={handleSave} disabled={isSaving}>
-                                {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
-                            </Button>
-                        </DialogFooter>
-                    </>
-                )}
+                <DialogHeader>
+                    <DialogTitle>Edit Player: {editablePlayer.name}</DialogTitle>
+                    <DialogDescription>
+                        Update the player's details below.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-player-name">Player Name</Label>
+                        <Input
+                            id="edit-player-name"
+                            value={editablePlayer.name}
+                            onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
+                        <Input
+                            id="edit-player-whatsapp"
+                            value={editablePlayer.whatsappNumber}
+                            onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
@@ -2127,7 +2127,7 @@ const ManagePlayersDialog: FC<{
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-1/3">Name</TableHead>
+                                    <TableHead>Name</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
                                     <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[100px]">Active</TableHead>
@@ -2514,7 +2514,7 @@ const ReportsDialog: FC<{
                     </div>
                      <div className="flex items-center gap-2 flex-wrap">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
                              Export PDF
                         </Button>
                         <Button onClick={onSettleUp}>
@@ -2536,28 +2536,28 @@ const ReportsDialog: FC<{
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="text-center">Player</TableHead>
-                                            <TableHead className="text-center md:text-right">Buy-in</TableHead>
-                                            <TableHead className="text-center md:text-right">Chip Return</TableHead>
-                                            <TableHead className="text-center md:text-right">P/L</TableHead>
+                                            <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
+                                            <TableHead className="px-2 sm:px-4 text-right">Buy-in</TableHead>
+                                            <TableHead className="px-2 sm:px-4 text-right">Return</TableHead>
+                                            <TableHead className="px-2 sm:px-4 text-right">P/L</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
-                                            <TableRow key={p.id} className="text-xs md:text-sm">
-                                                <TableCell className="font-medium text-center">{p.name}</TableCell>
-                                                <TableCell className="text-center md:text-right">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="text-center md:text-right">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`text-center md:text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                            <TableRow key={p.id} className="text-xs sm:text-sm">
+                                                <TableCell className="font-medium px-2 sm:px-4 text-left">{p.name}</TableCell>
+                                                <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
+                                                <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
+                                                <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
                                     <TableFoot>
-                                        <TableRow className="font-bold border-t-2 border-foreground text-xs md:text-sm">
-                                            <TableCell className="text-center">Accumulative Report</TableCell>
-                                            <TableCell className="text-center md:text-right">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="text-center md:text-right">₹{grandTotalChips}</TableCell>
-                                            <TableCell className={`text-center md:text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                        <TableRow className="font-bold border-t-2 border-foreground text-xs sm:text-sm">
+                                            <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
+                                            <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
+                                            <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
+                                            <TableCell className={`px-2 sm:px-4 text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
@@ -2617,17 +2617,17 @@ const ReportsDialog: FC<{
                                  <Table>
                                      <TableHeader>
                                          <TableRow>
-                                             <TableHead className="text-center">Player</TableHead>
-                                             <TableHead className="text-center md:text-right">Amount</TableHead>
-                                             <TableHead className="text-center md:text-right">Time</TableHead>
+                                             <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
+                                             <TableHead className="px-2 sm:px-4 text-right">Amount</TableHead>
+                                             <TableHead className="px-2 sm:px-4 text-right">Time</TableHead>
                                          </TableRow>
                                      </TableHeader>
                                      <TableBody>
                                          {logsToShow.map((log) => (
-                                             <TableRow key={log.id}>
-                                                 <TableCell className="font-medium text-center">{log.playerName}</TableCell>
-                                                 <TableCell className="text-center md:text-right">₹{log.amount}</TableCell>
-                                                 <TableCell className="text-center md:text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
+                                             <TableRow key={log.id} className="text-xs sm:text-sm">
+                                                 <TableCell className="font-medium px-2 sm:px-4 text-left">{log.playerName}</TableCell>
+                                                 <TableCell className="px-2 sm:px-4 text-right">₹{log.amount}</TableCell>
+                                                 <TableCell className="px-2 sm:px-4 text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
                                              </TableRow>
                                          ))}
                                      </TableBody>
@@ -3199,7 +3199,7 @@ const SettlementDialog: FC<{
             return `${venueLine}\n${dateLine}\n\nNo transfers needed. Everyone is settled up!`;
         }
         
-        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*')).join('\n');
+        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
 
         return `${venueLine}\n${dateLine}\n\n\`\`\`
 -----------------------
