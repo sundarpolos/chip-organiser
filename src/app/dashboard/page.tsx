@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -86,6 +87,7 @@ import {
   Info,
   Merge,
   SortAsc,
+  ArrowRight,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -137,6 +139,108 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
+const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
+    const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
+        if (!calculatedPlayers) return { grandTotalBuyin: 0, grandTotalChips: 0, grandTotalProfitLoss: 0 };
+        return {
+            grandTotalBuyin: calculatedPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0),
+            grandTotalChips: calculatedPlayers.reduce((sum, p) => sum + p.finalChips, 0),
+            grandTotalProfitLoss: calculatedPlayers.reduce((sum, p) => sum + p.profitLoss, 0)
+        };
+    }, [calculatedPlayers]);
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead className="text-right">Buy-in</TableHead>
+                    <TableHead className="text-right">Chip Return</TableHead>
+                    <TableHead className="text-right">P/L</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {calculatedPlayers.map((p) => (
+                    <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.name}</TableCell>
+                        <TableCell className="text-right">₹{p.totalBuyIns}</TableCell>
+                        <TableCell className="text-right">₹{p.finalChips}</TableCell>
+                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ₹{p.profitLoss.toFixed(0)}
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+            <TableFoot>
+                <TableRow className="font-bold border-t-2 border-foreground">
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="text-right">₹{grandTotalBuyin}</TableCell>
+                    <TableCell className="text-right">₹{grandTotalChips}</TableCell>
+                    <TableCell className={`text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>
+                        ₹{grandTotalProfitLoss.toFixed(0)}
+                    </TableCell>
+                </TableRow>
+            </TableFoot>
+        </Table>
+    );
+};
+
+const GameLog: FC<{ game: GameHistory }> = ({ game }) => {
+    const log = useMemo(() => {
+        if (!game) return [];
+        return (game.players || [])
+            .flatMap(p => (p.buyIns || []).map(b => ({ 
+                type: 'Buy-in',
+                timestamp: new Date(b.timestamp),
+                text: `${p.name} bought in for ₹${b.amount}`
+            })))
+            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    }, [game]);
+
+    if (log.length === 0) {
+        return <p className="text-muted-foreground text-center py-4">No game activity yet.</p>;
+    }
+
+    return (
+        <ScrollArea className="h-full">
+            <div className="space-y-3">
+                {log.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3 text-sm">
+                        <div className="text-muted-foreground min-w-[50px]">{format(item.timestamp, 'p')}</div>
+                        <div>{item.text}</div>
+                    </div>
+                ))}
+            </div>
+        </ScrollArea>
+    );
+};
+
+const SettlementPreview: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
+    const transfers = useMemo(() => {
+        if (!calculatedPlayers) return [];
+        return calculateInterPlayerTransfers(calculatedPlayers);
+    }, [calculatedPlayers]);
+
+    if (transfers.length === 0) {
+        return <p className="text-muted-foreground text-center py-4">No transfers needed yet.</p>;
+    }
+
+    return (
+        <div className="space-y-2">
+            {transfers.map((transfer, index) => (
+                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-2 font-medium">
+                        <span dangerouslySetInnerHTML={{ __html: transfer.split(':')[0] }} />
+                    </div>
+                    <div className="font-bold text-primary">
+                        {transfer.split(':')[1]}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 const AdminView: FC<{
     activeGame: GameHistory;
     activeTab: string;
@@ -159,6 +263,18 @@ const AdminView: FC<{
 }) => {
     
     const players = activeGame.players || [];
+
+    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        }).sort((a,b) => b.profitLoss - a.profitLoss);
+    }, [activeGame]);
     
     if (players.length === 0 && canEdit) {
         return (
@@ -174,48 +290,68 @@ const AdminView: FC<{
     }
 
     return (
-        <main className="grid grid-cols-1 md:gap-8">
-            <section>
-                <Card>
-                    <CardContent className="pt-6">
-                       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 h-auto flex-wrap">
-                                {players.map(p => (
-                                    <TabsTrigger key={p.id} value={p.id}>{p.name || "New Player"}</TabsTrigger>
-                                ))}
-                            </TabsList>
-                            {players.map((p) => (
-                                <TabsContent key={p.id} value={p.id} className="mt-4">
-                                    <PlayerCard
-                                        player={p}
-                                        onUpdate={updatePlayer}
-                                        onRemove={removePlayer}
-                                        onRunAnomalyCheck={handleRunAnomalyDetection}
-                                        isOtpEnabled={isOtpVerificationEnabled}
-                                        whatsappConfig={whatsappConfig}
-                                        canEdit={canEdit}
-                                        currentUser={currentUser}
-                                        toast={toast}
-                                        activeGame={activeGame}
-                                    />
-                                </TabsContent>
+        <div className="space-y-6">
+            <Card>
+                <CardContent className="pt-6">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 h-auto flex-wrap">
+                            {players.map(p => (
+                                <TabsTrigger key={p.id} value={p.id}>{p.name || "New Player"}</TabsTrigger>
                             ))}
-                       </Tabs>
+                        </TabsList>
+                        {players.map((p) => (
+                            <TabsContent key={p.id} value={p.id} className="mt-4">
+                                <PlayerCard
+                                    player={p}
+                                    onUpdate={updatePlayer}
+                                    onRemove={removePlayer}
+                                    onRunAnomalyCheck={handleRunAnomalyDetection}
+                                    isOtpEnabled={isOtpVerificationEnabled}
+                                    whatsappConfig={whatsappConfig}
+                                    canEdit={canEdit}
+                                    currentUser={currentUser}
+                                    toast={toast}
+                                    activeGame={activeGame}
+                                />
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                </CardContent>
+                <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
+                    <div className="flex gap-2">
+                        <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!canEdit}>
+                            <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                        </Button>
+                        <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                    </div>
+                </CardFooter>
+            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 <Card className="lg:col-span-2">
+                    <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
+                    <CardContent>
+                        <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
                     </CardContent>
-                    <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
-                        <div className="flex gap-2">
-                             <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!canEdit}>
-                                <Plus className="mr-2 h-4 w-4" />Add Player(s)
-                            </Button>
-                            <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
-                        </div>
-                    </CardFooter>
                 </Card>
-            </section>
-        </main>
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader>
+                        <CardContent>
+                           <SettlementPreview calculatedPlayers={calculatedPlayers} />
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader><CardTitle>Game Log</CardTitle></CardHeader>
+                        <CardContent className="max-h-60">
+                           <GameLog game={activeGame} />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -2349,7 +2485,7 @@ const ReportsDialog: FC<{
                             <span className="ml-2">Settlement</span>
                         </Button>
                         <DialogClose asChild>
-                           <Button variant="outline" size="icon" className="sm:hidden"><X /></Button>
+                           <Button variant="outline" size="icon"><X /></Button>
                         </DialogClose>
                     </div>
                 </DialogHeader>
