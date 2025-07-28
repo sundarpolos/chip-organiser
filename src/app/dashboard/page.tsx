@@ -1667,7 +1667,7 @@ const EditPlayerDialog: FC<{
                 {editablePlayer && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Edit Player: {player?.name}</DialogTitle>
+                            <DialogTitle>Edit Player: {editablePlayer.name}</DialogTitle>
                             <DialogDescription>
                                 Update the player's details below.
                             </DialogDescription>
@@ -3163,6 +3163,7 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
 
