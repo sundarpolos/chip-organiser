@@ -1743,7 +1743,7 @@ const PlayerCard: FC<{
                         </TooltipProvider>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon">
+                              <Button variant="destructive" size="icon" disabled={!canEdit}>
                                   <Trash2 className="h-4 w-4" />
                                   <span className="sr-only">Remove Player</span>
                               </Button>
@@ -3242,9 +3242,9 @@ ${formattedTransfers}
             
             setProgress(((i + 1) / totalToSend) * 100);
 
-            // Wait for 30 seconds before sending the next message, unless it's the last one
+            // Wait for 10 seconds before sending the next message, unless it's the last one
             if (i < totalToSend - 1) {
-                await new Promise(resolve => setTimeout(resolve, 30000));
+                await new Promise(resolve => setTimeout(resolve, 10000));
             }
         }
         
@@ -3268,7 +3268,7 @@ ${formattedTransfers}
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Send Settlement Details</DialogTitle>
-                    <DialogDescription>Select players to notify via WhatsApp. A 30s delay will be applied between messages.</DialogDescription>
+                    <DialogDescription>Select players to notify via WhatsApp. A 10s delay will be applied between messages.</DialogDescription>
                 </DialogHeader>
                  <div className="space-y-4">
                     <div className="space-y-2">
@@ -3357,5 +3357,6 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
