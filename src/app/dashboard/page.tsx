@@ -1146,27 +1146,23 @@ export default function DashboardPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-          <h1 className="text-2xl font-bold truncate">Smart Club Organiser</h1>
+           <h1 className="text-2xl font-bold truncate">{greeting || "Smart Club Organiser"}</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
-            {activeGame && activeGame.players.length > 0 && (
+            {activeGame && (
+              <>
                 <Badge variant="destructive" className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
                     {activeGame.players.length}
                 </Badge>
-             )}
-            {activeGame && (
                 <EditableDate date={activeGame.timestamp} onDateChange={handleDateChange} isAdmin={isAdmin}/>
-            )}
-            {activeGame?.startTime && (
-                <div className="flex items-center gap-1">
-                    <TimerIcon className="h-4 w-4" />
-                    <span>{gameDuration}</span>
-                </div>
-            )}
-            {greeting && activeGame && (
-              <>
+                {activeGame?.startTime && (
+                    <div className="flex items-center gap-1">
+                        <TimerIcon className="h-4 w-4" />
+                        <span>{gameDuration}</span>
+                    </div>
+                )}
                 <Separator orientation="vertical" className="h-4" />
-                <p className="font-semibold text-primary">{greeting}</p>
+                 <p className="font-semibold text-primary">{activeGame.venue}</p>
               </>
             )}
            </div>
@@ -3358,6 +3354,8 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
+
 
 
 
