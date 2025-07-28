@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -1437,6 +1436,35 @@ const PlayerCard: FC<{
   const isCurrentUser = player.name === currentUser?.name;
   const isAdmin = currentUser?.isAdmin === true;
 
+  const [finalChips, setFinalChips] = useState(player.finalChips);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setFinalChips(player.finalChips);
+  }, [player.finalChips]);
+
+  const handleFinalChipsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value) || 0;
+    setFinalChips(value);
+
+    if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+    }
+
+    debounceTimeoutRef.current = setTimeout(() => {
+        onUpdate(player.id, { finalChips: value });
+    }, 500); // 500ms debounce delay
+  };
+
+  const handleFinalChipsBlur = () => {
+      if (debounceTimeoutRef.current) {
+          clearTimeout(debounceTimeoutRef.current);
+      }
+      if (finalChips !== player.finalChips) {
+          onUpdate(player.id, { finalChips });
+      }
+  };
+
   const handleUpdateBuyIn = (buyInId: string, newValues: Partial<BuyIn>) => {
     const newBuyIns = (player.buyIns || []).map(b => 
         b.id === buyInId ? { ...b, ...newValues } : b
@@ -1511,8 +1539,9 @@ const PlayerCard: FC<{
             <Input 
                 type="number" 
                 className="mt-2 h-9" 
-                value={player.finalChips === 0 ? "" : player.finalChips}
-                onChange={e => onUpdate(player.id, { finalChips: parseInt(e.target.value) || 0 })}
+                value={finalChips === 0 ? "" : finalChips}
+                onChange={handleFinalChipsChange}
+                onBlur={handleFinalChipsBlur}
                 placeholder="Chip Count"
                 disabled={!canEdit}
             />
@@ -3159,15 +3188,3 @@ const BuyInRequestModalDialog: FC<{
         </Dialog>
     );
 };
-
-    
-
-    
-
-
-
-
-
-
-
-
