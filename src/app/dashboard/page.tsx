@@ -588,7 +588,7 @@ export default function DashboardPage() {
     if (!activeGame || !currentUser) return false;
     if (isAdmin) return true;
     const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
-    return gamePlayer?.isBanker === true;
+    return !!gamePlayer?.isBanker;
   }, [isAdmin, currentUser, activeGame]);
 
 
@@ -3355,3 +3355,4 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
