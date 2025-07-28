@@ -592,6 +592,12 @@ export default function DashboardPage() {
     return !!gamePlayer?.isBanker;
   }, [isAdmin, currentUser, activeGame]);
 
+  const isCurrentUserBankerInGame = useMemo(() => {
+    if (!activeGame || !currentUser) return false;
+    const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
+    return !!gamePlayer?.isBanker;
+  }, [activeGame, currentUser]);
+
 
   // Load user data and check auth
   useEffect(() => {
@@ -1173,6 +1179,9 @@ export default function DashboardPage() {
               <>
                 <Separator orientation="vertical" className="h-4" />
                 <p className="font-semibold text-primary">{greeting}</p>
+                {isCurrentUserBankerInGame && (
+                    <Badge variant="outline" className="border-green-600 text-green-600">You're a banker now</Badge>
+                )}
               </>
             )}
            </div>
@@ -2509,11 +2518,11 @@ const ReportsDialog: FC<{
                      <div className="flex items-center gap-2 flex-wrap">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
-                             Export PDF
+                             <span className="hidden sm:inline">Export PDF</span>
                         </Button>
                         <Button onClick={onSettleUp}>
                             <WhatsappIcon />
-                            <span className="ml-2">Settlement</span>
+                            <span className="ml-2 hidden sm:inline">Settlement</span>
                         </Button>
                         <DialogClose asChild>
                            <Button variant="outline" size="icon"><X /></Button>
@@ -3357,6 +3366,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
