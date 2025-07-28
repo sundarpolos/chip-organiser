@@ -1188,7 +1188,7 @@ export default function DashboardPage() {
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
-            {isAdmin && <>
+            {(isAdmin || currentUser?.isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
@@ -1275,7 +1275,7 @@ export default function DashboardPage() {
                 onJoinGame={handleJoinGame}
                 setLoadGameModalOpen={setLoadGameModalOpen}
             />
-        ) : (isAdmin && !activeGame && isDataReady && (
+        ) : ((isAdmin || currentUser?.isBanker) && !activeGame && isDataReady && (
             <div className="text-center py-20">
                 <h2 className="text-2xl font-semibold mb-2">Welcome, {currentUser.name}!</h2>
                 <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
@@ -3366,6 +3366,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
