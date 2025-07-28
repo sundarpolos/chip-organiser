@@ -1148,7 +1148,6 @@ export default function DashboardPage() {
         <div className="flex-1">
           <div className="flex items-baseline gap-3">
              <h1 className="text-2xl font-bold truncate">{greeting}</h1>
-             {activeGame && <p className="font-semibold text-primary">{activeGame.venue}</p>}
            </div>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && (
@@ -3356,6 +3355,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
