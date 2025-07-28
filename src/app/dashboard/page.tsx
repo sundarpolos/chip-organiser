@@ -1885,14 +1885,6 @@ const EditPlayerDialog: FC<{
                             onChange={(e) => setEditablePlayer(p => p ? { ...p, name: e.target.value } : null)}
                         />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
-                        <Input
-                            id="edit-player-whatsapp"
-                            value={editablePlayer.whatsappNumber}
-                            onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
-                        />
-                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
