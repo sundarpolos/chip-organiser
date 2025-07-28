@@ -2518,11 +2518,11 @@ const ReportsDialog: FC<{
                      <div className="flex items-center gap-2 flex-wrap">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
-                             <span className="hidden sm:inline">Export PDF</span>
+                             Export PDF
                         </Button>
                         <Button onClick={onSettleUp}>
                             <WhatsappIcon />
-                            <span className="ml-2 hidden sm:inline">Settlement</span>
+                            <span className="ml-2">Settlement</span>
                         </Button>
                         <DialogClose asChild>
                            <Button variant="outline" size="icon"><X /></Button>
@@ -3366,6 +3366,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
