@@ -325,9 +325,11 @@ const AdminView: FC<{
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                     <div className="flex gap-2">
-                        <Button onClick={() => setAddPlayerModalOpen(true)} disabled={!canEdit}>
-                            <Plus className="mr-2 h-4 w-4" />Add Player(s)
-                        </Button>
+                        {canEdit && (
+                            <Button onClick={() => setAddPlayerModalOpen(true)}>
+                                <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                            </Button>
+                        )}
                         <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                     </div>
                     <div className="flex gap-2">
@@ -1201,47 +1203,54 @@ export default function DashboardPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)} disabled={!isAdmin}>
-                    <BookUser className="h-4 w-4 mr-2" />
-                    Manage Players
-                </DropdownMenuItem>
-                 <DropdownMenuItem asChild disabled={!isAdmin}>
-                   <Link href="/merge">
-                      <Merge className="h-4 w-4 mr-2" />
-                      Merge Players
-                   </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild disabled={!isAdmin}>
+                {isAdmin && (
+                    <>
+                    <DropdownMenuItem onClick={() => setManagePlayersModalOpen(true)}>
+                        <BookUser className="h-4 w-4 mr-2" />
+                        Manage Players
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                       <Link href="/merge">
+                          <Merge className="h-4 w-4 mr-2" />
+                          Merge Players
+                       </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    </>
+                )}
+                <DropdownMenuItem asChild>
                    <Link href="/reports">
                       <History className="h-4 w-4 mr-2" />
                       Game History
                    </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={!isAdmin}>
-                  <MessageCircleCode className="h-4 w-4 mr-2" />
-                  <Label htmlFor="otp-verification-toggle" className="pr-2 flex-1">OTP Verification</Label>
-                  <Switch
-                      id="otp-verification-toggle"
-                      checked={isOtpVerificationEnabled}
-                      onCheckedChange={setOtpVerificationEnabled}
-                      disabled={!isAdmin}
-                  />
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setImportGameModalOpen(true)} disabled={!isAdmin}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import Game
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)} disabled={!isAdmin}>
-                  <WhatsappIcon />
-                  <span className="ml-2">Group Message</span>
-                </DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)} disabled={!isAdmin}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  WA Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {isAdmin && (
+                    <>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <MessageCircleCode className="h-4 w-4 mr-2" />
+                        <Label htmlFor="otp-verification-toggle" className="pr-2 flex-1">OTP Verification</Label>
+                        <Switch
+                            id="otp-verification-toggle"
+                            checked={isOtpVerificationEnabled}
+                            onCheckedChange={setOtpVerificationEnabled}
+                        />
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import Game
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
+                        <WhatsappIcon />
+                        <span className="ml-2">Group Message</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        WA Settings
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                    </>
+                )}
                 <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -2387,7 +2396,7 @@ const LoadGameDialog: FC<{
                         ) : (
                             <div className="text-center py-10">
                                 <p className="text-muted-foreground">No game history found.</p>
-                                {currentUser?.isAdmin && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
+                                {(currentUser?.isAdmin || currentUser?.isBanker) && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
                             </div>
                         )}
                     </div>
@@ -3366,6 +3375,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
