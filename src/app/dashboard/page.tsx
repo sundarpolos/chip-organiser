@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -1588,7 +1589,6 @@ const PlayerCard: FC<{
   activeGame: GameHistory;
 }> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, canEdit, currentUser, toast, activeGame }) => {
   const isCurrentUser = player.name === currentUser?.name;
-  const isAdmin = currentUser?.isAdmin === true;
 
   const [finalChips, setFinalChips] = useState(player.finalChips);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1703,7 +1703,7 @@ const PlayerCard: FC<{
                 <div className="mt-4 flex items-center justify-end">
                     <div className="flex gap-2">
                         {isCurrentUser && !canEdit ? (
-                        <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                            <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
                         ) : canEdit ? (
                             <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
                         ): null}
@@ -1726,40 +1726,42 @@ const PlayerCard: FC<{
         
         <div className="flex flex-wrap gap-4 justify-end items-center mt-4">
             <div className="flex gap-2 items-center">
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" disabled={!player.name || !isAdmin} size="icon">
-                                <ShieldAlert className="h-4 w-4" />
-                                <span className="sr-only">Analyze Buy-ins</span>
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>Analyze Buy-ins</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
                 {canEdit && (
-                     <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" disabled={!canEdit}>
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remove Player</span>
-                          </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure you want to remove {player.name}?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently remove the player and all their data from this game.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => onRemove(player.id)}>Remove Player</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon">
+                                        <ShieldAlert className="h-4 w-4" />
+                                        <span className="sr-only">Analyze Buy-ins</span>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Analyze Buy-ins</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon">
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="sr-only">Remove Player</span>
+                              </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure you want to remove {player.name}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently remove the player and all their data from this game.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onRemove(player.id)}>Remove Player</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                    </>
                 )}
             </div>
         </div>
@@ -3355,4 +3357,5 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
