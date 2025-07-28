@@ -1146,7 +1146,10 @@ export default function DashboardPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-           <h1 className="text-2xl font-bold truncate">{greeting || "Smart Club Organiser"}</h1>
+          <div className="flex items-baseline gap-3">
+             <h1 className="text-2xl font-bold truncate">{greeting}</h1>
+             {activeGame && <p className="font-semibold text-primary">{activeGame.venue}</p>}
+           </div>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && (
               <>
@@ -1161,8 +1164,7 @@ export default function DashboardPage() {
                         <span>{gameDuration}</span>
                     </div>
                 )}
-                <Separator orientation="vertical" className="h-4" />
-                 <p className="font-semibold text-primary">{activeGame.venue}</p>
+                
               </>
             )}
            </div>
@@ -3354,6 +3356,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 

@@ -129,10 +129,13 @@ export default function MergeVenuesPage() {
 
       const updatedGames = await Promise.all(updatedGamesPromises);
       setGameHistory(updatedGames);
+      
+      const updatedMasterVenues = await getMasterVenues();
+      setMasterVenues(updatedMasterVenues);
 
       toast({
         title: 'Merge Successful!',
-        description: `All game records for ${secondaryVenueNames.join(', ')} have been reassigned to ${primaryVenue.name}.`,
+        description: `All game records for ${secondaryVenueNames.join(', ')} have been reassigned to ${primaryVenue.name}. The original venue entries were not deleted.`,
       });
 
     } catch (error) {
