@@ -95,10 +95,11 @@ import {
   SortAsc,
   ArrowRight,
   Map,
+  Clock,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
-import { format, isSameDay, set, intervalToDuration } from "date-fns"
+import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -566,6 +567,8 @@ export default function DashboardPage() {
     apiToken: '',
     senderMobile: ''
   });
+  const [deckChangeInterval, setDeckChangeInterval] = useState(2); // in hours
+  const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
 
   // Modal & Dialog State
   const [isVenueModalOpen, setVenueModalOpen] = useState(false)
@@ -574,7 +577,6 @@ export default function DashboardPage() {
   const [isReportsModalOpen, setReportsModalOpen] = useState(false)
   const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false)
   const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
-  const [isWhatsappSettingsModalOpen, setWhatsappSettingsModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
@@ -665,6 +667,11 @@ export default function DashboardPage() {
             const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
             if (savedOtpPreference !== null) {
                 setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
+            }
+
+            const savedDeckInterval = localStorage.getItem("deckChangeInterval");
+            if (savedDeckInterval) {
+                setDeckChangeInterval(Number(savedDeckInterval));
             }
 
             const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
@@ -808,6 +815,39 @@ export default function DashboardPage() {
 
     return () => clearInterval(timerInterval);
   }, [activeGame?.startTime, activeGame?.endTime]);
+  
+  // Deck change timer effect
+  useEffect(() => {
+    if (!activeGame?.startTime || activeGame.endTime || deckChangeInterval <= 0) {
+        return;
+    }
+
+    const startTime = new Date(activeGame.startTime);
+    let nextChangeTime = addHours(startTime, deckChangeInterval);
+    const now = new Date();
+
+    // Find the next change time that is in the future
+    while (nextChangeTime < now) {
+        nextChangeTime = addHours(nextChangeTime, deckChangeInterval);
+    }
+
+    const alertTime = new Date(nextChangeTime.getTime() - 5 * 60 * 1000); // 5 minutes before
+    
+    let alertTimeout: NodeJS.Timeout | null = null;
+    
+    if (alertTime > now) {
+        const timeToAlert = differenceInMilliseconds(alertTime, now);
+        alertTimeout = setTimeout(() => {
+            setShowDeckChangeAlert(true);
+        }, timeToAlert);
+    }
+    
+    return () => {
+        if (alertTimeout) {
+            clearTimeout(alertTimeout);
+        }
+    };
+}, [activeGame?.startTime, activeGame?.endTime, deckChangeInterval]);
   
 
   const handleLogout = () => {
@@ -1230,9 +1270,11 @@ export default function DashboardPage() {
                         <WhatsappIcon />
                         <span className="ml-2">Group Message</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setWhatsappSettingsModalOpen(true)}>
-                        <Settings className="h-4 w-4 mr-2" />
-                        WA Settings
+                        <DropdownMenuItem asChild>
+                          <Link href="/settings">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Settings
+                          </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                     </>
@@ -1343,13 +1385,6 @@ export default function DashboardPage() {
         whatsappConfig={whatsappConfig}
         masterPlayers={masterPlayers}
       />
-      <WhatsappSettingsDialog
-        isOpen={isWhatsappSettingsModalOpen}
-        onOpenChange={setWhatsappSettingsModalOpen}
-        config={whatsappConfig}
-        onSave={setWhatsappConfig}
-        toast={toast}
-      />
       <ImportGameDialog
         isOpen={isImportGameModalOpen}
         onOpenChange={setImportGameModalOpen}
@@ -1384,6 +1419,10 @@ export default function DashboardPage() {
           approveButton?.click();
           setBuyInRequestModal(null);
         }}
+      />
+      <DeckChangeAlertDialog
+        isOpen={showDeckChangeAlert}
+        onOpenChange={setShowDeckChangeAlert}
       />
     </div>
   )
@@ -2836,83 +2875,6 @@ const WhatsappDialog: FC<{
   );
 };
 
-const WhatsappSettingsDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  config: WhatsappConfig;
-  onSave: (config: WhatsappConfig) => void;
-  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ isOpen, onOpenChange, config, onSave, toast }) => {
-  const [currentConfig, setCurrentConfig] = useState(config);
-
-  useEffect(() => {
-    setCurrentConfig(config);
-  }, [config, isOpen]);
-
-  const handleChange = (field: keyof WhatsappConfig, value: string) => {
-    setCurrentConfig(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSave = () => {
-    // In a real app, this might be saved to a secure backend or user profile
-    localStorage.setItem('whatsappConfig', JSON.stringify(currentConfig));
-    onSave(currentConfig);
-    toast({ title: 'Settings Saved', description: 'WhatsApp credentials have been updated for this session.' });
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>WhatsApp API Settings</DialogTitle>
-          <DialogDescription>
-            Enter your WhatsApp provider credentials here. These are stored locally in your browser.
-            You can also set these as ENV variables on the server.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="apiUrl">API URL</Label>
-            <Input
-              id="apiUrl"
-              placeholder="https://api.provider.com/send"
-              value={currentConfig.apiUrl}
-              onChange={(e) => handleChange('apiUrl', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="apiToken">API Token</Label>
-            <Input
-              id="apiToken"
-              type="password"
-              placeholder="Your secret API token"
-              value={currentConfig.apiToken}
-              onChange={(e) => handleChange('apiToken', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="senderMobile">Sender Mobile</Label>
-            <Input
-              id="senderMobile"
-              placeholder="e.g., 14155552671"
-              value={currentConfig.senderMobile}
-              onChange={(e) => handleChange('senderMobile', e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleSave}>Save Settings</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-
 const ImportGameDialog: FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -3354,7 +3316,31 @@ const BuyInRequestModalDialog: FC<{
     );
 };
     
+const DeckChangeAlertDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+}> = ({ isOpen, onOpenChange }) => {
+    return (
+        <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <div className="flex justify-center mb-4">
+                        <Clock className="h-12 w-12 text-primary"/>
+                    </div>
+                    <AlertDialogTitle className="text-center">Deck Change Reminder</AlertDialogTitle>
+                    <AlertDialogDescription className="text-center">
+                        Time for a new deck! It's been 5 minutes to the scheduled change.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogAction onClick={() => onOpenChange(false)}>Got it</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
     
+
 
 
 
