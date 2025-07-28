@@ -1685,12 +1685,15 @@ const PlayerCard: FC<{
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
-                <div className="mt-4 flex gap-2">
-                     {isCurrentUser && !canEdit ? (
-                       <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
-                    ) : canEdit ? (
-                        <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
-                    ): null}
+                <div className="mt-4 flex items-center justify-between">
+                    <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
+                    <div className="flex gap-2">
+                        {isCurrentUser && !canEdit ? (
+                        <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                        ) : canEdit ? (
+                            <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
+                        ): null}
+                    </div>
                 </div>
             </div>
             <div>
@@ -1707,10 +1710,7 @@ const PlayerCard: FC<{
             </div>
         </div>
         
-        <div className="flex flex-wrap gap-4 justify-between items-center mt-4">
-            <div className="flex items-center gap-4">
-                <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
-            </div>
+        <div className="flex flex-wrap gap-4 justify-end items-center mt-4">
             <div className="flex gap-2 items-center">
                 <TooltipProvider>
                     <Tooltip>
@@ -2500,8 +2500,8 @@ const ReportsDialog: FC<{
                     </div>
                      <div className="flex items-center gap-2 flex-wrap">
                         <Button onClick={handleExportPdf} disabled={isExporting}>
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                             <span className="ml-2">Export PDF</span>
+                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                             Export PDF
                         </Button>
                         <Button onClick={onSettleUp}>
                             <WhatsappIcon />
@@ -3347,3 +3347,4 @@ const BuyInRequestModalDialog: FC<{
         </Dialog>
     );
 };
+
