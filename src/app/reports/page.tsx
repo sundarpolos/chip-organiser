@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, type FC } from 'react';
+import { useRouter } from 'next/navigation';
 import { getGameHistory } from '@/services/game-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
@@ -51,6 +52,7 @@ const tickFormatter = (value: number) => `₹${value / 1000}k`;
 
 export default function GameHistoryPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const reportContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -59,6 +61,7 @@ export default function GameHistoryPage() {
   const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
   const [masterVenues, setMasterVenues] = useState<MasterVenue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
 
   // Filter state
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
@@ -78,9 +81,23 @@ export default function GameHistoryPage() {
     playerProfitBar: false,
   });
 
+  const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
+
+  // Load user from local storage
+  useEffect(() => {
+    const userStr = localStorage.getItem('chip-maestro-user');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    } else {
+      router.replace('/login');
+    }
+  }, [router]);
+
   // Load all data on component mount
   useEffect(() => {
     async function loadAllData() {
+      if (!currentUser) return;
+
       try {
         const [games, players, venues] = await Promise.all([
           getGameHistory(),
@@ -90,9 +107,17 @@ export default function GameHistoryPage() {
         setAllGames(games);
         setMasterPlayers(players);
         setMasterVenues(venues);
-        // Initially, select all players and venues
-        setSelectedPlayerIds(players.map(p => p.id));
-        setSelectedVenueIds(venues.map(v => v.id));
+        
+        if (isAdmin) {
+            // Admins see all players and venues by default
+            setSelectedPlayerIds(players.map(p => p.id));
+            setSelectedVenueIds(venues.map(v => v.id));
+        } else {
+            // Non-admins only see themselves, and all venues
+            setSelectedPlayerIds([currentUser.id]);
+            setSelectedVenueIds(venues.map(v => v.id));
+        }
+
       } catch (error) {
         console.error('Failed to load data for reports:', error);
         toast({
@@ -105,7 +130,7 @@ export default function GameHistoryPage() {
       }
     }
     loadAllData();
-  }, [toast]);
+  }, [toast, currentUser, isAdmin]);
 
   // Memoized filtered data
     const filteredGames = useMemo(() => {
@@ -246,7 +271,7 @@ export default function GameHistoryPage() {
   };
 
 
-  if (isLoading) {
+  if (isLoading || !currentUser) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -262,7 +287,7 @@ export default function GameHistoryPage() {
         </CardHeader>
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 border-b pb-4 mb-4">
-                <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>
+                {isAdmin && <MultiSelectPopover title="Players" options={masterPlayers} selected={selectedPlayerIds} onSelectedChange={setSelectedPlayerIds}/>}
                 <MultiSelectPopover title="Venues" options={masterVenues} selected={selectedVenueIds} onSelectedChange={setSelectedVenueIds}/>
                 <div className="space-y-2">
                     <Label>Date Range</Label>
@@ -323,7 +348,7 @@ export default function GameHistoryPage() {
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <CardTitle>Player Report</CardTitle>
+                        <CardTitle>{isAdmin ? "Player Report" : `Your Report, ${currentUser.name}`}</CardTitle>
                         <Badge variant="secondary">{playerReportData.length} players</Badge>
                     </div>
                 </CardHeader>
@@ -331,6 +356,7 @@ export default function GameHistoryPage() {
                     <PlayerReportTable
                         playerReportData={playerReportData}
                         filteredGames={filteredGames}
+                        isAdmin={isAdmin}
                     />
                 </CardContent>
             </Card>
@@ -522,7 +548,8 @@ const MultiSelectPopover: FC<{
 const PlayerReportTable: FC<{
     playerReportData: PlayerReportRow[],
     filteredGames: any[],
-}> = ({ playerReportData, filteredGames }) => {
+    isAdmin: boolean
+}> = ({ playerReportData, filteredGames, isAdmin }) => {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
     
     useEffect(() => {
@@ -579,10 +606,12 @@ const PlayerReportTable: FC<{
 
     return (
        <div className="w-full overflow-x-auto">
-            <div className="flex justify-end gap-2 mb-2">
-                <Button variant="outline" size="sm" onClick={expandAll}><Rows className="mr-2 h-4 w-4" />Expand All</Button>
-                <Button variant="outline" size="sm" onClick={collapseAll}><Columns className="mr-2 h-4 w-4" />Collapse All</Button>
-            </div>
+            {isAdmin && (
+                <div className="flex justify-end gap-2 mb-2">
+                    <Button variant="outline" size="sm" onClick={expandAll}><Rows className="mr-2 h-4 w-4" />Expand All</Button>
+                    <Button variant="outline" size="sm" onClick={collapseAll}><Columns className="mr-2 h-4 w-4" />Collapse All</Button>
+                </div>
+            )}
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -603,9 +632,11 @@ const PlayerReportTable: FC<{
                                 <React.Fragment key={player.id}>
                                     <TableRow>
                                         <TableCell>
+                                          {isAdmin && (
                                             <Button variant="ghost" size="icon" onClick={() => toggleRow(player.id)} className="h-6 w-6">
                                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                             </Button>
+                                          )}
                                         </TableCell>
                                         <TableCell className='font-medium'>{player.name}</TableCell>
                                         <TableCell>{player.gamesPlayed}</TableCell>
@@ -613,7 +644,7 @@ const PlayerReportTable: FC<{
                                         <TableCell className="font-mono">₹{(player.totalChipReturn || 0).toFixed(0)}</TableCell>
                                         <TableCell className={cn('font-mono font-bold', (player.profitLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600')}>₹{(player.profitLoss || 0).toFixed(0)}</TableCell>
                                     </TableRow>
-                                    {isExpanded && (
+                                    {isExpanded && isAdmin && (
                                         <TableRow>
                                             <TableCell colSpan={6} className="p-0 bg-muted/50">
                                                 <div className="p-4 overflow-x-auto">
