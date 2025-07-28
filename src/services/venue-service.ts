@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/firebase";
 import { MasterVenue } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, addDoc, writeBatch } from "firebase/firestore";
+import { getGameHistory } from "./game-service";
 
 const MASTER_VENUES_COLLECTION = "masterVenues";
 
@@ -15,10 +16,27 @@ export async function getMasterVenues(): Promise<MasterVenue[]> {
     return venues;
 }
 
-export async function saveMasterVenue(venue: Omit<MasterVenue, 'id'> | MasterVenue): Promise<MasterVenue> {
+export async function saveMasterVenue(
+    venue: Omit<MasterVenue, 'id'> | MasterVenue,
+    options: { updateGames: boolean, oldName?: string } = { updateGames: false }
+): Promise<MasterVenue> {
     if ('id' in venue) {
         // This is an update
         const docRef = doc(db, MASTER_VENUES_COLLECTION, venue.id);
+        
+        if (options.updateGames && options.oldName && options.oldName !== venue.name) {
+            const batch = writeBatch(db);
+            const allGames = await getGameHistory();
+            
+            allGames.forEach(game => {
+                if (game.venue === options.oldName) {
+                    const gameDocRef = doc(db, "gameHistory", game.id);
+                    batch.update(gameDocRef, { venue: venue.name });
+                }
+            });
+            await batch.commit();
+        }
+
         await setDoc(docRef, venue, { merge: true });
         return venue;
     } else {
@@ -27,6 +45,7 @@ export async function saveMasterVenue(venue: Omit<MasterVenue, 'id'> | MasterVen
         return { id: docRef.id, ...venue };
     }
 }
+
 
 export async function deleteMasterVenue(venueId: string): Promise<void> {
     await deleteDoc(doc(db, MASTER_VENUES_COLLECTION, venueId));

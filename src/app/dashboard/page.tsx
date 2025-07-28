@@ -94,6 +94,7 @@ import {
   Merge,
   SortAsc,
   ArrowRight,
+  Map,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -1213,6 +1214,12 @@ export default function DashboardPage() {
                        <Link href="/merge">
                           <Merge className="h-4 w-4 mr-2" />
                           Merge Players
+                       </Link>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                       <Link href="/merge-venues">
+                          <Map className="h-4 w-4 mr-2" />
+                          Merge Venues
                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -3375,6 +3382,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
