@@ -1926,7 +1926,6 @@ const ManagePlayersDialog: FC<{
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-1/3">Name</TableHead>
-                                    <TableHead className="w-1/3">WhatsApp Number</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
                                     <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[100px]">Active</TableHead>
@@ -1937,10 +1936,11 @@ const ManagePlayersDialog: FC<{
                                 {editablePlayers.map(p => (
                                     <TableRow key={p.id}>
                                         <TableCell>
-                                            <Input value={p.name} className="h-8" readOnly={!p.id.startsWith('new-')} onChange={e => p.id.startsWith('new-') && handleFieldChange(p.id, 'name', e.target.value)} />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input value={p.whatsappNumber} className="h-8" readOnly={!p.id.startsWith('new-')} onChange={e => p.id.startsWith('new-') && handleFieldChange(p.id, 'whatsappNumber', e.target.value)} />
+                                           { p.id.startsWith('new-') ? (
+                                                <Input value={p.name} className="h-8" onChange={e => handleFieldChange(p.id, 'name', e.target.value)} />
+                                            ) : (
+                                                <Label>{p.name}</Label>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
@@ -3163,6 +3163,7 @@ const BuyInRequestModalDialog: FC<{
     
 
     
+
 
 
 
