@@ -1655,11 +1655,14 @@ const PlayerCard: FC<{
     <div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
+                 <div className="flex items-center justify-between mb-2">
+                    <Label className="text-lg">Buy-ins</Label>
+                    <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
+                </div>
                  <Accordion type="single" collapsible className="w-full" defaultValue={totalBuyInCount > 4 ? "" : "item-1"}>
                   <AccordionItem value="item-1">
                     <AccordionTrigger>
                         <div className="flex justify-between items-center w-full pr-2">
-                             <Label className="text-lg">Buy-ins</Label>
                              <div className="text-sm">
                                 <span className="font-bold">{totalBuyInCount}</span> buy-in(s)
                              </div>
@@ -1685,8 +1688,7 @@ const PlayerCard: FC<{
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
-                <div className="mt-4 flex items-center justify-between">
-                    <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
+                <div className="mt-4 flex items-center justify-end">
                     <div className="flex gap-2">
                         {isCurrentUser && !canEdit ? (
                         <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
