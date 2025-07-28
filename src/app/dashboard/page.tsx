@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -544,7 +543,7 @@ export default function DashboardPage() {
 
   // Core State
   const [activeTab, setActiveTab] = useState<string>("")
-  const [isDataReady, setIsDataReady] = useState(false)
+  const [isDataReady, setIsDataReady] = useState(false);
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [greeting, setGreeting] = useState('');
@@ -571,11 +570,11 @@ export default function DashboardPage() {
   const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
 
   // Modal & Dialog State
-  const [isVenueModalOpen, setVenueModalOpen] = useState(false)
-  const [isManagePlayersModalOpen, setManagePlayersModalOpen] = useState(false)
-  const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false)
-  const [isReportsModalOpen, setReportsModalOpen] = useState(false)
-  const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false)
+  const [isVenueModalOpen, setVenueModalOpen] = useState(false);
+  const [isManagePlayersModalOpen, setManagePlayersModalOpen] = useState(false);
+  const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false);
+  const [isReportsModalOpen, setReportsModalOpen] = useState(false);
+  const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false);
   const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
@@ -2764,8 +2763,15 @@ const WhatsappDialog: FC<{
   const { toast } = useToast();
 
   const playersWithNumbers = useMemo(() => {
-    return masterPlayers.filter(p => p.whatsappNumber && p.isActive);
+    return masterPlayers.filter(p => p.whatsappNumber && (p.isActive ?? true));
   }, [masterPlayers]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Pre-select all active players with WhatsApp numbers
+      setSelectedNumbers(playersWithNumbers.map(p => p.whatsappNumber));
+    }
+  }, [isOpen, playersWithNumbers]);
 
   const handleSelectPlayer = (number: string, isSelected: boolean) => {
     if (isSelected) {
@@ -3381,5 +3387,9 @@ const DeckChangeAlertDialog: FC<{
 
 
 
+
+    
+
+    
 
     
