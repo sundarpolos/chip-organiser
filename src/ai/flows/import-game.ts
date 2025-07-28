@@ -6,7 +6,7 @@
  *
  * - importGameFromText - A function that parses text and returns structured game data.
  * - ImportGameInput - The input type for the importGameFromText function.
- * - ImportGameOutput - The return type for the importGameFromText function.
+ * - ImportGameOutput - The return type for the importGameFromText a function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -25,7 +25,6 @@ const ImportGameOutputSchema = z.object({
       id: z.string(),
       name: z.string(),
       whatsappNumber: z.string(),
-      isBanker: z.boolean(),
       buyIns: z.array(z.object({
           amount: z.number(),
           timestamp: z.string().describe("The timestamp of the buy-in in ISO format."),
@@ -55,7 +54,6 @@ The log contains 'Buy In' and 'Chip Return' entries for multiple players.
 - Generate a unique ID for each player (e.g., 'player-import-1', 'player-import-2').
 - Set the game 'timestamp' to the first date and time found in the log.
 - Set 'whatsappNumber' to an empty string for all players.
-- Set 'isBanker' to false for all players.
 - Infer the venue name from the log if possible, otherwise call it "Imported Game".
 
 Game Log:

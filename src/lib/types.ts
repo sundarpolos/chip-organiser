@@ -11,7 +11,6 @@ export interface Player {
   id: string;
   name: string;
   whatsappNumber: string;
-  isBanker: boolean;
   buyIns: BuyIn[];
   finalChips: number;
 }
@@ -26,7 +25,7 @@ export interface MasterPlayer {
   name: string;
   whatsappNumber: string;
   isAdmin: boolean;
-  isBanker: boolean;
+  isBanker?: boolean;
   isActive?: boolean;
 }
 

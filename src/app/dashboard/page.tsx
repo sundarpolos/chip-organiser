@@ -592,13 +592,13 @@ export default function DashboardPage() {
     if (!activeGame || !currentUser) return false;
     if (isAdmin) return true;
     const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
-    return !!gamePlayer?.isBanker;
+    return !!gamePlayer;
   }, [isAdmin, currentUser, activeGame]);
 
   const isCurrentUserBankerInGame = useMemo(() => {
     if (!activeGame || !currentUser) return false;
     const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
-    return !!gamePlayer?.isBanker;
+    return !!gamePlayer;
   }, [activeGame, currentUser]);
 
 
@@ -824,7 +824,6 @@ export default function DashboardPage() {
           id: `player-${Date.now()}-${playerToAdd.id}`,
           name: playerToAdd.name,
           whatsappNumber: playerToAdd.whatsappNumber,
-          isBanker: playerToAdd.isBanker,
           buyIns: [],
           finalChips: 0,
       }));
@@ -884,7 +883,6 @@ export default function DashboardPage() {
         id: p.id,
         name: p.name,
         whatsappNumber: p.whatsappNumber,
-        isBanker: p.isBanker,
         buyIns: p.buyIns.map(b => ({
             id: b.id,
             amount: b.amount,
@@ -940,7 +938,6 @@ export default function DashboardPage() {
                 name: currentUser.name,
                 whatsappNumber: currentUser.whatsappNumber,
                 isAdmin: currentUser.isAdmin,
-                isBanker: currentUser.isBanker,
                 isActive: currentUser.isActive,
             };
             
@@ -948,7 +945,6 @@ export default function DashboardPage() {
                 id: `player-${Date.now()}-${playerToAdd.id}`,
                 name: playerToAdd.name,
                 whatsappNumber: playerToAdd.whatsappNumber,
-                isBanker: playerToAdd.isBanker,
                 buyIns: [],
                 finalChips: 0,
             };
@@ -1086,7 +1082,6 @@ export default function DashboardPage() {
                 name: p.name,
                 whatsappNumber: p.whatsappNumber || "",
                 isAdmin: false,
-                isBanker: false,
                 isActive: true,
             };
             return await saveMasterPlayer(newPlayer, { updateGames: false });
@@ -1111,7 +1106,6 @@ export default function DashboardPage() {
             id: p.id,
             name: p.name,
             whatsappNumber: p.whatsappNumber || "",
-            isBanker: p.isBanker || false,
             buyIns: (p.buyIns || []).map(b => ({
                 id: b.id,
                 amount: b.amount,
@@ -1152,16 +1146,7 @@ export default function DashboardPage() {
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
-           {activeGame ? (
-              <EditableVenue
-                venue={activeGame.venue}
-                masterVenues={masterVenues}
-                onVenueChange={handleVenueChange}
-                isAdmin={isAdmin}
-              />
-            ) : (
-              <h1 className="text-2xl font-bold truncate">Smart Club Organiser</h1>
-            )}
+          <h1 className="text-2xl font-bold truncate">Smart Club Organiser</h1>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && activeGame.players.length > 0 && (
                 <Badge variant="destructive" className="flex items-center gap-1">
@@ -1182,9 +1167,6 @@ export default function DashboardPage() {
               <>
                 <Separator orientation="vertical" className="h-4" />
                 <p className="font-semibold text-primary">{greeting}</p>
-                {isCurrentUserBankerInGame && (
-                    <Badge variant="outline" className="border-green-600 text-green-600">You're a banker now</Badge>
-                )}
               </>
             )}
            </div>
@@ -1968,7 +1950,6 @@ const ManagePlayersDialog: FC<{
             name: '',
             whatsappNumber: '',
             isAdmin: false,
-            isBanker: false,
             isActive: true,
         };
         setEditablePlayers(prev => [newPlayer, ...prev]);
@@ -2015,7 +1996,6 @@ const ManagePlayersDialog: FC<{
                      const playerToSave = {
                         ...originalPlayer!, //we know it exists
                         isAdmin: player.isAdmin,
-                        isBanker: player.isBanker,
                         isActive: player.isActive
                      }
                      return saveMasterPlayer(playerToSave, { updateGames: false });
@@ -2148,7 +2128,6 @@ const ManagePlayersDialog: FC<{
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
-                                    <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[100px]">Active</TableHead>
                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                 </TableRow>
@@ -2165,9 +2144,6 @@ const ManagePlayersDialog: FC<{
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
-                                        </TableCell>
-                                         <TableCell className="text-center">
-                                            <Switch checked={p.isBanker} onCheckedChange={checked => handleFieldChange(p.id, 'isBanker', checked)} />
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isActive ?? true} onCheckedChange={checked => handleFieldChange(p.id, 'isActive', checked)} />
@@ -2403,7 +2379,7 @@ const LoadGameDialog: FC<{
                         ) : (
                             <div className="text-center py-10">
                                 <p className="text-muted-foreground">No game history found.</p>
-                                {(currentUser?.isAdmin || currentUser?.isBanker) && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
+                                {(currentUser?.isAdmin) && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
                             </div>
                         )}
                     </div>
@@ -3382,6 +3358,7 @@ const BuyInRequestModalDialog: FC<{
 };
     
     
+
 
 
 
