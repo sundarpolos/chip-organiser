@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
@@ -159,30 +158,30 @@ const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ cal
         <Table>
             <TableHeader>
                 <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead className="text-right">Buy-in</TableHead>
-                    <TableHead className="text-right">Chip Return</TableHead>
-                    <TableHead className="text-right">P/L</TableHead>
+                    <TableHead className="px-2 sm:px-4">Player</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">Buy-in</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">Return</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">P/L</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {calculatedPlayers.map((p) => (
-                    <TableRow key={p.id}>
-                        <TableCell className="font-medium">{p.name}</TableCell>
-                        <TableCell className="text-right">₹{p.totalBuyIns}</TableCell>
-                        <TableCell className="text-right">₹{p.finalChips}</TableCell>
-                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <TableRow key={p.id} className="text-xs sm:text-sm">
+                        <TableCell className="font-medium px-2 sm:px-4">{p.name}</TableCell>
+                        <TableCell className="text-right px-2 sm:px-4">₹{p.totalBuyIns}</TableCell>
+                        <TableCell className="text-right px-2 sm:px-4">₹{p.finalChips}</TableCell>
+                        <TableCell className={`text-right font-bold px-2 sm:px-4 ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             ₹{p.profitLoss.toFixed(0)}
                         </TableCell>
                     </TableRow>
                 ))}
             </TableBody>
             <TableFoot>
-                <TableRow className="font-bold border-t-2 border-foreground">
-                    <TableCell>Totals</TableCell>
-                    <TableCell className="text-right">₹{grandTotalBuyin}</TableCell>
-                    <TableCell className="text-right">₹{grandTotalChips}</TableCell>
-                    <TableCell className={`text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>
+                <TableRow className="font-bold border-t-2 border-foreground text-xs sm:text-sm">
+                    <TableCell className="px-2 sm:px-4">Totals</TableCell>
+                    <TableCell className="text-right px-2 sm:px-4">₹{grandTotalBuyin}</TableCell>
+                    <TableCell className="text-right px-2 sm:px-4">₹{grandTotalChips}</TableCell>
+                    <TableCell className={`text-right px-2 sm:px-4 ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>
                         ₹{grandTotalProfitLoss.toFixed(0)}
                     </TableCell>
                 </TableRow>
@@ -211,8 +210,8 @@ const GameLog: FC<{ game: GameHistory }> = ({ game }) => {
         <ScrollArea className="h-full">
             <div className="space-y-3">
                 {log.map((item, index) => (
-                    <div key={index} className="flex items-start gap-3 text-sm">
-                        <div className="text-muted-foreground min-w-[50px]">{format(item.timestamp, 'p')}</div>
+                    <div key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                        <div className="text-muted-foreground min-w-[45px] sm:min-w-[50px]">{format(item.timestamp, 'p')}</div>
                         <div>{item.text}</div>
                     </div>
                 ))}
@@ -234,7 +233,7 @@ const SettlementPreview: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calc
     return (
         <div className="space-y-2">
             {transfers.map((transfer, index) => (
-                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50 text-xs sm:text-sm">
                     <div className="flex items-center gap-2 font-medium">
                         <span dangerouslySetInnerHTML={{ __html: transfer.split(':')[0] }} />
                     </div>
@@ -3362,5 +3361,5 @@ const BuyInRequestModalDialog: FC<{
         </Dialog>
     );
 };
-
-
+    
+    
