@@ -589,19 +589,33 @@ export default function DashboardPage() {
   const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
   const [isAnomalyLoading, setAnomalyLoading] = useState(false);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
+  const isBanker = useMemo(() => currentUser?.isBanker === true, [currentUser]);
 
   const canEditGame = useMemo(() => {
     if (!activeGame || !currentUser) return false;
     if (isAdmin) return true;
-    const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
-    return !!gamePlayer;
-  }, [isAdmin, currentUser, activeGame]);
-
+    
+    // Check if the current user (master player) is a banker
+    const masterPlayer = masterPlayers.find(mp => mp.id === currentUser.id);
+    if (masterPlayer?.isBanker) {
+        // Check if this banker is actually a player in the current game
+        return activeGame.players.some(p => p.name === currentUser.name);
+    }
+    
+    return false;
+  }, [isAdmin, currentUser, activeGame, masterPlayers]);
+  
   const isCurrentUserBankerInGame = useMemo(() => {
     if (!activeGame || !currentUser) return false;
-    const gamePlayer = activeGame.players.find(p => p.name === currentUser.name);
-    return !!gamePlayer;
-  }, [activeGame, currentUser]);
+    // Admins have all rights, no need for banker badge
+    if (currentUser.isAdmin) return false;
+    
+    const masterPlayer = masterPlayers.find(mp => mp.id === currentUser.id);
+    if (masterPlayer?.isBanker) {
+        return activeGame.players.some(p => p.name === currentUser.name);
+    }
+    return false;
+  }, [activeGame, currentUser, masterPlayers]);
 
 
   // Load user data and check auth
@@ -979,6 +993,7 @@ export default function DashboardPage() {
                 whatsappNumber: currentUser.whatsappNumber,
                 isAdmin: currentUser.isAdmin,
                 isActive: currentUser.isActive,
+                isBanker: currentUser.isBanker,
             };
             
             const newPlayer: Player = {
@@ -1009,6 +1024,10 @@ export default function DashboardPage() {
   };
 
   const handleDeleteGame = async (gameId: string) => {
+    if (!isAdmin) {
+        toast({variant: 'destructive', title: 'Permission Denied', description: 'Only admins can delete games.'});
+        return;
+    }
     try {
         if(activeGame?.id === gameId) {
             setActiveGame(null);
@@ -1210,7 +1229,7 @@ export default function DashboardPage() {
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
-            {(isAdmin || currentUser?.isBanker) && <>
+            {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
@@ -1312,7 +1331,7 @@ export default function DashboardPage() {
                 onJoinGame={handleJoinGame}
                 setLoadGameModalOpen={setLoadGameModalOpen}
             />
-        ) : ((isAdmin || currentUser?.isBanker) && !activeGame && isDataReady && (
+        ) : ((isAdmin || isBanker) && !activeGame && isDataReady && (
             <div className="text-center py-20">
                 <h2 className="text-2xl font-semibold mb-2">Welcome, {currentUser.name}!</h2>
                 <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
@@ -1986,6 +2005,7 @@ const ManagePlayersDialog: FC<{
             name: '',
             whatsappNumber: '',
             isAdmin: false,
+            isBanker: false,
             isActive: true,
         };
         setEditablePlayers(prev => [newPlayer, ...prev]);
@@ -2032,6 +2052,7 @@ const ManagePlayersDialog: FC<{
                      const playerToSave = {
                         ...originalPlayer!, //we know it exists
                         isAdmin: player.isAdmin,
+                        isBanker: player.isBanker,
                         isActive: player.isActive
                      }
                      return saveMasterPlayer(playerToSave, { updateGames: false });
@@ -2164,6 +2185,7 @@ const ManagePlayersDialog: FC<{
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead className="w-[100px]">Admin</TableHead>
+                                    <TableHead className="w-[100px]">Banker</TableHead>
                                     <TableHead className="w-[100px]">Active</TableHead>
                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                 </TableRow>
@@ -2180,6 +2202,9 @@ const ManagePlayersDialog: FC<{
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isAdmin} onCheckedChange={checked => handleFieldChange(p.id, 'isAdmin', checked)} />
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Switch checked={p.isBanker ?? false} onCheckedChange={checked => handleFieldChange(p.id, 'isBanker', checked)} />
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <Switch checked={p.isActive ?? true} onCheckedChange={checked => handleFieldChange(p.id, 'isActive', checked)} />
@@ -3355,3 +3380,6 @@ const DeckChangeAlertDialog: FC<{
 
 
 
+
+
+    

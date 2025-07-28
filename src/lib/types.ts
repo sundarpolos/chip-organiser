@@ -49,3 +49,5 @@ export interface WhatsappConfig {
   apiToken: string;
   senderMobile: string;
 }
+
+    
