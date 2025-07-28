@@ -335,28 +335,41 @@ const AdminView: FC<{
                     </div>
                 </CardFooter>
             </Card>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 <Card className="lg:col-span-2">
-                    <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
-                    <CardContent>
-                        <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
-                    </CardContent>
+
+            <Accordion type="multiple" defaultValue={['summary']} className="w-full space-y-4">
+                <Card>
+                    <AccordionItem value="summary" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                            <CardTitle>Player Summary</CardTitle>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0">
+                            <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
+                        </AccordionContent>
+                    </AccordionItem>
                 </Card>
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader><CardTitle>Money Transfers</CardTitle></CardHeader>
-                        <CardContent>
-                           <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                        </CardContent>
-                    </Card>
-                     <Card>
-                        <CardHeader><CardTitle>Game Log</CardTitle></CardHeader>
-                        <CardContent className="max-h-60">
-                           <GameLog game={activeGame} />
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+
+                <Card>
+                    <AccordionItem value="transfers" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                            <CardTitle>Money Transfers</CardTitle>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0">
+                            <SettlementPreview calculatedPlayers={calculatedPlayers} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+
+                <Card>
+                    <AccordionItem value="log" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                            <CardTitle>Game Log</CardTitle>
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0 max-h-60">
+                             <GameLog game={activeGame} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+            </Accordion>
         </div>
     );
 };
@@ -3349,4 +3362,5 @@ const BuyInRequestModalDialog: FC<{
         </Dialog>
     );
 };
+
 
