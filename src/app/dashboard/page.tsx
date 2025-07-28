@@ -18,6 +18,12 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -1640,34 +1646,51 @@ const PlayerCard: FC<{
   const totalBuyIns = useMemo(() => {
     return (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
   }, [player.buyIns]);
+  
+  const totalBuyInCount = useMemo(() => {
+    return (player.buyIns || []).length;
+  }, [player.buyIns]);
 
   return (
     <div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <Label className="text-lg mb-2">Buy-ins</Label>
-                <div className="space-y-2">
-                    {(player.buyIns || []).map((buyIn) => (
-                      <div key={buyIn.id}>
-                        <BuyInRow 
-                            buyIn={buyIn}
-                            player={player}
-                            onUpdateBuyIn={handleUpdateBuyIn}
-                            onRemoveBuyIn={removeBuyIn}
-                            isOtpEnabled={isOtpEnabled}
-                            whatsappConfig={whatsappConfig}
-                            canEdit={canEdit}
-                            toast={toast}
-                        />
-                      </div>
-                    ))}
-                    <div className="flex gap-2">
-                         {isCurrentUser && !canEdit ? (
-                           <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
-                        ) : canEdit ? (
-                            <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
-                        ): null}
-                    </div>
+                 <Accordion type="single" collapsible className="w-full" defaultValue={totalBuyInCount > 4 ? "" : "item-1"}>
+                  <AccordionItem value="item-1">
+                    <AccordionTrigger>
+                        <div className="flex justify-between items-center w-full pr-2">
+                             <Label className="text-lg">Buy-ins</Label>
+                             <div className="text-sm">
+                                <span className="font-bold">{totalBuyInCount}</span> buy-in(s)
+                             </div>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <div className="space-y-2">
+                           {(player.buyIns || []).map((buyIn) => (
+                              <div key={buyIn.id}>
+                                <BuyInRow 
+                                    buyIn={buyIn}
+                                    player={player}
+                                    onUpdateBuyIn={handleUpdateBuyIn}
+                                    onRemoveBuyIn={removeBuyIn}
+                                    isOtpEnabled={isOtpEnabled}
+                                    whatsappConfig={whatsappConfig}
+                                    canEdit={canEdit}
+                                    toast={toast}
+                                />
+                              </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                <div className="mt-4 flex gap-2">
+                     {isCurrentUser && !canEdit ? (
+                       <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                    ) : canEdit ? (
+                        <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
+                    ): null}
                 </div>
             </div>
             <div>
