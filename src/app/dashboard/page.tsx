@@ -1220,7 +1220,7 @@ export default function DashboardPage() {
            </div>
         </div>
         
-        <div className="flex items-center justify-end gap-2 flex-wrap">
+        <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
             {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
@@ -3377,6 +3377,7 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
 
 
