@@ -1224,7 +1224,19 @@ export default function DashboardPage() {
             {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
-            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" size="icon">
+                            <History className="h-4 w-4" />
+                            <span className="sr-only">Load Game</span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Load Game</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -3374,4 +3386,5 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
