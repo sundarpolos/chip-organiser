@@ -1220,23 +1220,14 @@ export default function DashboardPage() {
            </div>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
             {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
             </>}
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" size="icon">
-                            <History className="h-4 w-4" />
-                            <span className="sr-only">Load Game</span>
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Load Game</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
+                <History className="mr-2 h-4 w-4" />
+                Load Game
+            </Button>
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -3386,5 +3377,6 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
 
