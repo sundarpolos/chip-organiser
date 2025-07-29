@@ -1445,12 +1445,33 @@ export default function DashboardPage() {
 
 const BuyInRequestPopover: FC<{
     onBuyInRequest: (amount: number) => void;
-}> = ({ onBuyInRequest }) => {
+    isOtpEnabled: boolean;
+}> = ({ onBuyInRequest, isOtpEnabled }) => {
     const [amount, setAmount] = useState<number | string>("");
+
+    const button = (
+        <Button disabled={!isOtpEnabled}>
+            <Plus className="mr-2" />Request Buy-in
+        </Button>
+    );
+
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button><Plus className="mr-2" />Request Buy-in</Button>
+                {isOtpEnabled ? (
+                    button
+                ) : (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span tabIndex={0}>{button}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                               <p>Buy-in requests are disabled when OTP verification is off.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
             </PopoverTrigger>
             <PopoverContent className="w-auto">
                 <div className="space-y-2">
@@ -1461,7 +1482,6 @@ const BuyInRequestPopover: FC<{
                             if (Number(amount) > 0) {
                                 onBuyInRequest(Number(amount));
                                 setAmount("");
-                                // Trigger popover close
                                 document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Escape'}));
                             }
                         }}
@@ -1761,7 +1781,7 @@ const PlayerCard: FC<{
                 <div className="mt-4 flex items-center justify-end">
                     <div className="flex gap-2">
                         {isCurrentUser && !canEdit ? (
-                            <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} />
+                            <BuyInRequestPopover onBuyInRequest={handleBuyInRequest} isOtpEnabled={isOtpEnabled} />
                         ) : canEdit ? (
                             <AddDirectBuyInPopover onAddDirectBuyIn={handleAddDirectBuyIn} />
                         ): null}
@@ -3377,6 +3397,7 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
 
 
