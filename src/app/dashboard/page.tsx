@@ -93,7 +93,7 @@ import {
   Merge,
   SortAsc,
   ArrowRight,
-  Map,
+  Map as MapIcon,
   Clock,
 } from "lucide-react"
 import jsPDF from "jspdf"
@@ -112,6 +112,7 @@ import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/servic
 import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+import { sendPushNotification } from "@/ai/flows/send-push-notification"
 
 
 const WhatsappIcon = () => (
@@ -383,8 +384,10 @@ const PlayerView: FC<{
     joinableGame: GameHistory | null;
     onJoinGame: (gameId: string) => void;
     setLoadGameModalOpen: (isOpen: boolean) => void;
+    onSubscribeToPush: () => void;
+    isSubscribed: boolean;
 }> = ({
-    currentUser, joinableGame, onJoinGame, setLoadGameModalOpen
+    currentUser, joinableGame, onJoinGame, setLoadGameModalOpen, onSubscribeToPush, isSubscribed
 }) => {
     
     return (
@@ -408,7 +411,7 @@ const PlayerView: FC<{
                         <p className="text-muted-foreground">You can view past games or wait for an admin to start a new one.</p>
                     )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-2">
                     {joinableGame ? (
                         <Button onClick={() => onJoinGame(joinableGame.id)} className="w-full">
                             <LogIn className="mr-2 h-4 w-4" /> Join Game
@@ -419,6 +422,10 @@ const PlayerView: FC<{
                             Load Previous Game
                         </Button>
                     )}
+                     <Button onClick={onSubscribeToPush} variant="secondary" className="w-full" disabled={isSubscribed}>
+                        {isSubscribed ? <Check className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+                        {isSubscribed ? "Subscribed to Notifications" : "Subscribe to Notifications"}
+                    </Button>
                 </CardFooter>
             </Card>
         </div>
@@ -542,7 +549,7 @@ export default function DashboardPage() {
 
 
   // Core State
-  const [activeTab, setActiveTab] = useState<string>("")
+  const [activeTab, setActiveTab] = useState<string>("");
   const [isDataReady, setIsDataReady] = useState(false);
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
@@ -550,17 +557,17 @@ export default function DashboardPage() {
 
 
   // Master Data State
-  const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([])
-  const [masterVenues, setMasterVenues] = useState<MasterVenue[]>([])
+  const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
+  const [masterVenues, setMasterVenues] = useState<MasterVenue[]>([]);
   
   // Game History & Results State
-  const [gameHistory, setGameHistory] = useState<GameHistory[]>([])
-  const [activeGame, setActiveGame] = useState<GameHistory | null>(null)
+  const [gameHistory, setGameHistory] = useState<GameHistory[]>([]);
+  const [activeGame, setActiveGame] = useState<GameHistory | null>(null);
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
   const [joinableGame, setJoinableGame] = useState<GameHistory | null>(null);
   const [hasCheckedForGame, setHasCheckedForGame] = useState(false);
 
-  // App Settings
+  // App Settings & PWA
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
     apiUrl: '',
     apiToken: '',
@@ -568,6 +575,9 @@ export default function DashboardPage() {
   });
   const [deckChangeInterval, setDeckChangeInterval] = useState(2); // in hours
   const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isPushSupported, setIsPushSupported] = useState(false);
+
 
   // Modal & Dialog State
   const [isVenueModalOpen, setVenueModalOpen] = useState(false);
@@ -575,7 +585,7 @@ export default function DashboardPage() {
   const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false);
   const [isReportsModalOpen, setReportsModalOpen] = useState(false);
   const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false);
-  const [isWhatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
@@ -616,6 +626,20 @@ export default function DashboardPage() {
     return false;
   }, [activeGame, currentUser, masterPlayers]);
 
+  // Check for push notification support and subscription status
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      setIsPushSupported(true);
+      navigator.serviceWorker.ready.then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          if (sub) {
+            setIsPushSubscribed(true);
+          }
+        });
+      });
+    }
+  }, []);
+
 
   // Load user data and check auth
   useEffect(() => {
@@ -630,14 +654,7 @@ export default function DashboardPage() {
   // Set greeting message
   useEffect(() => {
     if (currentUser) {
-      const messages = [
-        `Go get 'em, ${currentUser.name}!`,
-        `Today's your day, ${currentUser.name}!`,
-        `Stack those chips, ${currentUser.name}!`,
-        `Time to crush it, ${currentUser.name}!`,
-        `Let's see that winner's smile, ${currentUser.name}!`
-      ];
-      setGreeting(messages[Math.floor(Math.random() * messages.length)]);
+      setGreeting(`Hi, ${currentUser.name}!`);
     }
   }, [currentUser]);
 
@@ -862,6 +879,45 @@ export default function DashboardPage() {
     };
 }, [activeGame?.startTime, activeGame?.endTime, deckChangeInterval]);
   
+  const handleSubscribeToPush = async () => {
+    if (!isPushSupported || !currentUser) {
+        toast({variant: 'destructive', title: 'Unsupported', description: 'Push notifications are not supported on your browser or you are not logged in.'});
+        return;
+    }
+    
+    const registration = await navigator.serviceWorker.ready;
+    const existingSubscription = await registration.pushManager.getSubscription();
+
+    if (existingSubscription) {
+        toast({title: 'Already Subscribed', description: 'You are already subscribed to push notifications.'});
+        setIsPushSubscribed(true);
+        return;
+    }
+
+    try {
+        const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!applicationServerKey) {
+            throw new Error("VAPID public key is not configured.");
+        }
+        
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey,
+        });
+        
+        // Save subscription to the user's profile in Firestore
+        const updatedUser = { ...currentUser, pushSubscription: subscription.toJSON() };
+        await saveMasterPlayer(updatedUser);
+        setCurrentUser(updatedUser); // Update local state
+        
+        setIsPushSubscribed(true);
+        toast({title: 'Subscribed!', description: 'You will now receive push notifications.'});
+    } catch (error) {
+        console.error('Failed to subscribe to push notifications:', error);
+        toast({variant: 'destructive', title: 'Subscription Failed', description: 'Could not subscribe to push notifications. Please check permissions.'});
+    }
+  };
+
 
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
@@ -1255,7 +1311,7 @@ export default function DashboardPage() {
                     </DropdownMenuItem>
                      <DropdownMenuItem asChild>
                        <Link href="/merge-venues">
-                          <Map className="h-4 w-4 mr-2" />
+                          <MapIcon className="h-4 w-4 mr-2" />
                           Merge Venues
                        </Link>
                     </DropdownMenuItem>
@@ -1268,6 +1324,12 @@ export default function DashboardPage() {
                       Game History
                    </Link>
                 </DropdownMenuItem>
+                 {isPushSupported && (
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={handleSubscribeToPush} disabled={isPushSubscribed}>
+                        <Check className="h-4 w-4 mr-2" />
+                        {isPushSubscribed ? 'Subscribed' : 'Subscribe to Notifications'}
+                    </DropdownMenuItem>
+                )}
                 {isAdmin && (
                     <>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -1284,7 +1346,7 @@ export default function DashboardPage() {
                         <Upload className="h-4 w-4 mr-2" />
                         Import Game
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setWhatsappModalOpen(true)}>
+                        <DropdownMenuItem onClick={() => setSendMessageModalOpen(true)}>
                         <WhatsappIcon />
                         <span className="ml-2">Group Message</span>
                         </DropdownMenuItem>
@@ -1329,6 +1391,8 @@ export default function DashboardPage() {
                 joinableGame={joinableGame}
                 onJoinGame={handleJoinGame}
                 setLoadGameModalOpen={setLoadGameModalOpen}
+                onSubscribeToPush={handleSubscribeToPush}
+                isSubscribed={isPushSubscribed}
             />
         ) : ((isAdmin || isBanker) && !activeGame && isDataReady && (
             <div className="text-center py-20">
@@ -1397,11 +1461,12 @@ export default function DashboardPage() {
         isLoading={isAnomalyLoading}
         result={anomalyResult}
       />
-      <WhatsappDialog
-        isOpen={isWhatsappModalOpen}
-        onOpenChange={setWhatsappModalOpen}
+      <SendMessageDialog
+        isOpen={isSendMessageModalOpen}
+        onOpenChange={setSendMessageModalOpen}
         whatsappConfig={whatsappConfig}
         masterPlayers={masterPlayers}
+        toast={toast}
       />
       <ImportGameDialog
         isOpen={isImportGameModalOpen}
@@ -2751,86 +2816,127 @@ const AnomalyReportDialog: FC<{
     )
 }
 
-const WhatsappDialog: FC<{
+const SendMessageDialog: FC<{
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   whatsappConfig: WhatsappConfig;
   masterPlayers: MasterPlayer[];
-}> = ({ isOpen, onOpenChange, whatsappConfig, masterPlayers }) => {
-  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
+  toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, whatsappConfig, masterPlayers, toast }) => {
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
+  const [sendMethod, setSendMethod] = useState<'push' | 'whatsapp' | 'all'>('all');
 
-  const playersWithNumbers = useMemo(() => {
-    return masterPlayers.filter(p => p.whatsappNumber && (p.isActive ?? true));
+  const activePlayers = useMemo(() => {
+    return masterPlayers.filter(p => p.isActive ?? true);
   }, [masterPlayers]);
+
+  const playersWithWhatsapp = useMemo(() => {
+    return activePlayers.filter(p => p.whatsappNumber);
+  }, [activePlayers]);
+  
+  const playersWithPush = useMemo(() => {
+    return activePlayers.filter(p => p.pushSubscription);
+  }, [activePlayers]);
+  
+  const getCombinedPlayerList = useMemo(() => {
+    const allPlayersMap = new Map<string, MasterPlayer>();
+    [...playersWithWhatsapp, ...playersWithPush].forEach(p => {
+        if (p.isActive) {
+            allPlayersMap.set(p.id, p);
+        }
+    });
+    return Array.from(allPlayersMap.values());
+  }, [playersWithWhatsapp, playersWithPush]);
+
 
   useEffect(() => {
     if (isOpen) {
-      // Pre-select all active players with WhatsApp numbers
-      setSelectedNumbers(playersWithNumbers.map(p => p.whatsappNumber));
+      // Pre-select all active players with either communication method
+      setSelectedPlayerIds(getCombinedPlayerList.map(p => p.id));
     }
-  }, [isOpen, playersWithNumbers]);
+  }, [isOpen, getCombinedPlayerList]);
 
-  const handleSelectPlayer = (number: string, isSelected: boolean) => {
+  const handleSelectPlayer = (id: string, isSelected: boolean) => {
     if (isSelected) {
-      setSelectedNumbers(prev => [...prev, number]);
+      setSelectedPlayerIds(prev => [...prev, id]);
     } else {
-      setSelectedNumbers(prev => prev.filter(n => n !== number));
+      setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
     }
   };
 
   const handleSelectAll = (isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedNumbers(playersWithNumbers.map(p => p.whatsappNumber));
-    } else {
-      setSelectedNumbers([]);
-    }
+    setSelectedPlayerIds(isChecked ? getCombinedPlayerList.map(p => p.id) : []);
   };
 
   const handleSend = async () => {
-    if (selectedNumbers.length === 0 || !message) {
+    if (selectedPlayerIds.length === 0 || !message) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please select at least one recipient and enter a message.',
+        description: 'Please select recipients and enter a message.',
       });
       return;
     }
     setIsSending(true);
     
     try {
-      const sendPromises = selectedNumbers.map(number => 
-        sendWhatsappMessage({ 
-          to: number, 
-          message,
-          ...whatsappConfig
-        })
-      );
-      
-      const results = await Promise.all(sendPromises);
-      const successfulSends = results.filter(r => r.success).length;
-      const failedSends = results.length - successfulSends;
-      
-      if (successfulSends > 0) {
-        toast({
-          title: 'Messages Sent!',
-          description: `Successfully sent message to ${successfulSends} recipient(s).`,
-        });
-      }
-      if (failedSends > 0) {
-         toast({
-          variant: 'destructive',
-          title: 'Some Messages Failed',
-          description: `Failed to send message to ${failedSends} recipient(s). Check console for details.`,
-        });
-        results.filter(r => !r.success).forEach(r => console.error(r.error));
-      }
+        let whatsappPromises: Promise<any>[] = [];
+        let pushPromises: Promise<any>[] = [];
 
-      onOpenChange(false);
-      setSelectedNumbers([]);
-      setMessage('');
+        const selectedPlayers = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
+
+        if (sendMethod === 'whatsapp' || sendMethod === 'all') {
+            const whatsappRecipients = selectedPlayers.filter(p => p.whatsappNumber);
+            whatsappPromises = whatsappRecipients.map(player => 
+                sendWhatsappMessage({ 
+                  to: player.whatsappNumber, 
+                  message,
+                  ...whatsappConfig
+                })
+            );
+        }
+
+        if (sendMethod === 'push' || sendMethod === 'all') {
+            const pushRecipients = selectedPlayers.filter(p => p.pushSubscription);
+            if (pushRecipients.length > 0) {
+                 pushPromises.push(
+                    sendPushNotification({
+                        message,
+                        subscriptions: pushRecipients.map(p => p.pushSubscription!),
+                    })
+                );
+            }
+        }
+        
+        const [whatsappResults, pushResults] = await Promise.all([
+            Promise.all(whatsappPromises),
+            Promise.all(pushPromises),
+        ]);
+
+        const successfulWhatsapp = whatsappResults.filter(r => r.success).length;
+        const failedWhatsapp = whatsappResults.length - successfulWhatsapp;
+        
+        const successfulPush = pushResults.every(r => r.success) ? pushResults.length : 0;
+        const failedPush = pushResults.length > 0 && !successfulPush ? 'all' : 0;
+
+        let description = '';
+        if (successfulWhatsapp > 0) description += `Sent ${successfulWhatsapp} WhatsApp messages. `;
+        if (successfulPush > 0) description += `Sent push notifications. `;
+        
+        if (failedWhatsapp > 0 || failedPush) {
+            toast({
+                variant: 'destructive',
+                title: 'Some Messages Failed',
+                description: `WhatsApp: ${failedWhatsapp} failed. Push: ${failedPush} failed. Check logs.`
+            });
+        } else {
+             toast({ title: 'Messages Sent!', description });
+        }
+      
+        onOpenChange(false);
+        setMessage('');
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send messages.';
@@ -2849,37 +2955,56 @@ const WhatsappDialog: FC<{
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Send Group WhatsApp Message</DialogTitle>
+          <DialogTitle>Send Group Message</DialogTitle>
           <DialogDescription>
-            Select players to message. A separate message will be sent to each.
+            Select players and a channel to message them on.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Send Via</Label>
+             <Select value={sendMethod} onValueChange={(v) => setSendMethod(v as any)}>
+                <SelectTrigger>
+                    <SelectValue placeholder="Select send method..."/>
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Push & WhatsApp</SelectItem>
+                    <SelectItem value="push">Push Notification Only</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp Only</SelectItem>
+                </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label>Recipients</Label>
             <div className="flex items-center space-x-2 border-b pb-2">
                 <Checkbox
                     id="select-all"
                     onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                    checked={playersWithNumbers.length > 0 && selectedNumbers.length === playersWithNumbers.length}
-                    disabled={playersWithNumbers.length === 0}
+                    checked={getCombinedPlayerList.length > 0 && selectedPlayerIds.length === getCombinedPlayerList.length}
+                    disabled={getCombinedPlayerList.length === 0}
                 />
                 <Label htmlFor="select-all" className="font-medium">Select All</Label>
             </div>
             <ScrollArea className="h-40 border rounded-md p-2">
-                {playersWithNumbers.length > 0 ? (
-                    playersWithNumbers.map(player => (
-                        <div key={player.id} className="flex items-center space-x-2 p-1">
-                            <Checkbox 
-                                id={`p-${player.id}`} 
-                                onCheckedChange={(checked) => handleSelectPlayer(player.whatsappNumber, !!checked)}
-                                checked={selectedNumbers.includes(player.whatsappNumber)}
-                            />
-                            <Label htmlFor={`p-${player.id}`} className="flex-1">{player.name} ({player.whatsappNumber})</Label>
-                        </div>
-                    ))
+                {getCombinedPlayerList.length > 0 ? (
+                    getCombinedPlayerList.map(player => {
+                        const canSendWhatsapp = (sendMethod === 'whatsapp' || sendMethod === 'all') && player.whatsappNumber;
+                        const canSendPush = (sendMethod === 'push' || sendMethod === 'all') && player.pushSubscription;
+                        return (
+                            <div key={player.id} className="flex items-center space-x-2 p-1">
+                                <Checkbox 
+                                    id={`p-${player.id}`} 
+                                    onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                    checked={selectedPlayerIds.includes(player.id)}
+                                />
+                                <Label htmlFor={`p-${player.id}`} className="flex-1">{player.name}</Label>
+                                {canSendPush && <UserCheck className="h-4 w-4 text-green-500" />}
+                                {canSendWhatsapp && <WhatsappIcon />}
+                            </div>
+                        )
+                    })
                 ) : (
-                    <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers found.</p>
+                    <p className="text-sm text-muted-foreground text-center p-4">No players with contact info found.</p>
                 )}
             </ScrollArea>
           </div>
@@ -2897,8 +3022,8 @@ const WhatsappDialog: FC<{
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleSend} disabled={isSending || selectedNumbers.length === 0 || !message}>
-            {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedNumbers.length} Player(s)`}
+          <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0 || !message}>
+            {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedPlayerIds.length} Player(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>
