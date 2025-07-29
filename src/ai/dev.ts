@@ -8,4 +8,3 @@ import '@/ai/flows/import-game.ts';
 import '@/ai/flows/send-login-otp.ts';
 import '@/ai/flows/send-delete-player-otp.ts';
 import '@/ai/flows/send-delete-game-otp.ts';
-import '@/ai/flows/send-push-notification.ts';
