@@ -1,5 +1,6 @@
 
 
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -41,7 +42,7 @@ export interface GameHistory {
     id: string;
     venue: string;
     timestamp: string;
-    players: CalculatedPlayer[];
+    players: Player[];
     startTime?: string;
     endTime?: string;
     duration?: number; // in milliseconds

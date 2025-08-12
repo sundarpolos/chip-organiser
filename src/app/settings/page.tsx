@@ -2,166 +2,293 @@
 'use client';
 
 import { useState, useEffect, type FC } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { WhatsappConfig } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import type { WhatsappConfig, Club, MasterPlayer } from '@/lib/types';
+import { getClubs, createClub, updateClub, deleteClub } from '@/services/club-service';
+import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
 
+const SUPER_ADMIN_WHATSAPP = '919843350000';
 
-const WhatsappSettings: FC<{
-  config: WhatsappConfig;
-  onSave: (config: WhatsappConfig) => void;
-  toast: ReturnType<typeof useToast>['toast'];
-}> = ({ config, onSave, toast }) => {
-  const [currentConfig, setCurrentConfig] = useState(config);
-
-  useEffect(() => {
-    setCurrentConfig(config);
-  }, [config]);
-
-  const handleChange = (field: keyof WhatsappConfig, value: string) => {
-    setCurrentConfig(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSave = () => {
-    localStorage.setItem('whatsappConfig', JSON.stringify(currentConfig));
-    onSave(currentConfig);
-    toast({ title: 'Settings Saved', description: 'WhatsApp credentials have been updated for this session.' });
-  };
-
-  return (
-    <Card>
-        <CardHeader>
-            <CardTitle>WhatsApp API Settings</CardTitle>
-            <CardDescription>
-                Enter your WhatsApp provider credentials here. These are stored locally in your browser.
-                You can also set these as ENV variables on the server.
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-             <div className="space-y-2">
-                <Label htmlFor="apiUrl">API URL</Label>
-                <Input
-                id="apiUrl"
-                placeholder="https://api.provider.com/send"
-                value={currentConfig.apiUrl}
-                onChange={(e) => handleChange('apiUrl', e.target.value)}
-                />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="apiToken">API Token</Label>
-                <Input
-                id="apiToken"
-                type="password"
-                placeholder="Your secret API token"
-                value={currentConfig.apiToken}
-                onChange={(e) => handleChange('apiToken', e.target.value)}
-                />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="senderMobile">Sender Mobile</Label>
-                <Input
-                id="senderMobile"
-                placeholder="e.g., 14155552671"
-                value={currentConfig.senderMobile}
-                onChange={(e) => handleChange('senderMobile', e.target.value)}
-                />
-            </div>
-            <Button onClick={handleSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Save WhatsApp Settings
-            </Button>
-        </CardContent>
-    </Card>
-  );
-};
-
-
-const DeckChangeTimerSettings: FC<{
-    deckInterval: number;
-    onIntervalChange: (interval: number) => void;
+const ClubManagement: FC<{
+    clubs: Club[];
+    setClubs: React.Dispatch<React.SetStateAction<Club[]>>;
+    players: MasterPlayer[];
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ deckInterval, onIntervalChange, toast }) => {
-    const [currentInterval, setCurrentInterval] = useState(deckInterval);
-    
-    useEffect(() => {
-        setCurrentInterval(deckInterval);
-    }, [deckInterval]);
+    currentUser: MasterPlayer;
+}> = ({ clubs, setClubs, players, toast, currentUser }) => {
+    const router = useRouter();
+    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setEditModalOpen] = useState<Club | null>(null);
+    const [clubToDelete, setClubToDelete] = useState<Club | null>(null);
 
-    const handleSave = () => {
-        localStorage.setItem('deckChangeInterval', String(currentInterval));
-        onIntervalChange(currentInterval);
-        toast({ title: 'Timer Saved', description: `Deck change reminder set to every ${currentInterval} hour(s).` });
+    const handleEnterDashboard = (clubId: string) => {
+        router.push(`/dashboard?clubId=${clubId}`);
+    };
+
+    const handleDeleteClub = async () => {
+        if (!clubToDelete) return;
+
+        try {
+            await deleteClub(clubToDelete.id);
+            setClubs(prev => prev.filter(c => c.id !== clubToDelete.id));
+            toast({ title: 'Club Deleted', description: `"${clubToDelete.name}" has been permanently deleted.` });
+        } catch (error) {
+            console.error('Failed to delete club', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the club.' });
+        } finally {
+            setClubToDelete(null);
+        }
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Deck Change Timer</CardTitle>
-                <CardDescription>
-                    Set a timer to remind you to change the card deck. A popup will appear 5 minutes before the time is up. The timer starts with the game.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <RadioGroup value={String(currentInterval)} onValueChange={(val) => setCurrentInterval(Number(val))}>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="1" id="h1" />
-                        <Label htmlFor="h1">1 Hour</Label>
+        <>
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Club Management</CardTitle>
+                        <Button onClick={() => setCreateModalOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Club</Button>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="2" id="h2" />
-                        <Label htmlFor="h2">2 Hours</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="3" id="h3" />
-                        <Label htmlFor="h3">3 Hours</Label>
-                    </div>
-                </RadioGroup>
-                <Button onClick={handleSave}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Timer Setting
-                </Button>
-            </CardContent>
-        </Card>
+                    <CardDescription>Create, edit, and manage all clubs in the system.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Club Name</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {clubs.map(club => (
+                                <TableRow key={club.id}>
+                                    <TableCell className="font-medium">{club.name}</TableCell>
+                                    <TableCell className="text-right space-x-2">
+                                        <Button variant="outline" size="sm" onClick={() => handleEnterDashboard(club.id)}>
+                                            <LogIn className="mr-2 h-4 w-4" /> Enter Dashboard
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => setEditModalOpen(club)}><Pencil className="h-4 w-4" /></Button>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" onClick={() => setClubToDelete(club)}><Trash2 className="h-4 w-4" /></Button>
+                                        </AlertDialogTrigger>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <CreateEditClubDialog
+                isOpen={isCreateModalOpen}
+                onOpenChange={setCreateModalOpen}
+                players={players}
+                currentUser={currentUser}
+                onSave={async (newClub) => {
+                    setClubs(prev => [...prev, newClub].sort((a,b) => a.name.localeCompare(b.name)));
+                }}
+                toast={toast}
+            />
+            {isEditModalOpen && (
+                 <CreateEditClubDialog
+                    isOpen={!!isEditModalOpen}
+                    onOpenChange={() => setEditModalOpen(null)}
+                    players={players}
+                    currentUser={currentUser}
+                    onSave={async (updatedClub) => {
+                        setClubs(prev => prev.map(c => c.id === updatedClub.id ? updatedClub : c));
+                    }}
+                    toast={toast}
+                    clubToEdit={isEditModalOpen}
+                />
+            )}
+            
+            <AlertDialog open={!!clubToDelete} onOpenChange={() => setClubToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the <strong>{clubToDelete?.name}</strong> club and all associated players, games, and venues.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteClub}>Continue</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
 
+const CreateEditClubDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    players: MasterPlayer[];
+    currentUser: MasterPlayer;
+    onSave: (club: Club) => Promise<void>;
+    toast: ReturnType<typeof useToast>['toast'];
+    clubToEdit?: Club | null;
+}> = ({ isOpen, onOpenChange, players, currentUser, onSave, toast, clubToEdit }) => {
+    const [clubName, setClubName] = useState('');
+    const [adminId, setAdminId] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (clubToEdit) {
+            setClubName(clubToEdit.name);
+            const clubAdmin = players.find(p => p.clubId === clubToEdit.id && p.isAdmin);
+            if (clubAdmin) {
+                setAdminId(clubAdmin.id);
+            }
+        } else {
+            setClubName('');
+            setAdminId('');
+        }
+    }, [clubToEdit, players]);
+    
+    const nonAdminPlayers = players.filter(p => !p.isAdmin || p.whatsappNumber === SUPER_ADMIN_WHATSAPP);
+
+    const handleSave = async () => {
+        if (!clubName || (!clubToEdit && !adminId)) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please provide a club name and select an admin.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            if (clubToEdit) { // Editing existing club
+                const updatedClubData = { ...clubToEdit, name: clubName };
+                await updateClub(updatedClubData);
+                toast({ title: 'Club Updated', description: `"${clubName}" has been updated.`});
+                onSave(updatedClubData);
+            } else { // Creating new club
+                const newClub = await createClub({ name: clubName, ownerId: currentUser.id });
+                
+                // Promote selected player to admin for that club
+                const playerToPromote = players.find(p => p.id === adminId);
+                if (playerToPromote) {
+                    await saveMasterPlayer({ ...playerToPromote, isAdmin: true, clubId: newClub.id });
+                }
+                toast({ title: 'Club Created', description: `"${clubName}" has been created successfully.`});
+                onSave(newClub);
+            }
+            onOpenChange(false);
+        } catch (error) {
+            console.error('Failed to save club', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not save the club.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{clubToEdit ? 'Edit Club' : 'Create New Club'}</DialogTitle>
+                    <DialogDescription>
+                        {clubToEdit ? 'Update the details for this club.' : 'Enter a name for the new club and assign an admin.'}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="club-name">Club Name</Label>
+                        <Input id="club-name" value={clubName} onChange={e => setClubName(e.target.value)} />
+                    </div>
+                    {!clubToEdit && (
+                         <div className="space-y-2">
+                            <Label htmlFor="club-admin">Club Admin</Label>
+                             <Select value={adminId} onValueChange={setAdminId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a player to be admin..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {nonAdminPlayers.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                        {clubToEdit ? 'Save Changes' : 'Create Club'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
-  const [deckChangeInterval, setDeckChangeInterval] = useState(2); // default 2 hours
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [players, setPlayers] = useState<MasterPlayer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const isSuperAdmin = currentUser?.isAdmin === true && currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP;
 
   useEffect(() => {
-    const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
-    if (savedWhatsappConfig) {
-      setWhatsappConfig(JSON.parse(savedWhatsappConfig));
+    const userStr = localStorage.getItem('chip-maestro-user');
+    if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user);
+        if (user.whatsappNumber !== SUPER_ADMIN_WHATSAPP) {
+            toast({ variant: 'destructive', title: 'Access Denied' });
+            router.replace('/');
+        }
+    } else {
+      router.replace('/login');
     }
-    const savedDeckInterval = localStorage.getItem("deckChangeInterval");
-    if (savedDeckInterval) {
-        setDeckChangeInterval(Number(savedDeckInterval));
-    }
-  }, []);
+  }, [router, toast]);
+  
+  useEffect(() => {
+      async function loadData() {
+          if (!isSuperAdmin) return;
+          try {
+              const [allClubs, allPlayers] = await Promise.all([getClubs(), getMasterPlayers()]);
+              setClubs(allClubs.sort((a,b) => a.name.localeCompare(b.name)));
+              setPlayers(allPlayers);
+          } catch(e) {
+              toast({variant: 'destructive', title: 'Error', description: 'Could not load required data.'});
+          } finally {
+              setIsLoading(false);
+          }
+      }
+      loadData();
+  }, [isSuperAdmin, toast]);
+
+  if (isLoading || !isSuperAdmin) {
+    return (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your application preferences.</p>
+        <h1 className="text-3xl font-bold">Super Admin Settings</h1>
+        <p className="text-muted-foreground">Manage clubs and system-wide configurations.</p>
       </div>
-      <DeckChangeTimerSettings
-        deckInterval={deckChangeInterval}
-        onIntervalChange={setDeckChangeInterval}
-        toast={toast}
-      />
-      <WhatsappSettings
-        config={whatsappConfig}
-        onSave={setWhatsappConfig}
-        toast={toast}
-      />
+       <ClubManagement clubs={clubs} setClubs={setClubs} players={players} toast={toast} currentUser={currentUser} />
     </div>
   );
 }

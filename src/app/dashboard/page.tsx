@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
 import Link from "next/link"
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
@@ -541,6 +541,7 @@ const EditableDate: FC<{
 export default function DashboardPage() {
   const { toast } = useToast()
   const router = useRouter();
+  const searchParams = useSearchParams();
 
 
   // Core State
@@ -624,13 +625,22 @@ export default function DashboardPage() {
   // Load user data and check auth
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
-    const clubId = localStorage.getItem('chip-maestro-clubId');
+    // Allow for a direct clubId override from the URL for Super Admin access
+    const clubIdOverride = searchParams.get('clubId');
+    const clubId = clubIdOverride || localStorage.getItem('chip-maestro-clubId');
+    
     if (userStr && clubId) {
-      setCurrentUser(JSON.parse(userStr));
+      const user = JSON.parse(userStr);
+      setCurrentUser(user);
+      // If a super admin is using an override, we must also update localStorage
+      // so that subsequent reloads or actions use the correct club context.
+      if (clubIdOverride && user.isAdmin) {
+          localStorage.setItem('chip-maestro-clubId', clubIdOverride);
+      }
     } else {
       router.replace('/');
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   // Set greeting message
   useEffect(() => {

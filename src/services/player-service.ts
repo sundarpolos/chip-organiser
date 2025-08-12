@@ -53,9 +53,16 @@ export async function saveMasterPlayer(
         return player;
     } else {
         // This is a new player
-        const payload = 'id' in player ? { clubId: player.clubId, name: player.name, whatsappNumber: player.whatsappNumber, isAdmin: player.isAdmin, isBanker: player.isBanker, isActive: player.isActive } : player;
+        const payload: Omit<MasterPlayer, 'id'> = {
+            name: 'name' in player ? player.name : '',
+            whatsappNumber: 'whatsappNumber' in player ? player.whatsappNumber : '',
+            isAdmin: 'isAdmin' in player ? player.isAdmin : false,
+            isBanker: 'isBanker' in player ? player.isBanker : false,
+            isActive: 'isActive' in player ? player.isActive : true,
+            clubId: 'clubId' in player ? player.clubId : '',
+        };
         const docRef = await addDoc(collection(db, MASTER_PLAYERS_COLLECTION), payload);
-        return { id: docRef.id, ...(payload as Omit<MasterPlayer, 'id'>) };
+        return { id: docRef.id, ...payload };
     }
 }
 
