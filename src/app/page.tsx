@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const features = [
   {
@@ -76,24 +77,19 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="container flex flex-col items-center justify-center text-center py-20 md:py-32">
-          <div className="space-y-6 max-w-4xl">
-            <div className="text-5xl md:text-6xl font-bold">
-              <h1 className="inline">
-                <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
-                  Manage
-                </span>{" "}
-                Your Poker Club
-              </h1>{" "}
-              Like a Pro
-            </div>
-
+        <section className="container text-center py-20 md:py-32">
+          <div className="space-y-6 max-w-4xl mx-auto">
+            <h1 className="text-5xl md:text-6xl font-bold">
+              <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
+                Manage
+              </span>{" "}
+              Your Poker Club Like a Pro
+            </h1>
             <p className="text-xl text-muted-foreground md:w-10/12 mx-auto">
               The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
             </p>
-
-            <div className="space-y-4 md:space-y-0 md:space-x-4">
-              <Button className="w-full md:w-1/3" asChild>
+            <div className="space-x-4">
+              <Button asChild>
                 <Link href="/login">Get Started</Link>
               </Button>
             </div>
