@@ -4,8 +4,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Check, ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const features = [
@@ -32,7 +32,7 @@ const features = [
   {
     icon: <Crown className="h-8 w-8 text-primary" />,
     title: 'AI-Powered Anomaly Detection',
-    description: 'Analyze a player\'s buy-in patterns against their history to detect unusual activity.',
+    description: "Analyze a player's buy-in patterns against their history to detect unusual activity.",
   },
   {
     icon: <Upload className="h-8 w-8 text-primary" />,
@@ -78,56 +78,55 @@ export default function HomePage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="container flex flex-col items-center justify-center text-center py-20 md:py-32">
-            <div className="space-y-6 max-w-4xl">
-                <main className="text-5xl md:text-6xl font-bold">
-                <h1 className="inline">
-                    <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
-                    Manage
-                    </span>{" "}
-                    Your Poker Club
-                </h1>{" "}
-                Like a Pro
-                </main>
+          <div className="space-y-6 max-w-4xl">
+            <main className="text-5xl md:text-6xl font-bold">
+              <h1 className="inline">
+                <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
+                  Manage
+                </span>{" "}
+                Your Poker Club
+              </h1>{" "}
+              Like a Pro
+            </main>
 
-                <p className="text-xl text-muted-foreground md:w-10/12 mx-auto">
-                The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
-                </p>
+            <p className="text-xl text-muted-foreground md:w-10/12 mx-auto">
+              The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
+            </p>
 
-                <div className="space-y-4 md:space-y-0 md:space-x-4">
-                <Button className="w-full md:w-1/3" asChild>
-                    <Link href="/login">Get Started</Link>
-                </Button>
-                </div>
+            <div className="space-y-4 md:space-y-0 md:space-x-4">
+              <Button className="w-full md:w-1/3" asChild>
+                <Link href="/login">Get Started</Link>
+              </Button>
             </div>
+          </div>
         </section>
 
         {/* Features Section */}
         <section id="features" className="container py-24 sm:py-32 space-y-8">
-            <h2 className="text-3xl lg:text-4xl font-bold md:text-center">
-                Many{" "}
-                <span className="inline bg-gradient-to-r from-[#61DAFB] to-[#1d6fa5] text-transparent bg-clip-text">
-                Features
-                </span>
-            </h2>
+          <h2 className="text-3xl lg:text-4xl font-bold md:text-center">
+            Many{" "}
+            <span className="inline bg-gradient-to-r from-[#61DAFB] to-[#1d6fa5] text-transparent bg-clip-text">
+              Features
+            </span>
+          </h2>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {features.map(({ icon, title, description }) => (
-                <Card key={title}>
-                    <CardHeader className="flex items-center">
-                        {icon}
-                        <CardTitle>{title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>{description}</CardContent>
-                </Card>
-                ))}
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map(({ icon, title, description }) => (
+              <Card key={title}>
+                <CardHeader className="flex items-center">
+                  {icon}
+                  <CardTitle>{title}</CardTitle>
+                </CardHeader>
+                <CardContent>{description}</CardContent>
+              </Card>
+            ))}
+          </div>
         </section>
-
       </main>
 
       <footer className="py-8 border-t">
         <div className="container text-center text-muted-foreground">
-            &copy; {new Date().getFullYear()} Chip Maestro. All rights reserved.
+          &copy; {new Date().getFullYear()} Chip Maestro. All rights reserved.
         </div>
       </footer>
     </div>

@@ -15,9 +15,9 @@ export default function SettingsLayout({
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="flex justify-between items-center mb-6">
         <Button asChild variant="outline">
-          <Link href="/">
+          <Link href="/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Club Selection
+            Back to Dashboard
           </Link>
         </Button>
         <ThemeToggle />
