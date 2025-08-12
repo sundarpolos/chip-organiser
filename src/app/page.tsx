@@ -77,34 +77,28 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="container grid lg:grid-cols-2 place-items-center py-20 md:py-32 gap-10">
-          <div className="text-center lg:text-start space-y-6">
-            <main className="text-5xl md:text-6xl font-bold">
-              <h1 className="inline">
-                <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
-                  Manage
-                </span>{" "}
-                Your Poker Club
-              </h1>{" "}
-              Like a Pro
-            </main>
+        <section className="container flex flex-col items-center justify-center text-center py-20 md:py-32">
+            <div className="space-y-6 max-w-4xl">
+                <main className="text-5xl md:text-6xl font-bold">
+                <h1 className="inline">
+                    <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
+                    Manage
+                    </span>{" "}
+                    Your Poker Club
+                </h1>{" "}
+                Like a Pro
+                </main>
 
-            <p className="text-xl text-muted-foreground md:w-10/12 mx-auto lg:mx-0">
-              The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
-            </p>
+                <p className="text-xl text-muted-foreground md:w-10/12 mx-auto">
+                The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
+                </p>
 
-            <div className="space-y-4 md:space-y-0 md:space-x-4">
-              <Button className="w-full md:w-1/3" asChild>
-                <Link href="/login">Get Started</Link>
-              </Button>
+                <div className="space-y-4 md:space-y-0 md:space-x-4">
+                <Button className="w-full md:w-1/3" asChild>
+                    <Link href="/login">Get Started</Link>
+                </Button>
+                </div>
             </div>
-          </div>
-          
-          <div className="z-10">
-              <div className="hidden lg:block w-[500px] h-[500px] bg-blue-200/50 dark:bg-blue-900/50 rounded-full blur-3xl absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-              <img src="https://placehold.co/600x400.png" data-ai-hint="poker chips game" alt="Hero Image" className="w-full md:w-[500px] lg:w-[600px] object-contain rounded-lg shadow-lg" />
-          </div>
-
         </section>
 
         {/* Features Section */}
