@@ -123,6 +123,16 @@ function LoginPageContent() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4">
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute top-0 left-0 w-full h-full object-cover -z-20"
+      >
+        <source src="https://assets.mixkit.co/videos/preview/mixkit-poker-cards-being-shuffled-in-a-casino-33886-large.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
       <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm -z-10" />
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center">
