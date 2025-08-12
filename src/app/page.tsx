@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 const features = [
   {
