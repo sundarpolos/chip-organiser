@@ -15,9 +15,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import type { WhatsappConfig, Club, MasterPlayer } from '@/lib/types';
+import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
+import { getMasterVenues } from '@/services/venue-service';
+import { getGameHistory } from '@/services/game-service';
 import { Switch } from '@/components/ui/switch';
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -26,9 +28,11 @@ const ClubManagement: FC<{
     clubs: Club[];
     setClubs: React.Dispatch<React.SetStateAction<Club[]>>;
     players: MasterPlayer[];
+    venues: MasterVenue[];
+    games: GameHistory[];
     toast: ReturnType<typeof useToast>['toast'];
     currentUser: MasterPlayer;
-}> = ({ clubs, setClubs, players, toast, currentUser }) => {
+}> = ({ clubs, setClubs, players, venues, games, toast, currentUser }) => {
     const router = useRouter();
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState<Club | null>(null);
@@ -53,6 +57,13 @@ const ClubManagement: FC<{
         }
     };
 
+    const getClubStats = (clubId: string) => {
+        const playerCount = players.filter(p => p.clubId === clubId).length;
+        const venueCount = venues.filter(v => v.clubId === clubId).length;
+        const gameCount = games.filter(g => g.clubId === clubId).length;
+        return { playerCount, venueCount, gameCount };
+    };
+
     return (
         <>
             <Card>
@@ -68,16 +79,24 @@ const ClubManagement: FC<{
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Club Name</TableHead>
+                                <TableHead>Players</TableHead>
+                                <TableHead>Venues</TableHead>
+                                <TableHead>Games</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {clubs.map(club => (
+                            {clubs.map(club => {
+                                const { playerCount, venueCount, gameCount } = getClubStats(club.id);
+                                return (
                                 <TableRow key={club.id}>
                                     <TableCell className="font-medium">{club.name}</TableCell>
+                                    <TableCell>{playerCount}</TableCell>
+                                    <TableCell>{venueCount}</TableCell>
+                                    <TableCell>{gameCount}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button variant="outline" size="sm" onClick={() => handleEnterDashboard(club.id)}>
-                                            <LogIn className="mr-2 h-4 w-4" /> Enter Dashboard
+                                            <LogIn className="mr-2 h-4 w-4" /> Enter
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => setEditModalOpen(club)}><Pencil className="h-4 w-4" /></Button>
                                         <AlertDialog>
@@ -99,7 +118,7 @@ const ClubManagement: FC<{
                                         </AlertDialog>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -468,6 +487,8 @@ export default function SettingsPage() {
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [players, setPlayers] = useState<MasterPlayer[]>([]);
+  const [venues, setVenues] = useState<MasterVenue[]>([]);
+  const [games, setGames] = useState<GameHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const isSuperAdmin = currentUser?.isAdmin === true && currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP;
@@ -490,9 +511,16 @@ export default function SettingsPage() {
       async function loadData() {
           if (!isSuperAdmin) return;
           try {
-              const [allClubs, allPlayers] = await Promise.all([getClubs(), getMasterPlayers()]);
+              const [allClubs, allPlayers, allVenues, allGames] = await Promise.all([
+                getClubs(), 
+                getMasterPlayers(),
+                getMasterVenues(),
+                getGameHistory(),
+              ]);
               setClubs(allClubs.sort((a,b) => a.name.localeCompare(b.name)));
               setPlayers(allPlayers);
+              setVenues(allVenues);
+              setGames(allGames);
           } catch(e) {
               const errorMessage = e instanceof Error ? e.message : 'Could not load required data.'
               toast({variant: 'destructive', title: 'Error', description: errorMessage});
@@ -517,7 +545,14 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold">Super Admin Settings</h1>
         <p className="text-muted-foreground">Manage clubs, players, and system-wide configurations.</p>
       </div>
-       <ClubManagement clubs={clubs} setClubs={setClubs} players={players} toast={toast} currentUser={currentUser} />
+       <ClubManagement 
+        clubs={clubs} 
+        setClubs={setClubs} 
+        players={players}
+        venues={venues}
+        games={games}
+        toast={toast} 
+        currentUser={currentUser} />
        <PlayerManagement players={players} setPlayers={setPlayers} clubs={clubs} toast={toast} />
     </div>
   );
