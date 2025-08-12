@@ -130,7 +130,7 @@ function LoginPageContent() {
         playsInline
         className="absolute top-0 left-0 w-full h-full object-cover -z-20"
       >
-        <source src="https://assets.mixkit.co/videos/preview/mixkit-poker-cards-being-shuffled-in-a-casino-33886-large.mp4" type="video/mp4" />
+        <source src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </video>
       <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm -z-10" />
