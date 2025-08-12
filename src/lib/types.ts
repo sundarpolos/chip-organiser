@@ -1,6 +1,7 @@
 
 
 
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -59,4 +60,5 @@ export interface Club {
   id: string;
   name: string;
   ownerId: string;
+  whatsappConfig?: WhatsappConfig;
 }

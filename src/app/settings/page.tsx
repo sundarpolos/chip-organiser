@@ -162,11 +162,15 @@ const CreateEditClubDialog: FC<{
 }> = ({ isOpen, onOpenChange, players, currentUser, onSave, toast, clubToEdit }) => {
     const [clubName, setClubName] = useState('');
     const [adminId, setAdminId] = useState('');
+    const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
+        apiUrl: '', apiToken: '', senderMobile: ''
+    });
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (clubToEdit) {
             setClubName(clubToEdit.name);
+            setWhatsappConfig(clubToEdit.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
             const clubAdmin = players.find(p => p.clubId === clubToEdit.id && p.isAdmin);
             if (clubAdmin) {
                 setAdminId(clubAdmin.id);
@@ -174,26 +178,37 @@ const CreateEditClubDialog: FC<{
         } else {
             setClubName('');
             setAdminId('');
+            setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '' });
         }
     }, [clubToEdit, players]);
     
     const nonAdminPlayers = players.filter(p => !p.isAdmin || p.whatsappNumber === SUPER_ADMIN_WHATSAPP);
 
     const handleSave = async () => {
-        if (!clubName || (!clubToEdit && !adminId)) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please provide a club name and select an admin.' });
+        if (!clubName) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please provide a club name.' });
             return;
         }
 
         setIsSaving(true);
         try {
             if (clubToEdit) { // Editing existing club
-                const updatedClubData = { ...clubToEdit, name: clubName };
+                const updatedClubData: Club = { ...clubToEdit, name: clubName, whatsappConfig };
                 const savedClub = await updateClub(updatedClubData);
                 toast({ title: 'Club Updated', description: `"${clubName}" has been updated.`});
                 onSave(savedClub);
             } else { // Creating new club
-                const newClub = await createClub({ name: clubName, ownerId: currentUser.id });
+                if (!adminId) {
+                    toast({ variant: 'destructive', title: 'Error', description: 'Please select an admin for the new club.' });
+                    setIsSaving(false);
+                    return;
+                }
+                const newClubPayload: Omit<Club, 'id'> = {
+                    name: clubName,
+                    ownerId: currentUser.id,
+                    whatsappConfig,
+                };
+                const newClub = await createClub(newClubPayload);
                 
                 // Promote selected player to admin for that club
                 const playerToPromote = players.find(p => p.id === adminId);
@@ -242,6 +257,25 @@ const CreateEditClubDialog: FC<{
                             </Select>
                         </div>
                     )}
+                     <Accordion type="single" collapsible>
+                        <AccordionItem value="whatsapp">
+                            <AccordionTrigger>WhatsApp API Settings</AccordionTrigger>
+                            <AccordionContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-api-url">API URL</Label>
+                                    <Input id="wa-api-url" value={whatsappConfig.apiUrl} onChange={e => setWhatsappConfig(c => ({...c, apiUrl: e.target.value}))} placeholder="e.g., https://api.provider.com/send" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-api-token">API Token</Label>
+                                    <Input id="wa-api-token" value={whatsappConfig.apiToken} onChange={e => setWhatsappConfig(c => ({...c, apiToken: e.target.value}))} placeholder="Your API token" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-sender-mobile">Sender Mobile</Label>
+                                    <Input id="wa-sender-mobile" value={whatsappConfig.senderMobile} onChange={e => setWhatsappConfig(c => ({...c, senderMobile: e.target.value}))} placeholder="e.g., 14155552671" />
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>

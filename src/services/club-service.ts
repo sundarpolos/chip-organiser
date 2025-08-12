@@ -33,7 +33,12 @@ export async function createClub(club: Omit<Club, 'id'>): Promise<Club> {
 
 export async function updateClub(club: Club): Promise<Club> {
     const docRef = doc(db, CLUBS_COLLECTION, club.id);
-    await setDoc(docRef, club, { merge: true });
+    // Make sure we don't save "undefined" to firestore
+    const clubToSave = {
+        ...club,
+        whatsappConfig: club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: ''}
+    };
+    await setDoc(docRef, clubToSave, { merge: true });
     return club;
 }
 

@@ -679,6 +679,7 @@ export default function DashboardPage() {
                 return;
             }
             setActiveClub(club);
+            setWhatsappConfig(club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
             
             const [
                 loadedMasterPlayers,
@@ -702,17 +703,6 @@ export default function DashboardPage() {
             const savedDeckInterval = localStorage.getItem("deckChangeInterval");
             if (savedDeckInterval) {
                 setDeckChangeInterval(Number(savedDeckInterval));
-            }
-
-            const savedWhatsappConfig = localStorage.getItem("whatsappConfig");
-            if (savedWhatsappConfig) {
-              setWhatsappConfig(JSON.parse(savedWhatsappConfig));
-            } else {
-              setWhatsappConfig({
-                apiUrl: process.env.NEXT_PUBLIC_WHATSAPP_API_URL || '',
-                apiToken: process.env.NEXT_PUBLIC_WHATSAPP_API_TOKEN || '',
-                senderMobile: process.env.NEXT_PUBLIC_WHATSAPP_SENDER_MOBILE || ''
-              });
             }
             
             // Check for active games for non-admins
@@ -814,8 +804,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if(!isDataReady) return;
     localStorage.setItem("isOtpVerificationEnabled", JSON.stringify(isOtpVerificationEnabled));
-    localStorage.setItem("whatsappConfig", JSON.stringify(whatsappConfig));
-  }, [isOtpVerificationEnabled, whatsappConfig, isDataReady])
+  }, [isOtpVerificationEnabled, isDataReady])
 
   // Game timer effect
   useEffect(() => {
