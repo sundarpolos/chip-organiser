@@ -3,32 +3,27 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Building, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Loader2, Building, ArrowRight } from 'lucide-react';
 import { getClubs, Club } from '@/services/club-service';
-import { migrateLegacyData } from '@/services/migration-service';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import type { MasterPlayer } from '@/lib/types';
 
 export default function ClubSelectionPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
 
   useEffect(() => {
-    // Check for logged-in user to decide if we should show the migrate button
-    const userStr = localStorage.getItem('chip-maestro-user');
-    if (userStr) {
-      setCurrentUser(JSON.parse(userStr));
-    }
-
     async function fetchClubs() {
       try {
         const fetchedClubs = await getClubs();
+        if (fetchedClubs.length === 0) {
+            // This is a temporary measure for first-time setup.
+            // In a real SaaS, you'd have a proper club creation flow.
+            toast({ title: 'No clubs found', description: 'Please ask your admin to set up a club.' });
+        }
         setClubs(fetchedClubs);
       } catch (error) {
         console.error("Failed to fetch clubs", error);
@@ -43,31 +38,6 @@ export default function ClubSelectionPage() {
   const handleClubSelect = (clubId: string) => {
     router.push(`/login?clubId=${clubId}`);
   };
-
-  const handleMigration = async () => {
-    setIsMigrating(true);
-    try {
-      const result = await migrateLegacyData();
-      toast({
-        title: 'Migration Complete!',
-        description: `${result.message} You can now select Smart CLUB to log in.`,
-      });
-      // Refresh club list
-      const fetchedClubs = await getClubs();
-      setClubs(fetchedClubs);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Migration Failed',
-        description: error.message || 'An unknown error occurred.',
-      });
-    } finally {
-      setIsMigrating(false);
-    }
-  };
-  
-  const isSuperAdmin = currentUser?.whatsappNumber === '919843350000';
-  const hasMigrated = clubs.some(c => c.name === 'Smart CLUB');
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -101,20 +71,8 @@ export default function ClubSelectionPage() {
                 ))
               ) : (
                 <div className="text-center text-muted-foreground p-4">
-                  <p>No clubs found.</p>
-                  {isSuperAdmin && !hasMigrated && <p>You may need to migrate your legacy data.</p>}
+                  <p>No clubs have been created yet.</p>
                 </div>
-              )}
-              {isSuperAdmin && !hasMigrated && (
-                 <div className="pt-4 border-t">
-                    <Button onClick={handleMigration} disabled={isMigrating} className="w-full">
-                      {isMigrating ? <Loader2 className="animate-spin" /> : <ShieldCheck className="mr-2"/>}
-                      Migrate Legacy Data
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      This is a one-time action to move all existing players and games into the default "Smart CLUB".
-                    </p>
-                 </div>
               )}
             </div>
           )}
