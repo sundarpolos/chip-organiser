@@ -54,7 +54,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center px-4 md:px-6 lg:px-8">
+        <div className="container mx-auto flex h-14 items-center px-4 md:px-6 lg:px-8">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Crown className="h-6 w-6 text-primary" />
             <span className="font-bold">Chip Maestro</span>
@@ -79,7 +79,7 @@ export default function HomePage() {
       <main>
         {/* Hero Section */}
         <section className="py-24 md:py-32 lg:py-40">
-            <div className="container px-4 md:px-6">
+            <div className="container mx-auto px-4 md:px-6">
                 <div className="mx-auto max-w-4xl text-center space-y-6">
                     <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                         The Ultimate Platform for
@@ -104,7 +104,7 @@ export default function HomePage() {
 
         {/* Features Section */}
         <section id="features" className="py-16 sm:py-24 bg-secondary/50">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="mx-auto max-w-4xl space-y-4 text-center">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
                 Everything You Need, Nothing You Don't
@@ -132,7 +132,7 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t py-6 md:py-8">
-        <div className="container px-4 md:px-6 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="container mx-auto px-4 md:px-6 flex items-center justify-between text-sm text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Chip Maestro. All rights reserved.</p>
         </div>
       </footer>
