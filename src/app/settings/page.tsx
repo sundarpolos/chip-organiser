@@ -295,7 +295,8 @@ const PlayerManagement: FC<{
     setPlayers: React.Dispatch<React.SetStateAction<MasterPlayer[]>>;
     clubs: Club[];
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ players, setPlayers, clubs, toast }) => {
+    isSuperAdmin: boolean;
+}> = ({ players, setPlayers, clubs, toast, isSuperAdmin }) => {
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
 
     const handleSavePlayer = async (player: MasterPlayer) => {
@@ -393,6 +394,7 @@ const PlayerManagement: FC<{
                 clubs={clubs}
                 onSave={handleSavePlayer}
                 toast={toast}
+                isSuperAdmin={isSuperAdmin}
             />
         </>
     );
@@ -406,7 +408,8 @@ const EditPlayerDialog: FC<{
     clubs: Club[];
     onSave: (player: MasterPlayer) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, player, clubs, onSave, toast }) => {
+    isSuperAdmin: boolean;
+}> = ({ isOpen, onOpenChange, player, clubs, onSave, toast, isSuperAdmin }) => {
     const [editablePlayer, setEditablePlayer] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -460,6 +463,7 @@ const EditPlayerDialog: FC<{
                         <Select
                             value={editablePlayer.clubId}
                             onValueChange={(value) => setEditablePlayer(p => p ? { ...p, clubId: value } : null)}
+                            disabled={!isSuperAdmin}
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a club..." />
@@ -519,31 +523,33 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+  const [currentClubId, setCurrentClubId] = useState<string | null>(null);
   const [clubs, setClubs] = useState<Club[]>([]);
   const [players, setPlayers] = useState<MasterPlayer[]>([]);
   const [venues, setVenues] = useState<MasterVenue[]>([]);
   const [games, setGames] = useState<GameHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const isSuperAdmin = currentUser?.isAdmin === true && currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP;
+  const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP, [currentUser]);
 
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
+    const clubIdStr = localStorage.getItem('chip-maestro-clubId');
+    
     if (userStr) {
         const user = JSON.parse(userStr);
         setCurrentUser(user);
-        if (user.whatsappNumber !== SUPER_ADMIN_WHATSAPP) {
-            toast({ variant: 'destructive', title: 'Access Denied' });
-            router.replace('/');
+        if (clubIdStr) {
+          setCurrentClubId(clubIdStr);
         }
     } else {
       router.replace('/login');
     }
-  }, [router, toast]);
+  }, [router]);
   
   useEffect(() => {
       async function loadData() {
-          if (!isSuperAdmin) return;
+          if (!currentUser) return;
           try {
               const [allClubs, allPlayers, allVenues, allGames] = await Promise.all([
                 getClubs(), 
@@ -563,9 +569,21 @@ export default function SettingsPage() {
           }
       }
       loadData();
-  }, [isSuperAdmin, toast]);
+  }, [currentUser, toast]);
+  
+  const filteredPlayers = useMemo(() => {
+      if (isSuperAdmin) return players;
+      if (currentClubId) return players.filter(p => p.clubId === currentClubId);
+      return [];
+  }, [players, isSuperAdmin, currentClubId]);
 
-  if (isLoading || !isSuperAdmin) {
+  const filteredClubs = useMemo(() => {
+      if (isSuperAdmin) return clubs;
+      if (currentClubId) return clubs.filter(c => c.id === currentClubId);
+      return [];
+  }, [clubs, isSuperAdmin, currentClubId]);
+
+  if (isLoading || !currentUser) {
     return (
         <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -576,18 +594,31 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold">Super Admin Settings</h1>
-        <p className="text-muted-foreground">Manage clubs, players, and system-wide configurations.</p>
+        <h1 className="text-3xl font-bold">Settings</h1>
+        <p className="text-muted-foreground">
+            {isSuperAdmin
+              ? 'Manage all clubs, players, and system-wide configurations.'
+              : 'Manage players in your club.'}
+        </p>
       </div>
-       <ClubManagement 
-        clubs={clubs} 
-        setClubs={setClubs} 
-        players={players}
-        venues={venues}
-        games={games}
-        toast={toast} 
-        currentUser={currentUser} />
-       <PlayerManagement players={players} setPlayers={setPlayers} clubs={clubs} toast={toast} />
+       {isSuperAdmin && currentUser && (
+        <ClubManagement 
+            clubs={clubs} 
+            setClubs={setClubs} 
+            players={players}
+            venues={venues}
+            games={games}
+            toast={toast} 
+            currentUser={currentUser} 
+        />
+       )}
+       <PlayerManagement 
+          players={filteredPlayers} 
+          setPlayers={setPlayers} 
+          clubs={filteredClubs} 
+          toast={toast}
+          isSuperAdmin={isSuperAdmin}
+       />
     </div>
   );
 }
