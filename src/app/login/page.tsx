@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { sendLoginOtp } from '@/ai/flows/send-login-otp';
 import { findUserByWhatsapp } from '@/services/player-service';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ function LoginPageContent() {
   const [isVerifying, setIsVerifying] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
 
   const handleSendOtp = async () => {
     const tenDigitRegex = /^\d{10}$/;
