@@ -145,47 +145,6 @@ export default function HomePage() {
             </div>
         </section>
 
-
-        {/* Pricing Section */}
-        <section id="pricing" className="container py-24 sm:py-32">
-            <h2 className="text-3xl md:text-4xl text-center font-bold mb-8">
-                Pricing
-            </h2>
-             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                {pricingTiers.map((tier) => (
-                <Card key={tier.name} className={tier.variant === "default" ? "border-primary shadow-lg" : ""}>
-                    <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        {tier.name}
-                        {tier.name === "Pro" && <Badge variant="default">Pro</Badge>}
-                    </CardTitle>
-                    <div>
-                        <span className="text-3xl font-bold">{tier.price}</span>
-                        <span className="text-muted-foreground">{tier.period}</span>
-                    </div>
-
-                    <CardDescription>{tier.description}</CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="flex flex-col gap-4">
-                        {tier.features.map((feature) => (
-                            <div key={feature} className="flex items-center gap-2">
-                            <Check className="h-5 w-5 text-green-500" />
-                            <span>{feature}</span>
-                            </div>
-                        ))}
-                    </CardContent>
-
-                    <CardFooter>
-                    <Button className="w-full" variant={tier.variant as "default" | "outline"}>
-                        {tier.buttonText}
-                    </Button>
-                    </CardFooter>
-                </Card>
-                ))}
-            </div>
-        </section>
-
       </main>
 
       <footer className="py-8 border-t">
