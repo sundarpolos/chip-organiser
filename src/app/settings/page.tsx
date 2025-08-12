@@ -78,9 +78,25 @@ const ClubManagement: FC<{
                                             <LogIn className="mr-2 h-4 w-4" /> Enter Dashboard
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => setEditModalOpen(club)}><Pencil className="h-4 w-4" /></Button>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="icon" onClick={() => setClubToDelete(club)}><Trash2 className="h-4 w-4" /></Button>
-                                        </AlertDialogTrigger>
+                                        <AlertDialog onOpenChange={(open) => !open && setClubToDelete(null)}>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="icon" onClick={() => setClubToDelete(club)}><Trash2 className="h-4 w-4" /></Button>
+                                            </AlertDialogTrigger>
+                                             {clubToDelete && clubToDelete.id === club.id && (
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This action cannot be undone. This will permanently delete the <strong>{clubToDelete?.name}</strong> club and all associated players, games, and venues.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={handleDeleteClub}>Continue</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            )}
+                                        </AlertDialog>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -112,21 +128,6 @@ const ClubManagement: FC<{
                     clubToEdit={isEditModalOpen}
                 />
             )}
-            
-            <AlertDialog open={!!clubToDelete} onOpenChange={() => setClubToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the <strong>{clubToDelete?.name}</strong> club and all associated players, games, and venues.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteClub}>Continue</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </>
     );
 };
@@ -186,7 +187,8 @@ const CreateEditClubDialog: FC<{
             onOpenChange(false);
         } catch (error) {
             console.error('Failed to save club', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not save the club.' });
+            const errorMessage = error instanceof Error ? error.message : 'Could not save the club.';
+            toast({ variant: 'destructive', title: 'Error', description: errorMessage });
         } finally {
             setIsSaving(false);
         }
@@ -266,7 +268,8 @@ export default function SettingsPage() {
               setClubs(allClubs.sort((a,b) => a.name.localeCompare(b.name)));
               setPlayers(allPlayers);
           } catch(e) {
-              toast({variant: 'destructive', title: 'Error', description: 'Could not load required data.'});
+              const errorMessage = e instanceof Error ? e.message : 'Could not load required data.'
+              toast({variant: 'destructive', title: 'Error', description: errorMessage});
           } finally {
               setIsLoading(false);
           }
