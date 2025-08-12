@@ -1,151 +1,198 @@
 
 'use client';
 
-import { useEffect, useState, type FC } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2, Building, ArrowRight, UserPlus, Trash2, Pencil, LogIn, Plus } from 'lucide-react';
-import { getClubs, Club, createClub, deleteClub } from '@/services/club-service';
-import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import type { MasterPlayer } from '@/lib/types';
-import { getMasterPlayers } from '@/services/player-service';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Check, ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
-export default function ClubSelectionPage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+const features = [
+  {
+    icon: <Users className="h-8 w-8 text-primary" />,
+    title: 'Dynamic Player Management',
+    description: 'Easily add, remove, and manage roles for players within your club in real-time.',
+  },
+  {
+    icon: <ShieldAlert className="h-8 w-8 text-primary" />,
+    title: 'Secure Buy-in Workflow',
+    description: 'Admins and Bankers get instant notifications to approve player buy-in requests securely.',
+  },
+  {
+    icon: <BarChart className="h-8 w-8 text-primary" />,
+    title: 'Real-Time Calculations',
+    description: 'All buy-ins, chip counts, and profit/loss values are calculated and updated live for all participants.',
+  },
+  {
+    icon: <FileDown className="h-8 w-8 text-primary" />,
+    title: 'Automated Settlement & Reporting',
+    description: 'Automatically calculate the most efficient money transfers and generate detailed PDF reports.',
+  },
+  {
+    icon: <Crown className="h-8 w-8 text-primary" />,
+    title: 'AI-Powered Anomaly Detection',
+    description: 'Analyze a player\'s buy-in patterns against their history to detect unusual activity.',
+  },
+  {
+    icon: <Upload className="h-8 w-8 text-primary" />,
+    title: 'Effortless Game Import',
+    description: 'Got a game log from another app? Our AI will parse it to create a complete game history.',
+  },
+];
 
-  useEffect(() => {
-    async function setupDashboard() {
-        setIsLoading(true);
-        try {
-            const allPlayers = await getMasterPlayers();
-            const superAdmin = allPlayers.find(p => p.whatsappNumber === '919843350000');
-
-            if (!superAdmin) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Super Admin user not found. Please log in normally.' });
-                router.replace('/login'); // Fallback to a generic login
-                return;
-            }
-
-            const allClubs = await getClubs();
-            const smartClub = allClubs.find(c => c.name === 'Smart CLUB');
-
-            if (!smartClub) {
-                toast({ variant: 'destructive', title: 'Error', description: '"Smart CLUB" not found. Please create it or select another club.' });
-                setClubs(allClubs); // Show other clubs if Smart CLUB is missing
-                setIsLoading(false);
-                return;
-            }
-
-            // Set localStorage for auto-login
-            localStorage.setItem('chip-maestro-user', JSON.stringify(superAdmin));
-            localStorage.setItem('chip-maestro-clubId', smartClub.id);
-
-            // Redirect to dashboard
-            router.replace('/dashboard');
-
-        } catch (error) {
-            console.error("Failed to setup dashboard", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not automatically log you in. Please select a club manually.' });
-            setIsLoading(false);
-        }
+const pricingTiers = [
+    {
+        name: "Free",
+        price: "₹0",
+        period: "/ month",
+        description: "Perfect for small, casual poker nights.",
+        features: [
+            "Up to 10 players per club",
+            "Unlimited games",
+            "Real-time calculations",
+            "Basic game history",
+        ],
+        buttonText: "Get Started",
+        variant: "outline",
+    },
+    {
+        name: "Pro",
+        price: "₹999",
+        period: "/ month",
+        description: "The ultimate solution for professional clubs.",
+        features: [
+            "Unlimited players",
+            "AI Anomaly Detection",
+            "Advanced Reporting & Export",
+            "Game Log Import",
+            "Priority Support",
+        ],
+        buttonText: "Upgrade to Pro",
+        variant: "default",
     }
+]
 
-    setupDashboard();
-  }, [router, toast]);
-
-
-  if (isLoading) {
-    return (
-        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-             <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="absolute top-0 left-0 w-full h-full object-cover -z-20"
-                src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
-            />
-            <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
-            <div className="flex flex-col items-center gap-4 text-center">
-                <Loader2 className="h-10 w-10 animate-spin text-white" />
-                <p className="text-white font-semibold">Taking you to the Smart CLUB dashboard...</p>
-            </div>
-        </div>
-    );
-  }
-
-  // Fallback UI in case auto-login fails
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-        <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute top-0 left-0 w-full h-full object-cover -z-20"
-            src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
-        />
-        <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
-      <Card className="w-full max-w-md bg-background/[.25] backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building />
-            Select Your Club
-          </CardTitle>
-          <CardDescription>
-            Auto-login failed. Please select a club to log in.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-2">
-              {clubs.length > 0 ? (
-                clubs.map((club) => (
-                  <button
-                    key={club.id}
-                    onClick={() => router.push(`/login?clubId=${club.id}`)}
-                    className="w-full text-left p-3 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex justify-between items-center"
-                  >
-                    <span className="font-medium">{club.name}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                ))
-              ) : (
-                <div className="text-center text-muted-foreground p-4">
-                  <p>No clubs have been created yet.</p>
-                </div>
-              )}
+    <div className="flex flex-col min-h-screen">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Crown className="h-6 w-6" />
+            <span className="font-bold">Chip Maestro</span>
+          </Link>
+          <div className="flex flex-1 items-center justify-end">
+            <nav className="flex items-center space-x-2">
+              <Button asChild>
+                <Link href="/login">Login</Link>
+              </Button>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="container grid lg:grid-cols-2 place-items-center py-20 md:py-32 gap-10">
+          <div className="text-center lg:text-start space-y-6">
+            <main className="text-5xl md:text-6xl font-bold">
+              <h1 className="inline">
+                <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
+                  Manage
+                </span>{" "}
+                Your Poker Club
+              </h1>{" "}
+              Like a Pro
+            </main>
+
+            <p className="text-xl text-muted-foreground md:w-10/12 mx-auto lg:mx-0">
+              The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
+            </p>
+
+            <div className="space-y-4 md:space-y-0 md:space-x-4">
+              <Button className="w-full md:w-1/3" asChild>
+                <Link href="/login">Get Started</Link>
+              </Button>
             </div>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-             <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>Logout</Button>
-        </CardFooter>
-      </Card>
+          </div>
+          
+          <div className="z-10">
+              <div className="hidden lg:block w-[500px] h-[500px] bg-blue-200/50 dark:bg-blue-900/50 rounded-full blur-3xl absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              <img src="https://placehold.co/600x400.png" data-ai-hint="poker chips game" alt="Hero Image" className="w-full md:w-[500px] lg:w-[600px] object-contain rounded-lg shadow-lg" />
+          </div>
+
+        </section>
+
+        {/* Features Section */}
+        <section id="features" className="container py-24 sm:py-32 space-y-8">
+            <h2 className="text-3xl lg:text-4xl font-bold md:text-center">
+                Many{" "}
+                <span className="inline bg-gradient-to-r from-[#61DAFB] to-[#1d6fa5] text-transparent bg-clip-text">
+                Features
+                </span>
+            </h2>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {features.map(({ icon, title, description }) => (
+                <Card key={title}>
+                    <CardHeader className="flex items-center">
+                        {icon}
+                        <CardTitle>{title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>{description}</CardContent>
+                </Card>
+                ))}
+            </div>
+        </section>
+
+
+        {/* Pricing Section */}
+        <section id="pricing" className="container py-24 sm:py-32">
+            <h2 className="text-3xl md:text-4xl text-center font-bold mb-8">
+                Pricing
+            </h2>
+             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {pricingTiers.map((tier) => (
+                <Card key={tier.name} className={tier.variant === "default" ? "border-primary shadow-lg" : ""}>
+                    <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        {tier.name}
+                        {tier.name === "Pro" && <Badge variant="default">Pro</Badge>}
+                    </CardTitle>
+                    <div>
+                        <span className="text-3xl font-bold">{tier.price}</span>
+                        <span className="text-muted-foreground">{tier.period}</span>
+                    </div>
+
+                    <CardDescription>{tier.description}</CardDescription>
+                    </CardHeader>
+
+                    <CardContent className="flex flex-col gap-4">
+                        {tier.features.map((feature) => (
+                            <div key={feature} className="flex items-center gap-2">
+                            <Check className="h-5 w-5 text-green-500" />
+                            <span>{feature}</span>
+                            </div>
+                        ))}
+                    </CardContent>
+
+                    <CardFooter>
+                    <Button className="w-full" variant={tier.variant as "default" | "outline"}>
+                        {tier.buttonText}
+                    </Button>
+                    </CardFooter>
+                </Card>
+                ))}
+            </div>
+        </section>
+
+      </main>
+
+      <footer className="py-8 border-t">
+        <div className="container text-center text-muted-foreground">
+            &copy; {new Date().getFullYear()} Chip Maestro. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }

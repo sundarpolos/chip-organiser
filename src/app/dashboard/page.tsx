@@ -624,22 +624,15 @@ export default function DashboardPage() {
   // Load user data and check auth
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
-    // Allow for a direct clubId override from the URL for Super Admin access
-    const clubIdOverride = searchParams.get('clubId');
-    const clubId = clubIdOverride || localStorage.getItem('chip-maestro-clubId');
+    const clubId = localStorage.getItem('chip-maestro-clubId');
     
     if (userStr && clubId) {
       const user = JSON.parse(userStr);
       setCurrentUser(user);
-      // If a super admin is using an override, we must also update localStorage
-      // so that subsequent reloads or actions use the correct club context.
-      if (clubIdOverride && user.isAdmin) {
-          localStorage.setItem('chip-maestro-clubId', clubIdOverride);
-      }
     } else {
       router.replace('/');
     }
-  }, [router, searchParams]);
+  }, [router]);
 
   // Set greeting message
   useEffect(() => {
@@ -1312,10 +1305,6 @@ export default function DashboardPage() {
                         <DropdownMenuSeparator />
                     </>
                 )}
-                <DropdownMenuItem onClick={() => router.push('/')}>
-                    <Building className="h-4 w-4 mr-2" />
-                    Change Club
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout

@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/firebase";
 import { MasterPlayer } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, deleteDoc, addDoc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc, addDoc, writeBatch, query, where } from "firebase/firestore";
 import { getGameHistory } from "./game-service";
 
 const MASTER_PLAYERS_COLLECTION = "masterPlayers";
@@ -15,6 +15,18 @@ export async function getMasterPlayers(): Promise<MasterPlayer[]> {
         players.push({ id: doc.id, ...doc.data() } as MasterPlayer);
     });
     return players;
+}
+
+export async function findUserByWhatsapp(whatsappNumber: string): Promise<MasterPlayer | null> {
+    const q = query(collection(db, MASTER_PLAYERS_COLLECTION), where("whatsappNumber", "==", whatsappNumber));
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+        // In a true multi-tenant system, you might have multiple matches.
+        // For this app, we'll assume the first match is sufficient.
+        const doc = querySnapshot.docs[0];
+        return { id: doc.id, ...doc.data() } as MasterPlayer;
+    }
+    return null;
 }
 
 export async function saveMasterPlayer(
