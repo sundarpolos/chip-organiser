@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type FC } from 'react';
+import { useState, useEffect, type FC, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import type { WhatsappConfig, Club, MasterPlayer } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
@@ -79,7 +80,7 @@ const ClubManagement: FC<{
                                             <LogIn className="mr-2 h-4 w-4" /> Enter Dashboard
                                         </Button>
                                         <Button variant="ghost" size="icon" onClick={() => setEditModalOpen(club)}><Pencil className="h-4 w-4" /></Button>
-                                        <AlertDialog onOpenChange={(open) => !open && setClubToDelete(null)}>
+                                        <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
                                             </AlertDialogTrigger>
@@ -243,18 +244,6 @@ const PlayerManagement: FC<{
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ players, setPlayers, clubs, toast }) => {
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-    const [sortBy, setSortBy] = useState<'name' | 'club'>('name');
-
-    const sortedPlayers = [...players].sort((a, b) => {
-        if (sortBy === 'club') {
-            const clubA = clubs.find(c => c.id === a.clubId)?.name || 'zzz';
-            const clubB = clubs.find(c => c.id === b.clubId)?.name || 'zzz';
-            if (clubA !== clubB) {
-                return clubA.localeCompare(clubB);
-            }
-        }
-        return a.name.localeCompare(b.name);
-    });
 
     const handleSavePlayer = async (player: MasterPlayer) => {
         try {
@@ -267,50 +256,81 @@ const PlayerManagement: FC<{
         }
     };
 
+    const playersByClub = useMemo(() => {
+        const grouped = new Map<string, MasterPlayer[]>();
+        
+        // Group players by club ID
+        players.forEach(player => {
+            const clubId = player.clubId || 'unassigned';
+            if (!grouped.has(clubId)) {
+                grouped.set(clubId, []);
+            }
+            grouped.get(clubId)!.push(player);
+        });
+
+        // Sort players within each group alphabetically by name
+        grouped.forEach((playerList) => {
+            playerList.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+        // Convert map to array and sort clubs by name
+        const clubMap = new Map(clubs.map(c => [c.id, c.name]));
+        return Array.from(grouped.entries()).sort((a, b) => {
+            const clubNameA = clubMap.get(a[0]) || 'zzz';
+            const clubNameB = clubMap.get(b[0]) || 'zzz';
+            return clubNameA.localeCompare(clubNameB);
+        });
+
+    }, [players, clubs]);
+
+    const getClubName = (clubId: string) => {
+        return clubs.find(c => c.id === clubId)?.name || 'Unassigned';
+    };
+
     return (
         <>
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Player Management</CardTitle>
-                        <div className="flex items-center gap-2">
-                            <Label>Sort by:</Label>
-                            <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'name' | 'club')}>
-                                <SelectTrigger className="w-[120px]">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="name">Name</SelectItem>
-                                    <SelectItem value="club">Club</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <CardDescription>Edit player details, including their assigned club and roles.</CardDescription>
+                    <CardTitle>Player Management</CardTitle>
+                    <CardDescription>Edit player details, including their assigned club and roles. Players are grouped by club.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Player Name</TableHead>
-                                <TableHead>Club</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {sortedPlayers.map(player => (
-                                <TableRow key={player.id}>
-                                    <TableCell className="font-medium">{player.name}</TableCell>
-                                    <TableCell>{clubs.find(c => c.id === player.clubId)?.name || 'Unassigned'}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => setPlayerToEdit(player)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                    <Accordion type="multiple" className="w-full">
+                        {playersByClub.map(([clubId, clubPlayers]) => (
+                            <AccordionItem value={clubId} key={clubId}>
+                                <AccordionTrigger>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-semibold text-lg">{getClubName(clubId)}</span>
+                                        <span className="text-sm text-muted-foreground">({clubPlayers.length} players)</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Player Name</TableHead>
+                                                <TableHead>WhatsApp Number</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {clubPlayers.map(player => (
+                                                <TableRow key={player.id}>
+                                                    <TableCell className="font-medium">{player.name}</TableCell>
+                                                    <TableCell>{player.whatsappNumber}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button variant="ghost" size="icon" onClick={() => setPlayerToEdit(player)}>
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
                 </CardContent>
             </Card>
             <EditPlayerDialog
@@ -324,6 +344,7 @@ const PlayerManagement: FC<{
         </>
     );
 };
+
 
 const EditPlayerDialog: FC<{
     isOpen: boolean;
