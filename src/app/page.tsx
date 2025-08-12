@@ -66,19 +66,22 @@ export default function HomePage() {
             <Crown className="h-6 w-6 text-primary" />
             <span className="font-bold">Chip Maestro</span>
           </Link>
-          <div className="flex flex-1 items-center justify-end space-x-2">
-            <ThemeToggle />
-            <nav className="flex items-center">
-              {isLoggedIn ? (
-                <Button asChild>
-                  <Link href="/dashboard">Dashboard</Link>
+          <div className="flex flex-1 items-center justify-end space-x-4">
+            <nav className="flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                    <Link href="/contact">Contact</Link>
                 </Button>
-              ) : (
-                <Button asChild>
-                  <Link href="/login">Login</Link>
-                </Button>
-              )}
+                {isLoggedIn ? (
+                    <Button asChild>
+                        <Link href="/dashboard">Dashboard</Link>
+                    </Button>
+                ) : (
+                    <Button asChild>
+                        <Link href="/login">Login</Link>
+                    </Button>
+                )}
             </nav>
+            <ThemeToggle />
           </div>
         </div>
       </header>
