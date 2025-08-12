@@ -54,7 +54,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
+        <div className="container flex h-14 items-center px-4 md:px-6 lg:px-8">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Crown className="h-6 w-6" />
             <span className="font-bold">Chip Maestro</span>
@@ -80,7 +80,7 @@ export default function HomePage() {
         <section className="container text-center py-20 md:py-32">
           <div className="space-y-6 max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-6xl font-bold">
-              <span className="inline bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text">
+              <span className="inline bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">
                 Manage
               </span>{" "}
               Your Poker Club Like a Pro
@@ -89,7 +89,7 @@ export default function HomePage() {
               The ultimate all-in-one SaaS solution for managing poker clubs of any size. Say goodbye to messy spreadsheets and complicated payout calculations.
             </p>
             <div className="space-x-4">
-              <Button asChild>
+              <Button asChild size="lg">
                 <Link href="/login">Get Started</Link>
               </Button>
             </div>
@@ -100,7 +100,7 @@ export default function HomePage() {
         <section id="features" className="container py-24 sm:py-32 space-y-8">
           <h2 className="text-3xl lg:text-4xl font-bold md:text-center">
             Many{" "}
-            <span className="inline bg-gradient-to-r from-[#61DAFB] to-[#1d6fa5] text-transparent bg-clip-text">
+            <span className="inline bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">
               Features
             </span>
           </h2>
