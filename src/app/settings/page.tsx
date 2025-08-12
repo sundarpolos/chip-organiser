@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { WhatsappConfig, Club, MasterPlayer } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
+import { Switch } from '@/components/ui/switch';
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -285,7 +286,7 @@ const PlayerManagement: FC<{
                             </Select>
                         </div>
                     </div>
-                    <CardDescription>Edit player details, including their assigned club.</CardDescription>
+                    <CardDescription>Edit player details, including their assigned club and roles.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -360,7 +361,7 @@ const EditPlayerDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Edit Player: {player?.name}</DialogTitle>
                     <DialogDescription>
-                        Update the player's details below.
+                        Update the player's details and permissions below.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -395,6 +396,37 @@ const EditPlayerDialog: FC<{
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Permissions</Label>
+                        <div className="space-y-3 rounded-md border p-3">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="is-admin">Is Admin</Label>
+                                <Switch
+                                    id="is-admin"
+                                    checked={editablePlayer.isAdmin}
+                                    onCheckedChange={(checked) => setEditablePlayer(p => p ? { ...p, isAdmin: checked } : null)}
+                                    disabled={editablePlayer.whatsappNumber === SUPER_ADMIN_WHATSAPP}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="is-banker">Is Banker</Label>
+                                <Switch
+                                    id="is-banker"
+                                    checked={!!editablePlayer.isBanker}
+                                    onCheckedChange={(checked) => setEditablePlayer(p => p ? { ...p, isBanker: checked } : null)}
+                                />
+                            </div>
+                             <div className="flex items-center justify-between">
+                                <Label htmlFor="is-active">Is Active</Label>
+                                <Switch
+                                    id="is-active"
+                                    checked={editablePlayer.isActive ?? true}
+                                    onCheckedChange={(checked) => setEditablePlayer(p => p ? { ...p, isActive: checked } : null)}
+                                    disabled={editablePlayer.whatsappNumber === SUPER_ADMIN_WHATSAPP}
+                                />
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>
@@ -462,7 +494,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold">Super Admin Settings</h1>
-        <p className="text-muted-foreground">Manage clubs and system-wide configurations.</p>
+        <p className="text-muted-foreground">Manage clubs, players, and system-wide configurations.</p>
       </div>
        <ClubManagement clubs={clubs} setClubs={setClubs} players={players} toast={toast} currentUser={currentUser} />
        <PlayerManagement players={players} setPlayers={setPlayers} clubs={clubs} toast={toast} />
