@@ -97,7 +97,8 @@ function LoginPageContent() {
         localStorage.setItem('chip-maestro-clubId', user.clubId);
         router.replace('/dashboard');
       } else {
-        throw new Error("This WhatsApp number isn't registered with any club.");
+        // This case should ideally not be hit if sendLoginOtp is working correctly, but it's a good fallback.
+        throw new Error("This WhatsApp number isn't registered with any club. Please contact your admin.");
       }
     } catch (error: any) {
       toast({
@@ -122,21 +123,13 @@ function LoginPageContent() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute top-0 left-0 w-full h-full object-cover -z-20"
-        src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
-      />
-      <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
-      <Card className="w-full max-w-sm mx-auto bg-background/[.25] backdrop-blur-sm">
+      <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm -z-10" />
+      <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center">
           <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
             <KeyRound className="h-8 w-8 text-primary-foreground" />
           </div>
-          <CardTitle>Welcome Back</CardTitle>
+          <CardTitle>Chip Maestro Login</CardTitle>
           <CardDescription>
             {isOtpSent ? `Enter the OTP sent to ${whatsappNumber}.` : 'Enter your WhatsApp number to log in.'}
           </CardDescription>
@@ -144,7 +137,7 @@ function LoginPageContent() {
         <CardContent className="space-y-4">
           {!isOtpSent ? (
             <div className="space-y-2">
-              <Label htmlFor="whatsapp-number" className="text-center w-full block">WhatsApp Number</Label>
+              <Label htmlFor="whatsapp-number" className="sr-only">WhatsApp Number</Label>
               <Input
                 id="whatsapp-number"
                 type="tel"
@@ -156,7 +149,7 @@ function LoginPageContent() {
             </div>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="otp">One-Time Password (OTP)</Label>
+              <Label htmlFor="otp" className="sr-only">One-Time Password (OTP)</Label>
               <Input
                 id="otp"
                 type="text"
@@ -175,7 +168,7 @@ function LoginPageContent() {
             </Button>
           ) : (
             <>
-              <Button onClick={handleLogin} disabled={isVerifying} className="w-full">
+              <Button onClick={handleLogin} disabled={isVerifying || !otp} className="w-full">
                 {isVerifying ? <Loader2 className="animate-spin" /> : 'Login'}
               </Button>
               <Button variant="link" onClick={() => setIsOtpSent(false)}>

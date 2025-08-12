@@ -30,7 +30,6 @@ export type SendLoginOtpInput = z.infer<typeof SendLoginOtpInputSchema>;
 const SendLoginOtpOutputSchema = z.object({
   success: z.boolean().describe('Whether the OTP was sent successfully.'),
   otp: z.string().optional().describe('The 4-digit OTP that was sent. This is returned for verification.'),
-  isNewUser: z.boolean().describe('Whether a new user was created.'),
   error: z.string().optional().describe('Error message if sending failed.'),
 });
 export type SendLoginOtpOutput = z.infer<typeof SendLoginOtpOutputSchema>;
@@ -54,20 +53,14 @@ const sendLoginOtpFlow = ai.defineFlow(
     try {
       const allPlayers = await getMasterPlayers();
       let user = allPlayers.find(p => p.whatsappNumber === whatsappNumber);
-      let isNewUser = false;
       const isSuperAdminLogin = whatsappNumber === SUPER_ADMIN_WHATSAPP;
 
       if (!user) {
-        // Create a new user if not found
-        let newUserPayload: Omit<import('@/lib/types').MasterPlayer, 'id'> = {
-          name: isSuperAdminLogin ? 'Sundar' : `Player ${whatsappNumber.slice(-4)}`, // Default name
-          whatsappNumber: whatsappNumber,
-          isAdmin: isSuperAdminLogin, // Only super admin is admin on creation
-          isActive: true, // New users are active by default
-        };
-        user = await saveMasterPlayer(newUserPayload);
-        isNewUser = true;
-      } else if (isSuperAdminLogin && (!user.isAdmin)) {
+        // If user is not found, do not create a new one. Return an error.
+        return { success: false, error: 'This WhatsApp number is not registered. Please contact your club admin.' };
+      }
+
+      if (isSuperAdminLogin && (!user.isAdmin)) {
         // If the super admin logs in and isn't admin, make them so.
         user.isAdmin = true;
         await saveMasterPlayer(user);
@@ -77,9 +70,8 @@ const sendLoginOtpFlow = ai.defineFlow(
         await saveMasterPlayer(user);
       }
 
-
       const otp = generateOtp();
-      const message = `Your Smart Club Organiser login code is ${otp}. This code will expire in 10 minutes.`;
+      const message = `Your Chip Maestro login code is ${otp}. This code will expire in 10 minutes.`;
 
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
@@ -93,14 +85,14 @@ const sendLoginOtpFlow = ai.defineFlow(
         // In a real application, you would not return the OTP to the client.
         // This is done for prototype simplicity. The OTP would be stored
         // server-side (e.g., in Firestore with an expiry) and verified in a separate step.
-        return { success: true, otp: otp, isNewUser };
+        return { success: true, otp: otp };
       } else {
-        return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.', isNewUser: false };
+        return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.' };
       }
     } catch (error) {
       console.error('Error in sendLoginOtpFlow:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      return { success: false, error: errorMessage, isNewUser: false };
+      return { success: false, error: errorMessage };
     }
   }
 );
