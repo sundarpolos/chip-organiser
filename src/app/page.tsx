@@ -30,6 +30,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { MasterPlayer } from '@/lib/types';
+import { getMasterPlayers } from '@/services/player-service';
 
 export default function ClubSelectionPage() {
   const router = useRouter();
@@ -39,45 +40,67 @@ export default function ClubSelectionPage() {
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
 
   useEffect(() => {
-    // On page load, remove any existing club selection to ensure a fresh start
-    localStorage.removeItem('chip-maestro-clubId');
+    async function setupDashboard() {
+        setIsLoading(true);
+        try {
+            const allPlayers = await getMasterPlayers();
+            const superAdmin = allPlayers.find(p => p.whatsappNumber === '919843350000');
 
-    const userStr = localStorage.getItem('chip-maestro-user');
-    if (userStr) {
-      setCurrentUser(JSON.parse(userStr));
-    } else {
-      router.replace('/login'); // Should not happen, but a safeguard
+            if (!superAdmin) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Super Admin user not found. Please log in normally.' });
+                router.replace('/login'); // Fallback to a generic login
+                return;
+            }
+
+            const allClubs = await getClubs();
+            const smartClub = allClubs.find(c => c.name === 'Smart CLUB');
+
+            if (!smartClub) {
+                toast({ variant: 'destructive', title: 'Error', description: '"Smart CLUB" not found. Please create it or select another club.' });
+                setClubs(allClubs); // Show other clubs if Smart CLUB is missing
+                setIsLoading(false);
+                return;
+            }
+
+            // Set localStorage for auto-login
+            localStorage.setItem('chip-maestro-user', JSON.stringify(superAdmin));
+            localStorage.setItem('chip-maestro-clubId', smartClub.id);
+
+            // Redirect to dashboard
+            router.replace('/dashboard');
+
+        } catch (error) {
+            console.error("Failed to setup dashboard", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not automatically log you in. Please select a club manually.' });
+            setIsLoading(false);
+        }
     }
-  }, [router]);
 
-  useEffect(() => {
-    async function fetchClubs() {
-      if (!currentUser) return;
-      setIsLoading(true);
-      try {
-        const fetchedClubs = await getClubs();
-        setClubs(fetchedClubs);
-      } catch (error) {
-        console.error("Failed to fetch clubs", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load the list of clubs.' });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    fetchClubs();
-  }, [toast, currentUser]);
+    setupDashboard();
+  }, [router, toast]);
 
-  const handleClubSelect = (clubId: string) => {
-    router.push(`/login?clubId=${clubId}`);
-  };
 
-  const handleLogout = () => {
-    localStorage.removeItem('chip-maestro-user');
-    router.replace('/login');
-  };
+  if (isLoading) {
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+             <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute top-0 left-0 w-full h-full object-cover -z-20"
+                src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
+            />
+            <div className="absolute top-0 left-0 w-full h-full bg-black/50 -z-10" />
+            <div className="flex flex-col items-center gap-4 text-center">
+                <Loader2 className="h-10 w-10 animate-spin text-white" />
+                <p className="text-white font-semibold">Taking you to the Smart CLUB dashboard...</p>
+            </div>
+        </div>
+    );
+  }
 
-  const isSuperAdmin = currentUser?.isAdmin === true && currentUser?.whatsappNumber === '919843350000';
-
+  // Fallback UI in case auto-login fails
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <video
@@ -96,21 +119,16 @@ export default function ClubSelectionPage() {
             Select Your Club
           </CardTitle>
           <CardDescription>
-            Choose a club to log in or manage settings.
+            Auto-login failed. Please select a club to log in.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
             <div className="space-y-2">
               {clubs.length > 0 ? (
                 clubs.map((club) => (
                   <button
                     key={club.id}
-                    onClick={() => handleClubSelect(club.id)}
+                    onClick={() => router.push(`/login?clubId=${club.id}`)}
                     className="w-full text-left p-3 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground transition-colors flex justify-between items-center"
                   >
                     <span className="font-medium">{club.name}</span>
@@ -123,15 +141,9 @@ export default function ClubSelectionPage() {
                 </div>
               )}
             </div>
-          )}
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
-             {isSuperAdmin && (
-                <Button variant="secondary" className="w-full" onClick={() => router.push('/settings')}>
-                    <Plus className="mr-2 h-4 w-4" /> Manage Clubs
-                </Button>
-            )}
-            <Button variant="outline" className="w-full" onClick={handleLogout}>Logout</Button>
+             <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>Logout</Button>
         </CardFooter>
       </Card>
     </div>
