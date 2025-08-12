@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown } from 'lucide-react';
+import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const features = [
@@ -30,7 +30,7 @@ const features = [
     description: 'Automatically calculate the most efficient money transfers and generate detailed PDF reports.',
   },
   {
-    icon: <Crown className="h-8 w-8 text-primary" />,
+    icon: <Bot className="h-8 w-8 text-primary" />,
     title: 'AI-Powered Anomaly Detection',
     description: "Analyze a player's buy-in patterns against their history to detect unusual activity.",
   },
@@ -40,6 +40,13 @@ const features = [
     description: 'Got a game log from another app? Our AI will parse it to create a complete game history.',
   },
 ];
+
+const techStack = [
+    { icon: <Feather className="h-8 w-8 text-primary" />, name: 'Next.js & React', description: 'For a fast, modern, and server-rendered user experience.' },
+    { icon: <Server className="h-8 w-8 text-primary" />, name: 'Firebase', description: 'Powers our real-time database, ensuring all data is synced instantly.' },
+    { icon: <Bot className="h-8 w-8 text-primary" />, name: 'Genkit', description: 'Drives all our cutting-edge AI features, from game import to anomaly detection.'},
+    { icon: <Feather className="h-8 w-8 text-primary" />, name: 'ShadCN & Tailwind', description: 'Create a beautiful, responsive, and consistent design system.' },
+]
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -83,7 +90,7 @@ export default function HomePage() {
                 <div className="mx-auto max-w-4xl text-center space-y-6">
                     <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                         The Ultimate Platform for
-                        <span className="mt-2 block bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                        <span className="mt-2 block bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
                             Poker Club Management
                         </span>
                     </h1>
@@ -129,6 +136,83 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* In-Depth Features Section */}
+        <section className="py-16 sm:py-24">
+            <div className="container mx-auto px-4 md:px-6 space-y-16">
+                 <div className="mx-auto max-w-4xl space-y-4 text-center">
+                    <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Features In-Depth</h2>
+                 </div>
+                 
+                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <h3 className="text-2xl font-bold mb-2">Real-Time Sync & Calculations</h3>
+                        <p className="text-muted-foreground">
+                            Powered by Firebase Firestore, every buy-in, chip update, and player action is synced across all devices in real-time. The dashboard instantly recalculates profit and loss, so everyone at the table has a live view of the standings without any manual effort.
+                        </p>
+                    </div>
+                    <div>
+                        <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                            <BarChart className="h-24 w-24 text-primary/50" />
+                        </div>
+                    </div>
+                 </div>
+                 
+                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                     <div className="order-2 md:order-1">
+                        <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                            <Bot className="h-24 w-24 text-primary/50" />
+                        </div>
+                    </div>
+                    <div className="order-1 md:order-2">
+                        <h3 className="text-2xl font-bold mb-2">Advanced AI Tools</h3>
+                        <p className="text-muted-foreground">
+                           Leveraging Google's Genkit, Chip Maestro brings cutting-edge AI to your poker game. Automatically import game data from raw text logs, or use our Anomaly Detection to analyze player buy-in patterns against their history, helping to flag suspicious activity and ensure game integrity.
+                        </p>
+                    </div>
+                 </div>
+
+                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <h3 className="text-2xl font-bold mb-2">Secure & Automated Settlements</h3>
+                        <p className="text-muted-foreground">
+                            End-of-game payouts are calculated automatically. Our system determines the most efficient set of transactions required to settle all debts, minimizing the number of cash exchanges. Admins can send these settlement details to all players via WhatsApp with a single click.
+                        </p>
+                    </div>
+                    <div>
+                         <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                            <ShieldAlert className="h-24 w-24 text-primary/50" />
+                        </div>
+                    </div>
+                 </div>
+            </div>
+        </section>
+        
+        {/* Tech Stack Section */}
+        <section className="py-16 sm:py-24 bg-secondary/50">
+            <div className="container mx-auto px-4 md:px-6">
+                <div className="mx-auto max-w-4xl space-y-4 text-center">
+                  <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                    Built With Modern Technology
+                  </h2>
+                  <p className="text-muted-foreground md:text-lg">
+                    Chip Maestro is built on a robust, scalable, and modern tech stack to deliver a seamless experience.
+                  </p>
+                </div>
+                <div className="mt-12 grid gap-8 md:grid-cols-2">
+                    {techStack.map(tech => (
+                        <div key={tech.name} className="flex items-start gap-4">
+                            <div className="rounded-full bg-primary/10 p-3">{tech.icon}</div>
+                            <div>
+                                <h3 className="text-lg font-bold">{tech.name}</h3>
+                                <p className="text-muted-foreground">{tech.description}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
       </main>
 
       <footer className="border-t py-6 md:py-8">
