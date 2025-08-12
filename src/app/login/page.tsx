@@ -1,9 +1,8 @@
 
-
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { sendLoginOtp } from '@/ai/flows/send-login-otp';
 import { getMasterPlayers } from '@/services/player-service';
 import { Button } from '@/components/ui/button';
@@ -14,8 +13,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, KeyRound } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { MasterPlayer } from '@/lib/types';
+import { getClub } from '@/services/club-service';
 
-export default function LoginPage() {
+
+function LoginPageContent() {
   const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
   const [otp, setOtp] = useState('');
@@ -24,30 +25,55 @@ export default function LoginPage() {
   const [isSending, setIsSending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true);
+  const [clubName, setClubName] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+  
+  const clubId = searchParams.get('clubId');
 
   useEffect(() => {
-    async function loadPlayers() {
+    async function loadInitialData() {
+      if (!clubId) {
+        toast({
+          variant: 'destructive',
+          title: 'No Club Selected',
+          description: 'Please select a club first.',
+        });
+        router.replace('/');
+        return;
+      }
+
       try {
-        const players = await getMasterPlayers();
-        // Filter for players who are active and have a WhatsApp number
-        const activePlayersWithWhatsapp = players.filter(p => (p.isActive ?? true) && p.whatsappNumber);
-        const sortedPlayers = activePlayersWithWhatsapp.sort((a, b) => a.name.localeCompare(b.name));
+        const [club, allPlayers] = await Promise.all([
+            getClub(clubId),
+            getMasterPlayers(),
+        ]);
+
+        if (!club) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Invalid club selected.' });
+            router.replace('/');
+            return;
+        }
+        setClubName(club.name);
+
+        const clubPlayers = allPlayers.filter(p => p.clubId === clubId && (p.isActive ?? true) && p.whatsappNumber);
+        const sortedPlayers = clubPlayers.sort((a, b) => a.name.localeCompare(b.name));
         setMasterPlayers(sortedPlayers);
+        
       } catch (error) {
-        console.error("Failed to load players", error);
+        console.error("Failed to load players for club", error);
         toast({
           variant: 'destructive',
           title: 'Error Loading Players',
-          description: 'Could not fetch the list of registered players. Please try again.',
+          description: 'Could not fetch the list of players for this club.',
         });
       } finally {
         setIsLoadingPlayers(false);
       }
     }
-    loadPlayers();
-  }, [toast]);
+    loadInitialData();
+  }, [clubId, router, toast]);
 
   const handleSendOtp = async () => {
     const selectedPlayer = masterPlayers.find(p => p.id === selectedPlayerId);
@@ -55,13 +81,15 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Invalid Player',
-        description: 'Please select a valid player with a registered WhatsApp number.',
+        description: 'Please select a valid player.',
       });
       return;
     }
 
     setIsSending(true);
     try {
+      // Note: sendLoginOtp doesn't need clubId yet, as it identifies users by WhatsApp number.
+      // This might change in a full SaaS model with non-unique numbers across clubs.
       const result = await sendLoginOtp({ whatsappNumber: selectedPlayer.whatsappNumber, whatsappConfig: {} });
       if (result.success && result.otp) {
         setSentOtp(result.otp);
@@ -96,15 +124,15 @@ export default function LoginPage() {
 
     setIsVerifying(true);
     try {
-      // On successful OTP verification, the selected player is the current user
       const currentUser = masterPlayers.find(p => p.id === selectedPlayerId);
 
-      if (currentUser) {
-        // Store user details in localStorage to simulate a session
+      if (currentUser && clubId) {
+        // Store user and selected clubId in localStorage to simulate a session
         localStorage.setItem('chip-maestro-user', JSON.stringify(currentUser));
+        localStorage.setItem('chip-maestro-clubId', clubId);
         router.replace('/dashboard');
       } else {
-         throw new Error("Could not find user profile after login. Please try again.");
+         throw new Error("Could not find user profile or club. Please try again.");
       }
     } catch(error: any) {
         toast({
@@ -135,7 +163,7 @@ export default function LoginPage() {
             <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
                 <KeyRound className="h-8 w-8 text-primary-foreground" />
             </div>
-          <CardTitle>Smart Club Login</CardTitle>
+          <CardTitle>Login to {clubName || '...'}</CardTitle>
           <CardDescription>
             {isOtpSent ? `Enter the OTP sent to ${selectedPlayer?.name}.` : 'Select your name to receive WhatsApp OTP.'}
           </CardDescription>
@@ -185,8 +213,20 @@ export default function LoginPage() {
               </Button>
             </>
           )}
+           <Button variant="link" size="sm" onClick={() => router.push('/')}>
+            Select a different club
+          </Button>
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

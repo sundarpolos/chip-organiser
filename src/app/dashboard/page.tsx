@@ -10,7 +10,7 @@ import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn, Club } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -112,6 +112,7 @@ import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/servic
 import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+import { getClub } from "@/services/club-service"
 
 
 const WhatsappIcon = () => (
@@ -546,6 +547,7 @@ export default function DashboardPage() {
   const [isDataReady, setIsDataReady] = useState(false);
   const [isOtpVerificationEnabled, setOtpVerificationEnabled] = useState(true);
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+  const [activeClub, setActiveClub] = useState<Club | null>(null);
   const [greeting, setGreeting] = useState('');
 
 
@@ -621,19 +623,20 @@ export default function DashboardPage() {
   // Load user data and check auth
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
-    if (userStr) {
+    const clubId = localStorage.getItem('chip-maestro-clubId');
+    if (userStr && clubId) {
       setCurrentUser(JSON.parse(userStr));
     } else {
-      router.replace('/login');
+      router.replace('/');
     }
   }, [router]);
 
   // Set greeting message
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && activeClub) {
       setGreeting(`Hi, ${currentUser.name}!`);
     }
-  }, [currentUser]);
+  }, [currentUser, activeClub]);
 
   const loadGameIntoState = useCallback(async (gameToLoad: GameHistory) => {
         setActiveGame(gameToLoad);
@@ -655,8 +658,18 @@ export default function DashboardPage() {
   // Load data from Firestore on initial render
   useEffect(() => {
     async function loadInitialData() {
-        if (!currentUser) return;
+        const clubId = localStorage.getItem('chip-maestro-clubId');
+        if (!currentUser || !clubId) return;
+
         try {
+            const club = await getClub(clubId);
+            if (!club) {
+                toast({ variant: "destructive", title: "Club not found", description: "The selected club does not exist. Please select another club." });
+                handleLogout();
+                return;
+            }
+            setActiveClub(club);
+            
             const [
                 loadedMasterPlayers,
                 loadedMasterVenues,
@@ -667,9 +680,9 @@ export default function DashboardPage() {
                 getGameHistory(),
             ]);
 
-            setMasterPlayers(loadedMasterPlayers);
-            setMasterVenues(loadedMasterVenues);
-            setGameHistory(loadedGameHistory);
+            setMasterPlayers(loadedMasterPlayers.filter(p => p.clubId === clubId));
+            setMasterVenues(loadedMasterVenues.filter(v => v.clubId === clubId));
+            setGameHistory(loadedGameHistory.filter(g => g.clubId === clubId));
             
             const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
             if (savedOtpPreference !== null) {
@@ -695,7 +708,8 @@ export default function DashboardPage() {
             // Check for active games for non-admins
             if (!isAdmin) {
                 const today = new Date();
-                const activeGameForToday = loadedGameHistory.find(g => isSameDay(new Date(g.timestamp), today) && !g.endTime);
+                const activeGamesForClub = loadedGameHistory.filter(g => g.clubId === clubId);
+                const activeGameForToday = activeGamesForClub.find(g => isSameDay(new Date(g.timestamp), today) && !g.endTime);
                 
                 if (activeGameForToday) {
                     const isPlayerInGame = activeGameForToday.players.some(p => p.name === currentUser.name);
@@ -858,9 +872,10 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
+    localStorage.removeItem('chip-maestro-clubId');
     setActiveGame(null);
     setJoinableGame(null);
-    router.replace('/login');
+    router.replace('/');
   };
 
   const addPlayers = async (playersToAdd: MasterPlayer[]) => {
@@ -872,6 +887,7 @@ export default function DashboardPage() {
           whatsappNumber: playerToAdd.whatsappNumber,
           buyIns: [],
           finalChips: 0,
+          clubId: activeGame.clubId,
       }));
       
       const updatedGame = {
@@ -905,7 +921,7 @@ export default function DashboardPage() {
   };
   
     const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
-    if (!activeGame) return;
+    if (!activeGame || !activeClub) return;
 
     if (finalPlayers.length === 0) {
         toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
@@ -936,10 +952,12 @@ export default function DashboardPage() {
             status: b.status,
         })),
         finalChips: p.finalChips,
+        clubId: activeClub.id,
     }));
 
     const finalGame: GameHistory = {
         ...activeGame,
+        clubId: activeClub.id,
         players: serializablePlayers as any, // Use `any` to bypass strict type checking for the save
         endTime: now.toISOString(),
         duration: activeGame.startTime ? (now.getTime() - new Date(activeGame.startTime).getTime()) : undefined
@@ -969,7 +987,7 @@ export default function DashboardPage() {
   
     const handleJoinGame = async (gameId: string) => {
         const gameToJoin = gameHistory.find(g => g.id === gameId);
-        if (gameToJoin && currentUser) {
+        if (gameToJoin && currentUser && activeClub) {
             
             const isAlreadyInGame = gameToJoin.players.some(p => p.name === currentUser.name);
             if(isAlreadyInGame) {
@@ -980,12 +998,8 @@ export default function DashboardPage() {
             }
 
             const playerToAdd: MasterPlayer = {
-                id: currentUser.id,
-                name: currentUser.name,
-                whatsappNumber: currentUser.whatsappNumber,
-                isAdmin: currentUser.isAdmin,
-                isActive: currentUser.isActive,
-                isBanker: currentUser.isBanker,
+                ...currentUser,
+                clubId: activeClub.id,
             };
             
             const newPlayer: Player = {
@@ -994,6 +1008,7 @@ export default function DashboardPage() {
                 whatsappNumber: playerToAdd.whatsappNumber,
                 buyIns: [],
                 finalChips: 0,
+                clubId: activeClub.id,
             };
             const updatedGame: GameHistory = {
                 ...gameToJoin,
@@ -1040,8 +1055,10 @@ export default function DashboardPage() {
   }
   
   const handleStartGameFromVenue = async (venue: string, date: Date) => {
+    if (!activeClub) return;
+
     if (!masterVenues.some(v => v.name === venue)) {
-        const venueData: Omit<MasterVenue, 'id'> = { name: venue };
+        const venueData: Omit<MasterVenue, 'id'> = { name: venue, clubId: activeClub.id };
         const savedVenue = await saveMasterVenue(venueData);
         setMasterVenues(prev => [...prev, savedVenue]);
     }
@@ -1059,6 +1076,7 @@ export default function DashboardPage() {
         timestamp: finalTimestamp,
         players: [],
         startTime: now.toISOString(),
+        clubId: activeClub.id,
     }
     await saveGameHistory(newGame);
     setActiveGame(newGame);
@@ -1068,10 +1086,10 @@ export default function DashboardPage() {
   }
 
   const handleVenueChange = async (newVenue: string) => {
-    if (!activeGame || newVenue === activeGame.venue) return;
+    if (!activeGame || newVenue === activeGame.venue || !activeClub) return;
 
     if (!masterVenues.some(v => v.name === newVenue)) {
-        const venueData: Omit<MasterVenue, 'id'> = { name: newVenue };
+        const venueData: Omit<MasterVenue, 'id'> = { name: newVenue, clubId: activeClub.id };
         const savedVenue = await saveMasterVenue(venueData);
         setMasterVenues(prev => [...prev, savedVenue]);
     }
@@ -1125,6 +1143,8 @@ export default function DashboardPage() {
   };
 
   const handleImportedGame = async (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
+    if (!activeClub) return;
+
     const existingMasterNames = masterPlayers.map(mp => mp.name);
     const newMasterPlayersPromises: Promise<MasterPlayer>[] = importedGame.players
         .filter(p => !existingMasterNames.includes(p.name))
@@ -1134,6 +1154,7 @@ export default function DashboardPage() {
                 whatsappNumber: p.whatsappNumber || "",
                 isAdmin: false,
                 isActive: true,
+                clubId: activeClub.id,
             };
             return await saveMasterPlayer(newPlayer, { updateGames: false });
         });
@@ -1164,6 +1185,7 @@ export default function DashboardPage() {
                 status: b.status,
             })),
             finalChips: p.finalChips,
+            clubId: activeClub.id,
         }
     });
 
@@ -1174,6 +1196,7 @@ export default function DashboardPage() {
         players: serializablePlayers as any, // Use `any` to bypass strict type checking
         startTime: newGameDate.toISOString(),
         endTime: new Date().toISOString(),
+        clubId: activeClub.id,
     };
 
     await saveGameHistory(newGame);
@@ -1199,6 +1222,7 @@ export default function DashboardPage() {
         <div className="flex-1">
           <div className="flex items-baseline gap-3">
              <h1 className="text-2xl font-bold truncate">{greeting}</h1>
+             <Badge variant="secondary">{activeClub?.name}</Badge>
            </div>
            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-2">
             {activeGame && (
@@ -1293,6 +1317,10 @@ export default function DashboardPage() {
                         <DropdownMenuSeparator />
                     </>
                 )}
+                <DropdownMenuItem onClick={() => router.push('/')}>
+                    <Building className="h-4 w-4 mr-2" />
+                    Change Club
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Logout
@@ -1328,7 +1356,7 @@ export default function DashboardPage() {
             />
         ) : ((isAdmin || isBanker) && !activeGame && isDataReady && (
             <div className="text-center py-20">
-                <h2 className="text-2xl font-semibold mb-2">Welcome, {currentUser.name}!</h2>
+                <h2 className="text-2xl font-semibold mb-2">Welcome to {activeClub?.name}!</h2>
                 <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
                 <div className="flex justify-center gap-4">
                      <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
@@ -1356,6 +1384,7 @@ export default function DashboardPage() {
         toast={toast}
         gameHistory={gameHistory}
         setGameHistory={setGameHistory}
+        clubId={activeClub?.id || ''}
       />
        <AddPlayerDialog
         isOpen={isAddPlayerModalOpen}
@@ -1988,7 +2017,8 @@ const ManagePlayersDialog: FC<{
   toast: ReturnType<typeof useToast>['toast'];
   gameHistory: GameHistory[];
   setGameHistory: React.Dispatch<React.SetStateAction<GameHistory[]>>;
-}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast, gameHistory, setGameHistory }) => {
+  clubId: string;
+}> = ({ isOpen, onOpenChange, masterPlayers, setMasterPlayers, currentUser, whatsappConfig, toast, gameHistory, setGameHistory, clubId }) => {
     const [editablePlayers, setEditablePlayers] = useState<MasterPlayer[]>([]);
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -2023,6 +2053,7 @@ const ManagePlayersDialog: FC<{
             isAdmin: false,
             isBanker: false,
             isActive: true,
+            clubId: clubId,
         };
         setEditablePlayers(prev => [newPlayer, ...prev]);
     };
@@ -2039,8 +2070,8 @@ const ManagePlayersDialog: FC<{
                 getMasterPlayers(),
                 getGameHistory()
             ]);
-            setMasterPlayers(finalMasterPlayers);
-            setGameHistory(finalGameHistory);
+            setMasterPlayers(finalMasterPlayers.filter(p => p.clubId === clubId));
+            setGameHistory(finalGameHistory.filter(g => g.clubId === clubId));
 
             toast({ title: "Player Saved", description: `${playerToSave.name}'s details have been updated.` });
         } catch (error) {
@@ -2078,7 +2109,7 @@ const ManagePlayersDialog: FC<{
             await Promise.all(savePromises as Promise<MasterPlayer>[]);
             
             const finalMasterPlayers = await getMasterPlayers();
-            setMasterPlayers(finalMasterPlayers);
+            setMasterPlayers(finalMasterPlayers.filter(p => p.clubId === clubId));
 
             toast({ title: "Players Saved", description: "Player roles and status have been updated." });
             onOpenChange(false);
@@ -2455,7 +2486,7 @@ const LoadGameDialog: FC<{
                             )})
                         ) : (
                             <div className="text-center py-10">
-                                <p className="text-muted-foreground">No game history found.</p>
+                                <p className="text-muted-foreground">No game history found for this club.</p>
                                 {(currentUser?.isAdmin) && <Button variant="link" onClick={() => {onOpenChange(false); onNewGame();}}>Start a New Game</Button>}
                             </div>
                         )}
@@ -3397,6 +3428,7 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
 
 

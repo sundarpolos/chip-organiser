@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from "@/lib/firebase";
@@ -26,7 +27,7 @@ export async function saveMasterVenue(
         
         if (options.updateGames && options.oldName && options.oldName !== venue.name) {
             const batch = writeBatch(db);
-            const allGames = await getGameHistory();
+            const allGames = (await getGameHistory()).filter(g => g.clubId === venue.clubId);
             
             allGames.forEach(game => {
                 if (game.venue === options.oldName) {

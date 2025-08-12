@@ -17,10 +17,13 @@ export async function getGameHistory(): Promise<GameHistory[]> {
     return history;
 }
 
-export async function saveGameHistory(game: GameHistory): Promise<GameHistory> {
+export async function saveGameHistory(game: Partial<GameHistory>): Promise<GameHistory> {
+    if (!game.id) {
+        throw new Error("Game ID is required to save game history.");
+    }
     const docRef = doc(db, GAME_HISTORY_COLLECTION, game.id);
     await setDoc(docRef, game, { merge: true });
-    return game;
+    return game as GameHistory;
 }
 
 export async function deleteGameHistory(gameId: string): Promise<void> {

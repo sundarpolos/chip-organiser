@@ -22,13 +22,14 @@ export async function saveMasterPlayer(
     options: { updateGames: boolean, oldName?: string } = { updateGames: false }
 ): Promise<MasterPlayer> {
     
-    if ('id' in player) {
+    if ('id' in player && !player.id.startsWith('new-')) {
         // This is an update
         const docRef = doc(db, MASTER_PLAYERS_COLLECTION, player.id);
         
         if (options.updateGames && options.oldName && options.oldName !== player.name) {
             const batch = writeBatch(db);
-            const allGames = await getGameHistory();
+            // Only update games within the same club
+            const allGames = (await getGameHistory()).filter(g => g.clubId === player.clubId);
             
             allGames.forEach(game => {
                 let gameWasModified = false;
@@ -52,8 +53,9 @@ export async function saveMasterPlayer(
         return player;
     } else {
         // This is a new player
-        const docRef = await addDoc(collection(db, MASTER_PLAYERS_COLLECTION), player);
-        return { id: docRef.id, ...player };
+        const payload = 'id' in player ? { clubId: player.clubId, name: player.name, whatsappNumber: player.whatsappNumber, isAdmin: player.isAdmin, isBanker: player.isBanker, isActive: player.isActive } : player;
+        const docRef = await addDoc(collection(db, MASTER_PLAYERS_COLLECTION), payload);
+        return { id: docRef.id, ...(payload as Omit<MasterPlayer, 'id'>) };
     }
 }
 

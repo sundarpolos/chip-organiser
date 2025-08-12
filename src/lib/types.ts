@@ -13,6 +13,7 @@ export interface Player {
   whatsappNumber: string;
   buyIns: BuyIn[];
   finalChips: number;
+  clubId: string;
 }
 
 export interface CalculatedPlayer extends Player {
@@ -27,11 +28,13 @@ export interface MasterPlayer {
   isAdmin: boolean;
   isBanker?: boolean;
   isActive?: boolean;
+  clubId: string;
 }
 
 export interface MasterVenue {
     id: string;
     name: string;
+    clubId: string;
 }
 
 export interface GameHistory {
@@ -42,6 +45,7 @@ export interface GameHistory {
     startTime?: string;
     endTime?: string;
     duration?: number; // in milliseconds
+    clubId: string;
 }
 
 export interface WhatsappConfig {
@@ -50,4 +54,8 @@ export interface WhatsappConfig {
   senderMobile: string;
 }
 
-    
+export interface Club {
+  id: string;
+  name: string;
+  ownerId: string;
+}
