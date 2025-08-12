@@ -17,10 +17,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub } from '@/services/club-service';
-import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
+import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
 import { getGameHistory } from '@/services/game-service';
 import { Switch } from '@/components/ui/switch';
+import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
+
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -39,7 +41,8 @@ const ClubManagement: FC<{
     const [clubToDelete, setClubToDelete] = useState<Club | null>(null);
 
     const handleEnterDashboard = (clubId: string) => {
-        router.push(`/dashboard?clubId=${clubId}`);
+        localStorage.setItem('chip-maestro-clubId', clubId);
+        router.push(`/dashboard`);
     };
 
     const handleDeleteClub = async () => {
@@ -309,6 +312,18 @@ const PlayerManagement: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Could not save player details.' });
         }
     };
+    
+    const handleDeletePlayer = async (playerId: string) => {
+        try {
+            await deleteMasterPlayer(playerId);
+            setPlayers(prev => prev.filter(p => p.id !== playerId));
+            const deletedPlayer = players.find(p => p.id === playerId);
+            toast({ title: 'Player Deleted', description: `Player "${deletedPlayer?.name}" has been removed.`});
+        } catch (error) {
+            console.error('Failed to delete player', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the player.'});
+        }
+    }
 
     const playersByClub = useMemo(() => {
         const grouped = new Map<string, MasterPlayer[]>();
@@ -393,6 +408,7 @@ const PlayerManagement: FC<{
                 player={playerToEdit}
                 clubs={clubs}
                 onSave={handleSavePlayer}
+                onDelete={handleDeletePlayer}
                 toast={toast}
                 isSuperAdmin={isSuperAdmin}
             />
@@ -407,17 +423,33 @@ const EditPlayerDialog: FC<{
     player: MasterPlayer | null;
     clubs: Club[];
     onSave: (player: MasterPlayer) => Promise<void>;
+    onDelete: (playerId: string) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
-}> = ({ isOpen, onOpenChange, player, clubs, onSave, toast, isSuperAdmin }) => {
+}> = ({ isOpen, onOpenChange, player, clubs, onSave, onDelete, toast, isSuperAdmin }) => {
     const [editablePlayer, setEditablePlayer] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Delete OTP state
+    const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [otp, setOtp] = useState("");
+    const [sentOtp, setSentOtp] = useState("");
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (player) {
             setEditablePlayer(JSON.parse(JSON.stringify(player)));
         }
-    }, [player]);
+        // Reset OTP state when dialog opens or player changes
+        setDeleteConfirmOpen(false);
+        setIsOtpSent(false);
+        setOtp("");
+        setSentOtp("");
+        setIsSendingOtp(false);
+        setIsDeleting(false);
+    }, [player, isOpen]);
 
     const handleSave = async () => {
         if (!editablePlayer?.name || !editablePlayer.clubId) {
@@ -429,8 +461,81 @@ const EditPlayerDialog: FC<{
         setIsSaving(false);
         onOpenChange(false);
     };
+    
+    const handleDeleteRequest = async () => {
+        if (!editablePlayer) return;
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeletePlayerOtp({
+                playerToDeleteName: editablePlayer.name,
+                whatsappConfig: {} // Use env variables
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+            setDeleteConfirmOpen(false); // Close the confirm dialog on error
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+    
+    const confirmDelete = async () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The OTP is incorrect.' });
+            return;
+        }
+        setIsDeleting(true);
+        if (editablePlayer) {
+            await onDelete(editablePlayer.id);
+        }
+        setIsDeleting(false);
+        onOpenChange(false);
+    };
+
 
     if (!editablePlayer) return null;
+
+    if (isDeleteConfirmOpen) {
+        return (
+            <Dialog open={isDeleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Deletion: {editablePlayer.name}</DialogTitle>
+                        <DialogDescription>
+                          {isOtpSent 
+                            ? "Enter the OTP sent to the Super Admin's WhatsApp to finalize the deletion."
+                            : "Are you sure? This action will permanently delete this player. An OTP will be sent to the Super Admin to confirm."
+                          }
+                        </DialogDescription>
+                    </DialogHeader>
+                    {isOtpSent ? (
+                        <div className="py-4 space-y-2">
+                           <Label htmlFor="delete-otp">Admin OTP</Label>
+                           <Input id="delete-otp" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                        </div>
+                    ) : null}
+                     <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+                        {isOtpSent ? (
+                             <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+                                {isDeleting ? <Loader2 className="animate-spin" /> : 'Confirm & Delete'}
+                            </Button>
+                        ) : (
+                            <Button variant="destructive" onClick={handleDeleteRequest} disabled={isSendingOtp}>
+                                {isSendingOtp ? <Loader2 className="animate-spin" /> : 'Send OTP to Delete'}
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        )
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -507,11 +612,20 @@ const EditPlayerDialog: FC<{
                         </div>
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleSave} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
-                    </Button>
+                <DialogFooter className="justify-between">
+                     <div>
+                        {isSuperAdmin && player?.whatsappNumber !== SUPER_ADMIN_WHATSAPP && (
+                            <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Player
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button onClick={handleSave} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
