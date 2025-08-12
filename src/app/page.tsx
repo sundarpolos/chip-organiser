@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -40,39 +41,16 @@ const features = [
   },
 ];
 
-const pricingTiers = [
-    {
-        name: "Free",
-        price: "₹0",
-        period: "/ month",
-        description: "Perfect for small, casual poker nights.",
-        features: [
-            "Up to 10 players per club",
-            "Unlimited games",
-            "Real-time calculations",
-            "Basic game history",
-        ],
-        buttonText: "Get Started",
-        variant: "outline",
-    },
-    {
-        name: "Pro",
-        price: "₹999",
-        period: "/ month",
-        description: "The ultimate solution for professional clubs.",
-        features: [
-            "Unlimited players",
-            "AI Anomaly Detection",
-            "Advanced Reporting & Export",
-            "Game Log Import",
-            "Priority Support",
-        ],
-        buttonText: "Upgrade to Pro",
-        variant: "default",
-    }
-]
-
 export default function HomePage() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const user = localStorage.getItem('chip-maestro-user');
+    if (user) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -83,9 +61,15 @@ export default function HomePage() {
           </Link>
           <div className="flex flex-1 items-center justify-end">
             <nav className="flex items-center space-x-2">
-              <Button asChild>
-                <Link href="/login">Login</Link>
-              </Button>
+              {isLoggedIn ? (
+                <Button asChild>
+                  <Link href="/dashboard">Dashboard</Link>
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+              )}
             </nav>
           </div>
         </div>
