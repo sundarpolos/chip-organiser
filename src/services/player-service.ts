@@ -52,14 +52,16 @@ export async function saveMasterPlayer(
         await setDoc(docRef, player, { merge: true });
         return player;
     } else {
-        // This is a new player
+        // This is a new player. The `player` object might have an 'id' property if it's from the UI (e.g., "new-123"),
+        // so we destructure to ensure we don't pass that to Firestore.
+        const { id, ...newPlayerPayload } = player as MasterPlayer;
         const payload: Omit<MasterPlayer, 'id'> = {
-            name: 'name' in player ? player.name : '',
-            whatsappNumber: 'whatsappNumber' in player ? player.whatsappNumber : '',
-            isAdmin: 'isAdmin' in player ? player.isAdmin : false,
-            isBanker: 'isBanker' in player ? player.isBanker : false,
-            isActive: 'isActive' in player ? player.isActive : true,
-            clubId: 'clubId' in player ? player.clubId : '',
+            name: newPlayerPayload.name || '',
+            whatsappNumber: newPlayerPayload.whatsappNumber || '',
+            isAdmin: newPlayerPayload.isAdmin || false,
+            isBanker: newPlayerPayload.isBanker || false,
+            isActive: newPlayerPayload.isActive === undefined ? true : newPlayerPayload.isActive,
+            clubId: newPlayerPayload.clubId || '',
         };
         const docRef = await addDoc(collection(db, MASTER_PLAYERS_COLLECTION), payload);
         return { id: docRef.id, ...payload };
