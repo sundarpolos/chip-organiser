@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -49,6 +50,23 @@ export async function sendBuyInOtp(input: SendBuyInOtpInput): Promise<SendBuyInO
   return sendBuyInOtpFlow(input);
 }
 
+const sendBuyInOtpPrompt = ai.definePrompt({
+    name: 'sendBuyInOtpPrompt',
+    input: { schema: z.object({
+        playerName: z.string(),
+        otp: z.string(),
+        buyInOrdinal: z.string(),
+        buyInAmount: z.number(),
+        totalBuyInAmount: z.number(),
+        newTotalBuyInAmount: z.number(),
+    })},
+    prompt: `Hi {{{playerName}}}, your OTP is {{{otp}}} for your {{{buyInOrdinal}}} buy-in.
+Amount: ₹{{{buyInAmount}}}
+Previous Total: ₹{{{totalBuyInAmount}}}
+After verification, your new grand total will be ₹{{{newTotalBuyInAmount}}}.`,
+});
+
+
 const sendBuyInOtpFlow = ai.defineFlow(
   {
     name: 'sendBuyInOtpFlow',
@@ -62,10 +80,16 @@ const sendBuyInOtpFlow = ai.defineFlow(
 
     const otp = generateOtp();
     const newTotal = totalBuyInAmount + buyInAmount;
-    const message = `Hi ${playerName}, your OTP is ${otp} for your ${getOrdinalSuffix(buyInCount)} buy-in.
-Amount: ₹${buyInAmount}
-Previous Total: ₹${totalBuyInAmount}
-After verification, your new grand total will be ₹${newTotal}.`;
+    
+    const response = await sendBuyInOtpPrompt({
+        playerName,
+        otp,
+        buyInOrdinal: getOrdinalSuffix(buyInCount),
+        buyInAmount,
+        totalBuyInAmount,
+        newTotalBuyInAmount: newTotal,
+    });
+    const message = response.text;
 
     try {
       const whatsappPayload: SendWhatsappMessageInput = { 
