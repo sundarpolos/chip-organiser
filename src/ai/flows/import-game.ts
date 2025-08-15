@@ -1,4 +1,4 @@
-
+npm 
 'use server';
 
 /**
@@ -22,11 +22,14 @@ const ImportGameOutputSchema = z.object({
   venue: z.string().describe("The name of the venue. Infer this if possible, otherwise use 'Imported Game'."),
   timestamp: z.string().describe('The date and time of the game in ISO format. Use the first date in the log.'),
   players: z.array(z.object({
+      clubId: z.string().describe('TODO: Properly set clubId based on context.'),
       id: z.string(),
       name: z.string(),
       whatsappNumber: z.string(),
       buyIns: z.array(z.object({
           amount: z.number(),
+          id: z.string().describe('TODO: Properly set buy-in ID.'),
+          status: z.union([z.literal('verified'), z.literal('requested'), z.literal('approved')]).describe('TODO: Properly set buy-in status.'),
           timestamp: z.string().describe("The timestamp of the buy-in in ISO format."),
           verified: z.boolean(),
       })),
@@ -72,6 +75,8 @@ const importGameFlow = ai.defineFlow(
     if (!output) {
       throw new Error('Failed to parse game log.');
     }
+    // Set default status for imported buy-ins to "requested"
+    output.players.forEach(player => player.buyIns.forEach(buyIn => buyIn.status = "requested"));
     return output;
   }
 );

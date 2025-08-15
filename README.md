@@ -1,4 +1,4 @@
-
+ please check
 # Chip Maestro: The Premier SaaS Platform for Poker Club Management
 
 npm install
