@@ -1,4 +1,3 @@
-npm 
 'use server';
 
 /**
@@ -6,7 +5,7 @@ npm
  *
  * - importGameFromText - A function that parses text and returns structured game data.
  * - ImportGameInput - The input type for the importGameFromText function.
- * - ImportGameOutput - The return type for the importGameFromText a function.
+ * - ImportGameOutput - The return type for the importGameFrom-text a function.
  */
 
 import { ai } from '@/ai/genkit';
