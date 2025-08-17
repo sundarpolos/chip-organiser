@@ -1,6 +1,4 @@
-
 'use client';
-
 import React, { useState, useEffect, useMemo, useRef, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { getGameHistory } from '@/services/game-service';
@@ -711,7 +709,7 @@ const ChartContainer: FC<{ title: string; children: React.ReactNode; dateRange: 
         </p>
     )}
     <ResponsiveContainer width="100%" height={300}>
-        {children}
+        {children as React.ReactElement<any, string | React.JSXElementConstructor<any>>}
     </ResponsiveContainer>
   </div>
 );
@@ -862,7 +860,16 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange |
             <ResponsiveContainer width="100%" height="100%">
                 <RechartsBarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 75 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12, angle: -90, textAnchor: 'end' }} interval={0} />
+                    <XAxis 
+ dataKey="name" 
+ tick={({ x, y, payload }) => (
+ <text x={x} y={y} dy={16} angle={-90} textAnchor="end" fill="#666" fontSize={12}>
+ {payload.value}
+ </text> as any // Cast to any to satisfy the type checker for the transform attribute
+ )} 
+ interval={0} 
+                    />
+
                     <YAxis domain={[-maxVal, maxVal]} ticks={customTicks} tickFormatter={tickFormatter} />
                     <Tooltip formatter={(value:any) => `₹${value.toFixed(0)}`} />
                     <Legend verticalAlign="top" />
