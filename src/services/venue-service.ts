@@ -22,7 +22,6 @@ export async function saveMasterVenue(
     options: { updateGames: boolean, oldName?: string } = { updateGames: false }
 ): Promise<MasterVenue> {
     if ('id' in venue) {
-        // This is an update
         const docRef = doc(db, MASTER_VENUES_COLLECTION, venue.id);
         
         if (options.updateGames && options.oldName && options.oldName !== venue.name) {
@@ -38,10 +37,10 @@ export async function saveMasterVenue(
             await batch.commit();
         }
 
-        await setDoc(docRef, venue, { merge: true });
+        const venueToSave = JSON.parse(JSON.stringify(venue));
+        await setDoc(docRef, venueToSave, { merge: true });
         return venue;
     } else {
-        // This is a new venue
         const docRef = await addDoc(collection(db, MASTER_VENUES_COLLECTION), venue);
         return { id: docRef.id, ...venue };
     }

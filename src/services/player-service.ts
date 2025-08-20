@@ -21,8 +21,6 @@ export async function findUserByWhatsapp(whatsappNumber: string): Promise<Master
     const q = query(collection(db, MASTER_PLAYERS_COLLECTION), where("whatsappNumber", "==", whatsappNumber));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
-        // In a true multi-tenant system, you might have multiple matches.
-        // For this app, we'll assume the first match is sufficient.
         const doc = querySnapshot.docs[0];
         return { id: doc.id, ...doc.data() } as MasterPlayer;
     }
@@ -35,12 +33,10 @@ export async function saveMasterPlayer(
 ): Promise<MasterPlayer> {
     
     if ('id' in player && !player.id.startsWith('new-')) {
-        // This is an update
         const docRef = doc(db, MASTER_PLAYERS_COLLECTION, player.id);
         
         if (options.updateGames && options.oldName && options.oldName !== player.name) {
             const batch = writeBatch(db);
-            // Only update games within the same club
             const allGames = (await getGameHistory()).filter(g => g.clubId === player.clubId);
             
             allGames.forEach(game => {
@@ -60,12 +56,11 @@ export async function saveMasterPlayer(
             });
             await batch.commit();
         }
-
-        await setDoc(docRef, player, { merge: true });
+        
+        const playerToSave = JSON.parse(JSON.stringify(player));
+        await setDoc(docRef, playerToSave, { merge: true });
         return player;
     } else {
-        // This is a new player. The `player` object might have an 'id' property if it's from the UI (e.g., "new-123"),
-        // so we destructure to ensure we don't pass that to Firestore.
         const { id, ...newPlayerPayload } = player as MasterPlayer;
         const payload: Omit<MasterPlayer, 'id'> = {
             name: newPlayerPayload.name || '',
