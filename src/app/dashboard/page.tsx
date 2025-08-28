@@ -528,7 +528,7 @@ const EditableDate: FC<{
           selected={selectedDate}
           onSelect={handleDateSelect}
           initialFocus
-          captionLayout="dropdown-buttons"
+ captionLayout="dropdown"
           fromYear={1990}
           toYear={2030}
         />

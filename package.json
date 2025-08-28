@@ -1,3 +1,4 @@
+
 {
   "name": "chip-maestro-app",
   "version": "0.1.0",
@@ -12,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@genkit-ai/googleai": "^1.16.1",
-    "@genkit-ai/next": "^1.16.1",
+    "@genkit-ai/googleai": "1.0.0",
+    "@genkit-ai/next": "1.0.0",
     "@hookform/resolvers": "^3.3.4",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -42,7 +43,7 @@
     "dotenv": "^16.4.5",
     "embla-carousel-react": "^8.0.2",
     "firebase": "^10.11.0",
-    "genkit": "^1.16.1",
+    "genkit": "1.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
@@ -60,12 +61,11 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0-alpha.13",
     "@types/node": "^20",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.19",
-    "genkit-cli": "^1.16.1",
+    "genkit-cli": "1.0.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5"
