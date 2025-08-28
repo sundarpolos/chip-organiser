@@ -345,7 +345,7 @@ const AdminView: FC<{
                 <Card>
                     <AccordionItem value="summary" className="border-b-0">
                         <AccordionTrigger className="p-4">
-                            <CardTitle>Player Summary</CardTitle>
+                            Player Summary
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
@@ -356,7 +356,7 @@ const AdminView: FC<{
                 <Card>
                     <AccordionItem value="transfers" className="border-b-0">
                         <AccordionTrigger className="p-4">
-                            <CardTitle>Money Transfers</CardTitle>
+                            Money Transfers
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
@@ -367,7 +367,7 @@ const AdminView: FC<{
                 <Card>
                     <AccordionItem value="log" className="border-b-0">
                         <AccordionTrigger className="p-4">
-                            <CardTitle>Game Log</CardTitle>
+                            Game Log
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0 max-h-60">
                              <GameLog game={activeGame} />
@@ -3060,5 +3060,6 @@ const DeckChangeAlertDialog: FC<{
     
 
     
+
 
 
