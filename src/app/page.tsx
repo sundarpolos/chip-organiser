@@ -125,7 +125,7 @@ export default function HomePage() {
                         The Future of Poker Club Management
                     </h1>
                     <p className="text-lg text-muted-foreground md:text-xl">
-                        From buy-ins to payouts, Chip Maestro handles it all. Focus on the game, not the paperwork. Our all-in-one SaaS solution brings real-time tracking, secure transactions, and AI-powered insights to your poker club.
+                        From buy-ins to payouts, Chip Maestro handles it all, so you can focus on the game, not the paperwork. Our premier, all-in-one SaaS solution brings your poker club into the modern age with real-time tracking of every chip, secure WhatsApp-based OTP verification for transactions, and powerful AI-driven insights to ensure fair play. Streamline your operations, enhance security, and provide an unparalleled experience for your members.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Button asChild size="lg" className="w-full sm:w-auto">
