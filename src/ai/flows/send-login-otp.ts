@@ -1,6 +1,7 @@
 
 
 
+
 'use server';
 
 /**
@@ -52,6 +53,11 @@ const sendLoginOtpFlow = ai.defineFlow(
   },
   async ({ whatsappNumber, whatsappConfig }) => {
     try {
+      const whatsappRegex = /^\d{1,5}\d{10}$/; // Country code (1-5 digits) + 10-digit number
+      if (!whatsappRegex.test(whatsappNumber)) {
+        return { success: false, error: 'Invalid WhatsApp number format. Please use country code + 10-digit number without "+".' };
+      }
+
       const allPlayers = await getMasterPlayers();
       let user = allPlayers.find(p => p.whatsappNumber === whatsappNumber);
       const isSuperAdminLogin = whatsappNumber === SUPER_ADMIN_WHATSAPP;

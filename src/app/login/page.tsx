@@ -25,34 +25,15 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
 
   const handleSendOtp = async () => {
-    const tenDigitRegex = /^\d{10}$/;
-    const fullNumberRegex = /^\d{11,15}$/;
+    const whatsappRegex = /^\d{1,5}\d{10}$/; // Country code (1-5 digits) + 10-digit number
 
-    if (!whatsappNumber) {
+    if (!whatsappNumber || !whatsappRegex.test(whatsappNumber)) {
         toast({
             variant: 'destructive',
-            title: 'Invalid Number',
-            description: 'Please enter a valid WhatsApp number.',
+            title: 'Invalid Number Format',
+            description: 'Please enter a valid WhatsApp number including the country code, without the "+" symbol (e.g., 919876543210).',
         });
         return;
-    }
-
-    if (tenDigitRegex.test(whatsappNumber)) {
-      toast({
-        variant: 'destructive',
-        title: 'Country Code Required',
-        description: 'Please include your country code with your mobile number (e.g., 919876543210).',
-      });
-      return;
-    }
-    
-    if (!fullNumberRegex.test(whatsappNumber)) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Number',
-        description: 'Please enter a valid WhatsApp number including the country code (11-15 digits).',
-      });
-      return;
     }
 
     setIsSending(true);
