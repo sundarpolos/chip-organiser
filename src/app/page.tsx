@@ -288,6 +288,10 @@ export default function HomePage() {
                 <CardContent className="space-y-4">
                   <p className="font-semibold">Everything in Chip Maestro, including:</p>
                   <ul className="space-y-2">
+                    <li className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                        <span className="text-muted-foreground">Single Club Management</span>
+                    </li>
                     {features.map((feature) => (
                       <li key={feature.title} className="flex items-start gap-3">
                         <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
