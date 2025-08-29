@@ -1,6 +1,6 @@
 
 "use client"
-
+// firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -3054,29 +3054,3 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-    
-
-
-
