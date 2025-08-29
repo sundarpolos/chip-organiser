@@ -4,15 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "lint": "next lint"
   },
   "dependencies": {
-    "@genkit-ai/firebase": "1.17.1",
+    "@genkit-ai/ai": "^1.17.1",
+    "@genkit-ai/core": "^1.17.1",
+    "@genkit-ai/firebase": "^1.17.1",
     "@genkit-ai/googleai": "^1.17.1",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -40,13 +39,13 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.5",
-    "embla-carousel-react": "^8.1.6",
+    "embla-carousel-react": "^8.1.7",
     "firebase": "^12.2.1",
-    "genkit": "1.17.1",
+    "genkit": "^1.17.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
-    "lucide-react": "^0.408.0",
+    "lucide-react": "^0.417.0",
     "next": "14.2.5",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
@@ -55,21 +54,18 @@
     "react-hook-form": "^7.52.1",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.4.0",
-    "tailwindcss-animate": "^1.0.0",
-    "tmp": "^0.2.3",
+    "tailwindcss-animate": "^1.0.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^20.14.10",
+    "@types/node": "^20.14.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@types/tmp": "^0.2.6",
     "autoprefixer": "^10.4.19",
-    "firebase-tools": "^13.13.2",
-    "genkit-cli": "1.17.1",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5",
     "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.4",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.4"
   }
 }
