@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useMemo, useCallback, useRef, type FC } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from 'next/navigation';
 import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
@@ -538,7 +538,8 @@ const EditableDate: FC<{
 };
 
 
-export default function DashboardPage() {
+// Separate component that uses searchParams
+function DashboardContent() {
   const { toast } = useToast()
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3037,6 +3038,22 @@ const DeckChangeAlertDialog: FC<{
         </AlertDialog>
     );
 };
+
+// Main component with Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading Dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}
     
 
 
