@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { motion, useAnimation } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
+import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather, CheckCircle2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const features = [
@@ -259,6 +259,53 @@ export default function HomePage() {
                     </div>
                 </AnimatedSection>
             </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-16 sm:py-24 overflow-hidden">
+          <div className="container mx-auto px-4 md:px-6">
+            <AnimatedSection>
+              <div className="mx-auto max-w-4xl space-y-4 text-center">
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  Simple, Transparent Pricing
+                </h2>
+                <p className="text-muted-foreground md:text-lg">
+                  One plan. All features. No hidden fees.
+                </p>
+              </div>
+            </AnimatedSection>
+
+            <AnimatedSection className="mt-12 flex justify-center">
+              <Card className="w-full max-w-md border-2 border-primary shadow-xl">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Club Pro</CardTitle>
+                  <CardDescription>All features included for one simple price.</CardDescription>
+                  <div className="my-4">
+                    <span className="text-5xl font-bold">₹1999</span>
+                    <span className="text-muted-foreground">/month per club</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="font-semibold">Everything in Chip Maestro, including:</p>
+                  <ul className="space-y-2">
+                    {features.map((feature) => (
+                      <li key={feature.title} className="flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                        <span className="text-muted-foreground">{feature.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                   <Button asChild size="lg" className="w-full">
+                        <Link href={isLoggedIn ? "/dashboard" : "/login"}>
+                            {isLoggedIn ? "Go to Dashboard" : "Get Started Now"}
+                        </Link>
+                    </Button>
+                </CardFooter>
+              </Card>
+            </AnimatedSection>
+          </div>
         </section>
 
       </main>
