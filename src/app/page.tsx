@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { motion, useAnimation } from 'framer-motion';
+import { useInView } from 'react-intersection-observer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather } from 'lucide-react';
@@ -48,6 +50,37 @@ const techStack = [
     { icon: <Feather className="h-8 w-8 text-primary" />, name: 'ShadCN & Tailwind', description: 'Create a beautiful, responsive, and consistent design system.' },
 ]
 
+const AnimatedSection = ({ children, className }: { children: React.ReactNode, className?: string }) => {
+  const controls = useAnimation();
+  const [ref, inView] = useInView({
+    triggerOnce: true,
+    threshold: 0.1,
+  });
+
+  useEffect(() => {
+    if (inView) {
+      controls.start('visible');
+    }
+  }, [controls, inView]);
+
+  const variants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } },
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      animate={controls}
+      initial="hidden"
+      variants={variants}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -90,64 +123,72 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="py-24 md:py-32 lg:py-40">
             <div className="container mx-auto px-4 md:px-6">
-                <div className="mx-auto max-w-4xl text-center space-y-6">
-                    <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                        The Ultimate Platform for
-                        <span className="mt-2 block bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                            Poker Club Management
-                        </span>
-                    </h1>
-                    <p className="text-lg text-muted-foreground md:text-xl">
-                        From buy-ins to payouts, Chip Maestro handles it all. Focus on the game, not the paperwork.
-                        Our all-in-one SaaS solution brings real-time tracking, secure transactions, and AI-powered insights to your poker club.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                        <Button asChild size="lg" className="w-full sm:w-auto">
-                            <Link href={isLoggedIn ? "/dashboard" : "/login"}>
-                                {isLoggedIn ? "Go to Dashboard" : "Get Started Now"}
-                            </Link>
-                        </Button>
+                <AnimatedSection>
+                    <div className="mx-auto max-w-4xl text-center space-y-6">
+                        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                            The Ultimate Platform for
+                            <span className="mt-2 block bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+                                Poker Club Management
+                            </span>
+                        </h1>
+                        <p className="text-lg text-muted-foreground md:text-xl">
+                            From buy-ins to payouts, Chip Maestro handles it all. Focus on the game, not the paperwork.
+                            Our all-in-one SaaS solution brings real-time tracking, secure transactions, and AI-powered insights to your poker club.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <Button asChild size="lg" className="w-full sm:w-auto">
+                                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
+                                    {isLoggedIn ? "Go to Dashboard" : "Get Started Now"}
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                </AnimatedSection>
             </div>
         </section>
 
         {/* Features Section */}
-        <section id="features" className="py-16 sm:py-24 bg-secondary/50">
+        <section id="features" className="py-16 sm:py-24 bg-secondary/50 overflow-hidden">
           <div className="container mx-auto px-4 md:px-6">
-            <div className="mx-auto max-w-4xl space-y-4 text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Everything You Need, Nothing You Don't
-              </h2>
-              <p className="text-muted-foreground md:text-lg">
-                Chip Maestro is packed with features designed to make running your poker club effortless and secure.
-              </p>
-            </div>
+            <AnimatedSection>
+              <div className="mx-auto max-w-4xl space-y-4 text-center">
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  Everything You Need, Nothing You Don't
+                </h2>
+                <p className="text-muted-foreground md:text-lg">
+                  Chip Maestro is packed with features designed to make running your poker club effortless and secure.
+                </p>
+              </div>
+            </AnimatedSection>
 
             <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {features.map(({ icon, title, description }) => (
-                <Card key={title} className="bg-background/80 backdrop-blur">
-                  <CardHeader className="flex flex-col items-center text-center">
-                    <div className="mb-4 rounded-full bg-primary/10 p-3">{icon}</div>
-                    <CardTitle>{title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-center text-muted-foreground">
-                    {description}
-                  </CardContent>
-                </Card>
+              {features.map((feature, i) => (
+                <AnimatedSection key={feature.title}>
+                  <Card className="bg-background/80 backdrop-blur h-full">
+                    <CardHeader className="flex flex-col items-center text-center">
+                      <div className="mb-4 rounded-full bg-primary/10 p-3">{feature.icon}</div>
+                      <CardTitle>{feature.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center text-muted-foreground">
+                      {feature.description}
+                    </CardContent>
+                  </Card>
+                </AnimatedSection>
               ))}
             </div>
           </div>
         </section>
 
         {/* In-Depth Features Section */}
-        <section className="py-16 sm:py-24">
+        <section className="py-16 sm:py-24 overflow-hidden">
             <div className="container mx-auto px-4 md:px-6 space-y-16">
-                 <div className="mx-auto max-w-4xl space-y-4 text-center">
-                    <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Features In-Depth</h2>
-                 </div>
+                 <AnimatedSection>
+                    <div className="mx-auto max-w-4xl space-y-4 text-center">
+                        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Features In-Depth</h2>
+                    </div>
+                 </AnimatedSection>
                  
-                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
                         <h3 className="text-2xl font-bold mb-2">Real-Time Sync & Calculations</h3>
                         <p className="text-muted-foreground">
@@ -159,9 +200,9 @@ export default function HomePage() {
                             <BarChart className="h-24 w-24 text-primary/50" />
                         </div>
                     </div>
-                 </div>
+                 </AnimatedSection>
                  
-                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
                      <div className="order-2 md:order-1">
                         <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                             <Bot className="h-24 w-24 text-primary/50" />
@@ -173,9 +214,9 @@ export default function HomePage() {
                            Leveraging Google's Genkit, Chip Maestro brings cutting-edge AI to your poker game. Automatically import game data from raw text logs, or use our Anomaly Detection to analyze player buy-in patterns against their history, helping to flag suspicious activity and ensure game integrity.
                         </p>
                     </div>
-                 </div>
+                 </AnimatedSection>
 
-                 <div className="grid md:grid-cols-2 gap-12 items-center">
+                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
                         <h3 className="text-2xl font-bold mb-2">Secure & Automated Settlements</h3>
                         <p className="text-muted-foreground">
@@ -187,32 +228,36 @@ export default function HomePage() {
                             <ShieldAlert className="h-24 w-24 text-primary/50" />
                         </div>
                     </div>
-                 </div>
+                 </AnimatedSection>
             </div>
         </section>
         
         {/* Tech Stack Section */}
-        <section className="py-16 sm:py-24 bg-secondary/50">
+        <section className="py-16 sm:py-24 bg-secondary/50 overflow-hidden">
             <div className="container mx-auto px-4 md:px-6">
-                <div className="mx-auto max-w-4xl space-y-4 text-center">
-                  <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                    Built With Modern Technology
-                  </h2>
-                  <p className="text-muted-foreground md:text-lg">
-                    Chip Maestro is built on a robust, scalable, and modern tech stack to deliver a seamless experience.
-                  </p>
-                </div>
-                <div className="mt-12 grid gap-8 md:grid-cols-2">
-                    {techStack.map(tech => (
-                        <div key={tech.name} className="flex items-start gap-4">
-                            <div className="rounded-full bg-primary/10 p-3">{tech.icon}</div>
-                            <div>
-                                <h3 className="text-lg font-bold">{tech.name}</h3>
-                                <p className="text-muted-foreground">{tech.description}</p>
+                <AnimatedSection>
+                    <div className="mx-auto max-w-4xl space-y-4 text-center">
+                      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                        Built With Modern Technology
+                      </h2>
+                      <p className="text-muted-foreground md:text-lg">
+                        Chip Maestro is built on a robust, scalable, and modern tech stack to deliver a seamless experience.
+                      </p>
+                    </div>
+                </AnimatedSection>
+                <AnimatedSection>
+                    <div className="mt-12 grid gap-8 md:grid-cols-2">
+                        {techStack.map(tech => (
+                            <div key={tech.name} className="flex items-start gap-4">
+                                <div className="rounded-full bg-primary/10 p-3">{tech.icon}</div>
+                                <div>
+                                    <h3 className="text-lg font-bold">{tech.name}</h3>
+                                    <p className="text-muted-foreground">{tech.description}</p>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                </AnimatedSection>
             </div>
         </section>
 
