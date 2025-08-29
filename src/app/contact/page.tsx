@@ -43,10 +43,7 @@ const contactFormSchema = z.object({
   subject: z.string().min(5, 'Subject must be at least 5 characters.'),
   reason: z.enum([
     'General Inquiry',
-    'Feature Request',
-    'Bug Report',
-    'Partnership',
-    'Poker Story',
+    'Apply for software',
   ]),
   message: z.string().min(10, 'Message must be at least 10 characters.'),
 });
@@ -178,12 +175,9 @@ export default function ContactPage() {
                             <SelectItem value="General Inquiry">
                                 General Inquiry
                             </SelectItem>
-                            <SelectItem value="Feature Request">
-                                Feature Request
+                            <SelectItem value="Apply for software">
+                                Apply for software
                             </SelectItem>
-                            <SelectItem value="Bug Report">Bug Report</SelectItem>
-                            <SelectItem value="Partnership">Partnership</SelectItem>
-                            <SelectItem value="Poker Story">Poker Story</SelectItem>
                             </SelectContent>
                         </Select>
                         <FormMessage />
