@@ -137,8 +137,8 @@ export default function HomePage() {
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Button asChild size="lg" className="w-full sm:w-auto">
-                                <Link href={isLoggedIn ? "/dashboard" : "/login"}>
-                                    {isLoggedIn ? "Go to Dashboard" : "Get Started Now"}
+                                <Link href="/contact">
+                                    Contact Now
                                 </Link>
                             </Button>
                         </div>
@@ -302,8 +302,8 @@ export default function HomePage() {
                 </CardContent>
                 <CardFooter>
                    <Button asChild size="lg" className="w-full">
-                        <Link href={isLoggedIn ? "/dashboard" : "/login"}>
-                            {isLoggedIn ? "Go to Dashboard" : "Get Started Now"}
+                        <Link href="/contact">
+                            Contact Now
                         </Link>
                     </Button>
                 </CardFooter>
