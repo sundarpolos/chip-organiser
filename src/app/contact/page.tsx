@@ -40,6 +40,7 @@ import { Crown } from 'lucide-react';
 const contactFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Please enter a valid email address.'),
+  whatsappNumber: z.string().optional(),
   subject: z.string().min(5, 'Subject must be at least 5 characters.'),
   reason: z.enum([
     'General Inquiry',
@@ -59,6 +60,7 @@ export default function ContactPage() {
     defaultValues: {
       name: '',
       email: '',
+      whatsappNumber: '',
       subject: '',
       reason: 'General Inquiry',
       message: '',
@@ -130,6 +132,21 @@ export default function ContactPage() {
                   />
                   <FormField
                     control={form.control}
+                    name="whatsappNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WhatsApp Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+1 555-123-4567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                    control={form.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
@@ -141,8 +158,6 @@ export default function ContactPage() {
                       </FormItem>
                     )}
                   />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                     control={form.control}
                     name="subject"
@@ -156,7 +171,10 @@ export default function ContactPage() {
                         </FormItem>
                     )}
                     />
-                    <FormField
+                    
+                </div>
+                
+                <FormField
                     control={form.control}
                     name="reason"
                     render={({ field }) => (
@@ -184,7 +202,6 @@ export default function ContactPage() {
                         </FormItem>
                     )}
                     />
-                </div>
 
                 <FormField
                   control={form.control}

@@ -18,6 +18,7 @@ const SUPER_ADMIN_WHATSAPP = '919843350000'; // The Super Admin's WhatsApp numbe
 const SendContactMessageInputSchema = z.object({
   name: z.string().describe('The name of the person sending the message.'),
   email: z.string().email().describe('The email address of the sender.'),
+  whatsappNumber: z.string().optional().describe("The sender's WhatsApp number, if provided."),
   subject: z.string().describe('The subject of the message.'),
   reason: z.string().describe('The reason for contacting.'),
   message: z.string().describe('The content of the message.'),
@@ -40,14 +41,14 @@ const sendContactMessageFlow = ai.defineFlow(
     inputSchema: SendContactMessageInputSchema,
     outputSchema: SendContactMessageOutputSchema,
   },
-  async ({ name, email, subject, reason, message }) => {
+  async ({ name, email, whatsappNumber, subject, reason, message }) => {
     try {
       // Format the message for WhatsApp
       const whatsappMessage = `*New Contact Form Submission*
 
 *Name:* ${name}
 *Email:* ${email}
-*Reason:* ${reason}
+${whatsappNumber ? `*WhatsApp:* ${whatsappNumber}\n` : ''}*Reason:* ${reason}
 *Subject:* ${subject}
 
 *Message:*
