@@ -690,7 +690,7 @@ const CreatePlayerDialog: FC<{
 
     const handleVerifyNumber = async () => {
         if (!whatsappNumber) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please enter a WhatsApp number to verify.' });
+            setVerificationStatus('idle');
             return;
         }
         setVerificationStatus('loading');
@@ -764,11 +764,14 @@ const CreatePlayerDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="create-player-whatsapp">WhatsApp Number</Label>
                         <div className="flex items-center gap-2">
-                            <Input id="create-player-whatsapp" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} className="flex-1" />
+                             <Input 
+                                id="create-player-whatsapp" 
+                                value={whatsappNumber} 
+                                onChange={e => setWhatsappNumber(e.target.value)} 
+                                onBlur={handleVerifyNumber}
+                                className="flex-1" 
+                            />
                              <div className="flex items-center gap-1">
-                                <Button type="button" variant="outline" size="sm" onClick={handleVerifyNumber} disabled={!whatsappNumber || verificationStatus === 'loading'}>
-                                    {verificationStatus === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
-                                </Button>
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
@@ -780,7 +783,7 @@ const CreatePlayerDialog: FC<{
                                             </span>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                            {verificationStatus === 'idle' && <p>Verify the number's WhatsApp status.</p>}
+                                            {verificationStatus === 'idle' && <p>Verification status will appear here.</p>}
                                             {verificationStatus === 'loading' && <p>Checking...</p>}
                                             {verificationStatus === 'verified' && <p>This number is active on WhatsApp.</p>}
                                             {verificationStatus === 'failed' && <p>{verificationError || 'This number is not on WhatsApp or could not be verified.'}</p>}
