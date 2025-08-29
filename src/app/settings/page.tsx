@@ -299,8 +299,10 @@ const PlayerManagement: FC<{
     clubs: Club[];
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
-}> = ({ players, setPlayers, clubs, toast, isSuperAdmin }) => {
+    currentUser: MasterPlayer;
+}> = ({ players, setPlayers, clubs, toast, isSuperAdmin, currentUser }) => {
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+    const [isCreatePlayerOpen, setCreatePlayerOpen] = useState(false);
 
     const handleSavePlayer = async (player: MasterPlayer) => {
         try {
@@ -360,7 +362,10 @@ const PlayerManagement: FC<{
         <>
             <Card>
                 <CardHeader>
-                    <CardTitle>Player Management</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Player Management</CardTitle>
+                        <Button onClick={() => setCreatePlayerOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Player</Button>
+                    </div>
                     <CardDescription>Edit player details, including their assigned club and roles. Players are grouped by club.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -411,6 +416,17 @@ const PlayerManagement: FC<{
                 onDelete={handleDeletePlayer}
                 toast={toast}
                 isSuperAdmin={isSuperAdmin}
+            />
+            <CreatePlayerDialog
+                isOpen={isCreatePlayerOpen}
+                onOpenChange={setCreatePlayerOpen}
+                clubs={clubs}
+                onSave={(newPlayer) => {
+                    setPlayers(prev => [...prev, newPlayer]);
+                }}
+                toast={toast}
+                isSuperAdmin={isSuperAdmin}
+                currentUser={currentUser}
             />
         </>
     );
@@ -632,6 +648,123 @@ const EditPlayerDialog: FC<{
     );
 };
 
+const CreatePlayerDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    clubs: Club[];
+    onSave: (player: MasterPlayer) => void;
+    toast: ReturnType<typeof useToast>['toast'];
+    isSuperAdmin: boolean;
+    currentUser: MasterPlayer | null;
+}> = ({ isOpen, onOpenChange, clubs, onSave, toast, isSuperAdmin, currentUser }) => {
+    const [name, setName] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
+    const [clubId, setClubId] = useState('');
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isBanker, setIsBanker] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Reset form
+            setName('');
+            setWhatsappNumber('');
+            setIsAdmin(false);
+            setIsBanker(false);
+            // Set default club based on role
+            if (!isSuperAdmin && currentUser?.clubId) {
+                setClubId(currentUser.clubId);
+            } else {
+                setClubId('');
+            }
+        }
+    }, [isOpen, isSuperAdmin, currentUser]);
+
+    const handleSave = async () => {
+        if (!name || !clubId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Player name and club are required.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const newPlayer: Omit<MasterPlayer, 'id'> = {
+                name,
+                whatsappNumber,
+                isAdmin,
+                isBanker,
+                isActive: true,
+                clubId,
+            };
+            const savedPlayer = await saveMasterPlayer(newPlayer);
+            onSave(savedPlayer);
+            toast({ title: 'Player Created', description: `Successfully created ${name}.` });
+            onOpenChange(false);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Could not create the player.';
+            toast({ variant: 'destructive', title: 'Creation Failed', description: errorMessage });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Create New Player</DialogTitle>
+                    <DialogDescription>
+                        Enter the details for the new player and assign them to a club.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="create-player-name">Player Name</Label>
+                        <Input id="create-player-name" value={name} onChange={e => setName(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="create-player-whatsapp">WhatsApp Number</Label>
+                        <Input id="create-player-whatsapp" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="create-player-club">Club</Label>
+                        <Select value={clubId} onValueChange={setClubId} disabled={!isSuperAdmin}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {clubs.map(club => (
+                                    <SelectItem key={club.id} value={club.id}>{club.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                         {!isSuperAdmin && <p className="text-xs text-muted-foreground">Admins can only add players to their own club.</p>}
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Permissions</Label>
+                        <div className="space-y-3 rounded-md border p-3">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="create-is-admin">Is Admin</Label>
+                                <Switch id="create-is-admin" checked={isAdmin} onCheckedChange={setIsAdmin} />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="create-is-banker">Is Banker</Label>
+                                <Switch id="create-is-banker" checked={isBanker} onCheckedChange={setIsBanker} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin" /> : <><Plus className="mr-2 h-4 w-4" /> Create Player</>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -732,6 +865,7 @@ export default function SettingsPage() {
           clubs={filteredClubs} 
           toast={toast}
           isSuperAdmin={isSuperAdmin}
+          currentUser={currentUser}
        />
     </div>
   );
