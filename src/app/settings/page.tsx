@@ -24,9 +24,76 @@ import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
+const countries = [
+  { name: 'India', code: '91', flag: '🇮🇳' },
+  { name: 'United States', code: '1', flag: '🇺🇸' },
+  { name: 'United Kingdom', code: '44', flag: '🇬🇧' },
+  // Add more countries as needed
+];
+
+const CountryCodePicker: FC<{
+    value: string;
+    onValueChange: (value: string) => void;
+    disabled?: boolean;
+}> = ({ value, onValueChange, disabled }) => {
+    const [open, setOpen] = useState(false);
+    const selectedCountry = countries.find(c => c.code === value) || countries[0];
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-auto justify-start"
+                    disabled={disabled}
+                >
+                    {selectedCountry.flag} +{selectedCountry.code}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+                <Command>
+                    <CommandInput placeholder="Search country..." />
+                    <CommandList>
+                        <CommandEmpty>No country found.</CommandEmpty>
+                        <CommandGroup>
+                            <ScrollArea className="h-48">
+                                {countries.map((country) => (
+                                <CommandItem
+                                    key={country.code}
+                                    value={`${country.name} (${country.code})`}
+                                    onSelect={() => {
+                                        onValueChange(country.code)
+                                        setOpen(false)
+                                    }}
+                                >
+                                    <Check
+                                    className={cn(
+                                        "mr-2 h-4 w-4",
+                                        value === country.code ? "opacity-100" : "opacity-0"
+                                    )}
+                                    />
+                                    {country.flag} {country.name} (+{country.code})
+                                </CommandItem>
+                                ))}
+                            </ScrollArea>
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
 
 const ClubManagement: FC<{
     clubs: Club[];
@@ -450,6 +517,9 @@ const EditPlayerDialog: FC<{
     const [editablePlayer, setEditablePlayer] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     
+    const [countryCode, setCountryCode] = useState('91');
+    const [mobileNumber, setMobileNumber] = useState('');
+
     // Delete OTP state
     const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isOtpSent, setIsOtpSent] = useState(false);
@@ -461,6 +531,15 @@ const EditPlayerDialog: FC<{
     useEffect(() => {
         if (player) {
             setEditablePlayer(JSON.parse(JSON.stringify(player)));
+            const fullNumber = player.whatsappNumber || '';
+            const indiaCode = '91';
+            if (fullNumber.startsWith(indiaCode) && fullNumber.length > indiaCode.length) {
+                setCountryCode(indiaCode);
+                setMobileNumber(fullNumber.substring(indiaCode.length));
+            } else {
+                setCountryCode(indiaCode);
+                setMobileNumber(fullNumber);
+            }
         }
         // Reset OTP state when dialog opens or player changes
         setDeleteConfirmOpen(false);
@@ -476,8 +555,10 @@ const EditPlayerDialog: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Player name and club are required.' });
             return;
         }
+        const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
+        const playerToSave = { ...editablePlayer, whatsappNumber: fullWhatsappNumber };
         setIsSaving(true);
-        await onSave(editablePlayer);
+        await onSave(playerToSave);
         setIsSaving(false);
         onOpenChange(false);
     };
@@ -577,11 +658,15 @@ const EditPlayerDialog: FC<{
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="edit-player-whatsapp">WhatsApp Number</Label>
-                        <Input
-                            id="edit-player-whatsapp"
-                            value={editablePlayer.whatsappNumber}
-                            onChange={(e) => setEditablePlayer(p => p ? { ...p, whatsappNumber: e.target.value } : null)}
-                        />
+                        <div className="flex gap-2">
+                            <CountryCodePicker value={countryCode} onValueChange={setCountryCode} />
+                            <Input
+                                id="edit-player-whatsapp-number"
+                                value={mobileNumber}
+                                onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                                placeholder="10-digit number"
+                            />
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="edit-player-club">Club</Label>
@@ -662,7 +747,8 @@ const CreatePlayerDialog: FC<{
     currentUser: MasterPlayer | null;
 }> = ({ isOpen, onOpenChange, clubs, onSave, toast, isSuperAdmin, currentUser }) => {
     const [name, setName] = useState('');
-    const [whatsappNumber, setWhatsappNumber] = useState('');
+    const [countryCode, setCountryCode] = useState('91');
+    const [mobileNumber, setMobileNumber] = useState('');
     const [clubId, setClubId] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
     const [isBanker, setIsBanker] = useState(false);
@@ -674,7 +760,8 @@ const CreatePlayerDialog: FC<{
         if (isOpen) {
             // Reset form
             setName('');
-            setWhatsappNumber('');
+            setCountryCode('91');
+            setMobileNumber('');
             setIsAdmin(false);
             setIsBanker(false);
             setVerificationStatus('idle');
@@ -689,14 +776,15 @@ const CreatePlayerDialog: FC<{
     }, [isOpen, isSuperAdmin, currentUser]);
 
     const handleVerifyNumber = async () => {
-        if (!whatsappNumber) {
+        const fullNumber = `${countryCode}${mobileNumber}`;
+        if (!mobileNumber) {
             setVerificationStatus('idle');
             return;
         }
         setVerificationStatus('loading');
         setVerificationError(null);
         try {
-            const result = await verifyWhatsappNumber({ whatsappNumber });
+            const result = await verifyWhatsappNumber({ whatsappNumber: fullNumber });
             if (result.success) {
                 setVerificationStatus(result.isOnWhatsApp ? 'verified' : 'failed');
                 if (!result.isOnWhatsApp) {
@@ -717,7 +805,7 @@ const CreatePlayerDialog: FC<{
     useEffect(() => {
         setVerificationStatus('idle');
         setVerificationError(null);
-    }, [whatsappNumber]);
+    }, [countryCode, mobileNumber]);
 
     const handleSave = async () => {
         if (!name || !clubId) {
@@ -727,9 +815,10 @@ const CreatePlayerDialog: FC<{
 
         setIsSaving(true);
         try {
+            const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
             const newPlayer: Omit<MasterPlayer, 'id'> = {
                 name,
-                whatsappNumber,
+                whatsappNumber: fullWhatsappNumber,
                 isAdmin,
                 isBanker,
                 isActive: true,
@@ -764,32 +853,35 @@ const CreatePlayerDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="create-player-whatsapp">WhatsApp Number</Label>
                         <div className="flex items-center gap-2">
-                             <Input 
-                                id="create-player-whatsapp" 
-                                value={whatsappNumber} 
-                                onChange={e => setWhatsappNumber(e.target.value)} 
-                                onBlur={handleVerifyNumber}
-                                className="flex-1" 
-                            />
-                             <div className="flex items-center gap-1">
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="cursor-help">
-                                                {verificationStatus === 'verified' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                                                {verificationStatus === 'failed' && <AlertCircle className="h-5 w-5 text-red-600" />}
-                                                {verificationStatus === 'idle' && <HelpCircle className="h-5 w-5 text-muted-foreground" />}
-                                                {verificationStatus === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
-                                            </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {verificationStatus === 'idle' && <p>Verification status will appear here.</p>}
-                                            {verificationStatus === 'loading' && <p>Checking...</p>}
-                                            {verificationStatus === 'verified' && <p>This number is active on WhatsApp.</p>}
-                                            {verificationStatus === 'failed' && <p>{verificationError || 'This number is not on WhatsApp or could not be verified.'}</p>}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                             <CountryCodePicker value={countryCode} onValueChange={setCountryCode} />
+                             <div className="flex-1 relative">
+                                <Input 
+                                    id="create-player-whatsapp-number" 
+                                    value={mobileNumber} 
+                                    onChange={e => setMobileNumber(e.target.value.replace(/\D/g, ''))} 
+                                    onBlur={handleVerifyNumber}
+                                    placeholder="10-digit number"
+                                />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="cursor-help">
+                                                    {verificationStatus === 'verified' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                                                    {verificationStatus === 'failed' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                                                    {verificationStatus === 'idle' && <HelpCircle className="h-5 w-5 text-muted-foreground" />}
+                                                    {verificationStatus === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {verificationStatus === 'idle' && <p>Verification status will appear here.</p>}
+                                                {verificationStatus === 'loading' && <p>Checking...</p>}
+                                                {verificationStatus === 'verified' && <p>This number is active on WhatsApp.</p>}
+                                                {verificationStatus === 'failed' && <p>{verificationError || 'This number is not on WhatsApp or could not be verified.'}</p>}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
                              </div>
                         </div>
                     </div>
