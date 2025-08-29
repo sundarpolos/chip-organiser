@@ -723,6 +723,7 @@ const PlayerManagement: FC<{
                 onDelete={handleDeletePlayer}
                 toast={toast}
                 isSuperAdmin={isSuperAdmin}
+                currentUser={currentUser}
             />
             <CreatePlayerDialog
                 isOpen={isCreatePlayerOpen}
@@ -749,7 +750,8 @@ const EditPlayerDialog: FC<{
     onDelete: (playerId: string) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
-}> = ({ isOpen, onOpenChange, player, clubs, onSave, onDelete, toast, isSuperAdmin }) => {
+    currentUser: MasterPlayer;
+}> = ({ isOpen, onOpenChange, player, clubs, onSave, onDelete, toast, isSuperAdmin, currentUser }) => {
     const [editablePlayer, setEditablePlayer] = useState<MasterPlayer | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -955,7 +957,7 @@ const EditPlayerDialog: FC<{
                 </div>
                 <DialogFooter className="justify-between">
                      <div>
-                        {isSuperAdmin && player?.whatsappNumber !== SUPER_ADMIN_WHATSAPP && (
+                        {(isSuperAdmin || (currentUser.isAdmin && currentUser.clubId === player?.clubId)) && player?.whatsappNumber !== SUPER_ADMIN_WHATSAPP && (
                             <Button variant="destructive" onClick={() => setDeleteConfirmOpen(true)}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete Player
                             </Button>
