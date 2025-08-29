@@ -282,7 +282,7 @@ export default function HomePage() {
                   <CardDescription>All features included for one simple price.</CardDescription>
                   <div className="my-4">
                     <span className="text-5xl font-bold">₹1999</span>
-                    <span className="text-muted-foreground">/month per club</span>
+                    <span className="text-muted-foreground">/month</span>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
