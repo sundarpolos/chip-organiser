@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +22,8 @@ import { getMasterVenues } from '@/services/venue-service';
 import { getGameHistory } from '@/services/game-service';
 import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
+import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -665,6 +667,8 @@ const CreatePlayerDialog: FC<{
     const [isAdmin, setIsAdmin] = useState(false);
     const [isBanker, setIsBanker] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState<'idle' | 'loading' | 'verified' | 'failed'>('idle');
+    const [verificationError, setVerificationError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -673,6 +677,8 @@ const CreatePlayerDialog: FC<{
             setWhatsappNumber('');
             setIsAdmin(false);
             setIsBanker(false);
+            setVerificationStatus('idle');
+            setVerificationError(null);
             // Set default club based on role
             if (!isSuperAdmin && currentUser?.clubId) {
                 setClubId(currentUser.clubId);
@@ -681,6 +687,37 @@ const CreatePlayerDialog: FC<{
             }
         }
     }, [isOpen, isSuperAdmin, currentUser]);
+
+    const handleVerifyNumber = async () => {
+        if (!whatsappNumber) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please enter a WhatsApp number to verify.' });
+            return;
+        }
+        setVerificationStatus('loading');
+        setVerificationError(null);
+        try {
+            const result = await verifyWhatsappNumber({ whatsappNumber });
+            if (result.success) {
+                setVerificationStatus(result.isOnWhatsApp ? 'verified' : 'failed');
+                if (!result.isOnWhatsApp) {
+                    setVerificationError('This number is not on WhatsApp.');
+                }
+            } else {
+                throw new Error(result.error || 'Verification check failed.');
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+            setVerificationStatus('failed');
+            setVerificationError(errorMessage);
+            toast({ variant: 'destructive', title: 'Verification Failed', description: errorMessage });
+        }
+    };
+    
+    // Reset verification status when number changes
+    useEffect(() => {
+        setVerificationStatus('idle');
+        setVerificationError(null);
+    }, [whatsappNumber]);
 
     const handleSave = async () => {
         if (!name || !clubId) {
@@ -726,7 +763,32 @@ const CreatePlayerDialog: FC<{
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="create-player-whatsapp">WhatsApp Number</Label>
-                        <Input id="create-player-whatsapp" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} />
+                        <div className="flex items-center gap-2">
+                            <Input id="create-player-whatsapp" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} className="flex-1" />
+                             <div className="flex items-center gap-1">
+                                <Button type="button" variant="outline" size="sm" onClick={handleVerifyNumber} disabled={!whatsappNumber || verificationStatus === 'loading'}>
+                                    {verificationStatus === 'loading' ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                                </Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="cursor-help">
+                                                {verificationStatus === 'verified' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                                                {verificationStatus === 'failed' && <AlertCircle className="h-5 w-5 text-red-600" />}
+                                                {verificationStatus === 'idle' && <HelpCircle className="h-5 w-5 text-muted-foreground" />}
+                                                {verificationStatus === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            {verificationStatus === 'idle' && <p>Verify the number's WhatsApp status.</p>}
+                                            {verificationStatus === 'loading' && <p>Checking...</p>}
+                                            {verificationStatus === 'verified' && <p>This number is active on WhatsApp.</p>}
+                                            {verificationStatus === 'failed' && <p>{verificationError || 'This number is not on WhatsApp or could not be verified.'}</p>}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                             </div>
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="create-player-club">Club</Label>
