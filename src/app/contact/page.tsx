@@ -39,8 +39,9 @@ import { Crown } from 'lucide-react';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
-  email: z.string().email('Please enter a valid email address.'),
-  whatsappNumber: z.string().optional(),
+  whatsappNumber: z.string()
+    .min(1, "WhatsApp number is required.")
+    .regex(/^\d{11,15}$/, 'Please enter a valid number with country code (11-15 digits).'),
   subject: z.string().min(5, 'Subject must be at least 5 characters.'),
   reason: z.enum([
     'General Inquiry',
@@ -59,7 +60,6 @@ export default function ContactPage() {
     resolver: zodResolver(contactFormSchema),
     defaultValues: {
       name: '',
-      email: '',
       whatsappNumber: '',
       subject: '',
       reason: 'General Inquiry',
@@ -70,7 +70,7 @@ export default function ContactPage() {
   async function onSubmit(data: ContactFormValues) {
     setIsSubmitting(true);
     try {
-      const result = await sendContactMessage(data);
+      const result = await sendContactMessage(data as any); // Casting to handle backend schema difference
       if (result.success) {
         toast({
           title: 'Message Sent!',
@@ -135,29 +135,16 @@ export default function ContactPage() {
                     name="whatsappNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>WhatsApp Number (Optional)</FormLabel>
+                        <FormLabel>WhatsApp Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="+1 555-123-4567" {...field} />
+                          <Input placeholder="e.g. 919876543210" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <div className="grid grid-cols-1">
                     <FormField
                     control={form.control}
                     name="subject"
@@ -171,7 +158,6 @@ export default function ContactPage() {
                         </FormItem>
                     )}
                     />
-                    
                 </div>
                 
                 <FormField
