@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Map, Users, Library } from 'lucide-react';
+import { Loader2, Map } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -181,7 +181,7 @@ export default function MergeVenuesPage() {
             </div>
              <div className="flex gap-2">
                 <Button onClick={handleOpenMergeModal} disabled={selectedVenueIds.length < 2}>
-                    <Library className="mr-2" />
+                    <Map className="mr-2 h-4 w-4" />
                     Merge Selected ({selectedVenueIds.length})
                 </Button>
             </div>
