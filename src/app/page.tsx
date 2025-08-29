@@ -3,11 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion, useAnimation } from 'framer-motion';
-import { useInView } from 'react-intersection-observer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
-import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather, CheckCircle2, Club, FileText } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const features = [
@@ -50,36 +48,26 @@ const techStack = [
     { icon: <Feather className="h-8 w-8 text-primary" />, name: 'ShadCN & Tailwind', description: 'Create a beautiful, responsive, and consistent design system.' },
 ]
 
-const AnimatedSection = ({ children, className }: { children: React.ReactNode, className?: string }) => {
-  const controls = useAnimation();
-  const [ref, inView] = useInView({
-    triggerOnce: true,
-    threshold: 0.1,
-  });
-
-  useEffect(() => {
-    if (inView) {
-      controls.start('visible');
-    }
-  }, [controls, inView]);
-
-  const variants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: 'easeOut' } },
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      animate={controls}
-      initial="hidden"
-      variants={variants}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-};
+const stats = [
+    {
+        icon: <Club className="h-8 w-8 text-primary" />,
+        value: "100+",
+        label: "Clubs Managed",
+        description: "Trusted clubs are actively using our platform.",
+    },
+    {
+        icon: <Users className="h-8 w-8 text-primary" />,
+        value: "10,000+",
+        label: "Players Onboarded",
+        description: "A growing community of poker enthusiasts.",
+    },
+    {
+        icon: <FileText className="h-8 w-8 text-primary" />,
+        value: "1M+",
+        label: "Reports Generated",
+        description: "In-depth analytics over the last five years.",
+    },
+]
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -92,20 +80,28 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-14 items-center px-4 md:px-6 lg:px-8">
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <Crown className="h-6 w-6 text-primary" />
-            <span className="font-bold">Chip Maestro</span>
+            <span className="font-bold tracking-wider">Chip Maestro</span>
           </Link>
           <div className="flex flex-1 items-center justify-end space-x-4">
-            <nav className="flex items-center space-x-2">
+            <nav className="hidden md:flex items-center space-x-2 text-sm">
+                <Button variant="ghost" asChild>
+                    <Link href="#features">Features</Link>
+                </Button>
+                <Button variant="ghost" asChild>
+                    <Link href="#pricing">Pricing</Link>
+                </Button>
                 <Button variant="ghost" asChild>
                     <Link href="/contact">Contact</Link>
                 </Button>
-                {isLoggedIn ? (
-                    <Button asChild>
+            </nav>
+            <div className="flex items-center gap-2">
+                 {isLoggedIn ? (
+                    <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
                         <Link href="/dashboard">Dashboard</Link>
                     </Button>
                 ) : (
@@ -113,44 +109,59 @@ export default function HomePage() {
                         <Link href="/login">Login</Link>
                     </Button>
                 )}
-            </nav>
-            <ThemeToggle />
+                <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
 
       <main>
         {/* Hero Section */}
-        <section className="py-24 md:py-32 lg:py-40">
+        <section className="relative py-24 md:py-32 lg:py-40 overflow-hidden">
+             <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background via-background/80 to-transparent" />
             <div className="container mx-auto px-4 md:px-6">
-                <AnimatedSection>
-                    <div className="mx-auto max-w-4xl text-center space-y-6">
-                        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                            The Ultimate Platform for
-                            <span className="mt-2 block bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                                Poker Club Management
-                            </span>
-                        </h1>
-                        <p className="text-lg text-muted-foreground md:text-xl">
-                            From buy-ins to payouts, Chip Maestro handles it all. Focus on the game, not the paperwork.
-                            Our all-in-one SaaS solution brings real-time tracking, secure transactions, and AI-powered insights to your poker club.
-                        </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Button asChild size="lg" className="w-full sm:w-auto">
-                                <Link href="/contact">
-                                    Contact Now
-                                </Link>
-                            </Button>
-                        </div>
+                <div className="mx-auto max-w-4xl text-center space-y-6">
+                    <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400">
+                        The Future of Poker Club Management
+                    </h1>
+                    <p className="text-lg text-muted-foreground md:text-xl">
+                        From buy-ins to payouts, Chip Maestro handles it all. Focus on the game, not the paperwork. Our all-in-one SaaS solution brings real-time tracking, secure transactions, and AI-powered insights to your poker club.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <Button asChild size="lg" className="w-full sm:w-auto">
+                            <Link href="/contact">
+                                Contact Now
+                            </Link>
+                        </Button>
                     </div>
-                </AnimatedSection>
+                </div>
             </div>
         </section>
 
+        {/* Stats Section */}
+        <section className="py-16 sm:py-24">
+            <div className="container mx-auto px-4 md:px-6">
+                <div className="grid gap-8 md:grid-cols-3">
+                    {stats.map((stat) => (
+                        <Card key={stat.label} className="border-white/10 bg-white/5">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
+                                {stat.icon}
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold">{stat.value}</div>
+                                <p className="text-xs text-muted-foreground">{stat.description}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+
         {/* Features Section */}
-        <section id="features" className="py-16 sm:py-24 bg-secondary/50 overflow-hidden">
+        <section id="features" className="py-16 sm:py-24 overflow-hidden">
           <div className="container mx-auto px-4 md:px-6">
-            <AnimatedSection>
               <div className="mx-auto max-w-4xl space-y-4 text-center">
                 <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
                   Everything You Need, Nothing You Don't
@@ -159,12 +170,10 @@ export default function HomePage() {
                   Chip Maestro is packed with features designed to make running your poker club effortless and secure.
                 </p>
               </div>
-            </AnimatedSection>
 
             <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {features.map((feature, i) => (
-                <AnimatedSection key={feature.title}>
-                  <Card className="bg-background/80 backdrop-blur h-full">
+              {features.map((feature) => (
+                <Card key={feature.title} className="bg-white/5 border-white/10 h-full">
                     <CardHeader className="flex flex-col items-center text-center">
                       <div className="mb-4 rounded-full bg-primary/10 p-3">{feature.icon}</div>
                       <CardTitle>{feature.title}</CardTitle>
@@ -173,98 +182,39 @@ export default function HomePage() {
                       {feature.description}
                     </CardContent>
                   </Card>
-                </AnimatedSection>
               ))}
             </div>
           </div>
         </section>
 
-        {/* In-Depth Features Section */}
-        <section className="py-16 sm:py-24 overflow-hidden">
-            <div className="container mx-auto px-4 md:px-6 space-y-16">
-                 <AnimatedSection>
-                    <div className="mx-auto max-w-4xl space-y-4 text-center">
-                        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Features In-Depth</h2>
-                    </div>
-                 </AnimatedSection>
-                 
-                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
-                    <div>
-                        <h3 className="text-2xl font-bold mb-2">Real-Time Sync & Calculations</h3>
-                        <p className="text-muted-foreground">
-                            Powered by Firebase Firestore, every buy-in, chip update, and player action is synced across all devices in real-time. The dashboard instantly recalculates profit and loss, so everyone at the table has a live view of the standings without any manual effort.
-                        </p>
-                    </div>
-                    <div>
-                        <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                            <BarChart className="h-24 w-24 text-primary/50" />
-                        </div>
-                    </div>
-                 </AnimatedSection>
-                 
-                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
-                     <div className="order-2 md:order-1">
-                        <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                            <Bot className="h-24 w-24 text-primary/50" />
-                        </div>
-                    </div>
-                    <div className="order-1 md:order-2">
-                        <h3 className="text-2xl font-bold mb-2">Advanced AI Tools</h3>
-                        <p className="text-muted-foreground">
-                           Leveraging Google's Genkit, Chip Maestro brings cutting-edge AI to your poker game. Automatically import game data from raw text logs, or use our Anomaly Detection to analyze player buy-in patterns against their history, helping to flag suspicious activity and ensure game integrity.
-                        </p>
-                    </div>
-                 </AnimatedSection>
-
-                 <AnimatedSection className="grid md:grid-cols-2 gap-12 items-center">
-                    <div>
-                        <h3 className="text-2xl font-bold mb-2">Secure & Automated Settlements</h3>
-                        <p className="text-muted-foreground">
-                            End-of-game payouts are calculated automatically. Our system determines the most efficient set of transactions required to settle all debts, minimizing the number of cash exchanges. Admins can send these settlement details to all players via WhatsApp with a single click.
-                        </p>
-                    </div>
-                    <div>
-                         <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                            <ShieldAlert className="h-24 w-24 text-primary/50" />
-                        </div>
-                    </div>
-                 </AnimatedSection>
-            </div>
-        </section>
-        
         {/* Tech Stack Section */}
-        <section className="py-16 sm:py-24 bg-secondary/50 overflow-hidden">
+        <section className="py-16 sm:py-24 overflow-hidden">
             <div className="container mx-auto px-4 md:px-6">
-                <AnimatedSection>
-                    <div className="mx-auto max-w-4xl space-y-4 text-center">
-                      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                        Built With Modern Technology
-                      </h2>
-                      <p className="text-muted-foreground md:text-lg">
-                        Chip Maestro is built on a robust, scalable, and modern tech stack to deliver a seamless experience.
-                      </p>
-                    </div>
-                </AnimatedSection>
-                <AnimatedSection>
-                    <div className="mt-12 grid gap-8 md:grid-cols-2">
-                        {techStack.map(tech => (
-                            <div key={tech.name} className="flex items-start gap-4">
-                                <div className="rounded-full bg-primary/10 p-3">{tech.icon}</div>
-                                <div>
-                                    <h3 className="text-lg font-bold">{tech.name}</h3>
-                                    <p className="text-muted-foreground">{tech.description}</p>
-                                </div>
+                <div className="mx-auto max-w-4xl space-y-4 text-center">
+                  <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                    Built With Modern Technology
+                  </h2>
+                  <p className="text-muted-foreground md:text-lg">
+                    Chip Maestro is built on a robust, scalable, and modern tech stack to deliver a seamless experience.
+                  </p>
+                </div>
+                <div className="mt-12 grid gap-8 md:grid-cols-2">
+                    {techStack.map(tech => (
+                        <div key={tech.name} className="flex items-start gap-4">
+                            <div className="rounded-full bg-primary/10 p-3">{tech.icon}</div>
+                            <div>
+                                <h3 className="text-lg font-bold">{tech.name}</h3>
+                                <p className="text-muted-foreground">{tech.description}</p>
                             </div>
-                        ))}
-                    </div>
-                </AnimatedSection>
+                        </div>
+                    ))}
+                </div>
             </div>
         </section>
 
         {/* Pricing Section */}
         <section id="pricing" className="py-16 sm:py-24 overflow-hidden">
           <div className="container mx-auto px-4 md:px-6">
-            <AnimatedSection>
               <div className="mx-auto max-w-4xl space-y-4 text-center">
                 <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
                   Simple, Transparent Pricing
@@ -273,10 +223,9 @@ export default function HomePage() {
                   One plan. All features. No hidden fees.
                 </p>
               </div>
-            </AnimatedSection>
 
-            <AnimatedSection className="mt-12 flex justify-center">
-              <Card className="w-full max-w-md border-2 border-primary shadow-xl">
+            <div className="mt-12 flex justify-center">
+              <Card className="w-full max-w-md border-2 border-primary shadow-xl bg-white/5">
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl">Club Pro</CardTitle>
                   <CardDescription>All features included for one simple price.</CardDescription>
@@ -286,7 +235,6 @@ export default function HomePage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="font-semibold">Everything in Chip Maestro, including:</p>
                   <ul className="space-y-2">
                     <li className="flex items-start gap-3">
                         <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
@@ -308,16 +256,20 @@ export default function HomePage() {
                     </Button>
                 </CardFooter>
               </Card>
-            </AnimatedSection>
+            </div>
           </div>
         </section>
 
       </main>
 
-      <footer className="border-t py-6 md:py-8">
+      <footer className="border-t border-white/10 py-6 md:py-8">
         <div className="container mx-auto px-4 md:px-6 flex items-center justify-between text-sm text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Chip Maestro. All rights reserved.</p>
-          <Link href="/contact" className="hover:text-primary">Contact Support</Link>
+          <div className="flex gap-4">
+             <Link href="#features" className="hover:text-primary">Features</Link>
+             <Link href="#pricing" className="hover:text-primary">Pricing</Link>
+             <Link href="/contact" className="hover:text-primary">Contact</Link>
+          </div>
         </div>
       </footer>
     </div>
