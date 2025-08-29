@@ -42,8 +42,8 @@ const sendContactMessageFlow = ai.defineFlow(
   },
   async ({ name, whatsappNumber, subject, reason, message }) => {
     try {
-      // Format the message for WhatsApp
-      const whatsappMessage = `*New Contact Form Submission*
+      // 1. Format and send the message to the Super Admin
+      const adminMessage = `*New Contact Form Submission*
 
 *Name:* ${name}
 *WhatsApp:* ${whatsappNumber}
@@ -53,19 +53,42 @@ const sendContactMessageFlow = ai.defineFlow(
 *Message:*
 ${message}`;
 
-      const whatsappPayload: SendWhatsappMessageInput = {
+      const adminPayload: SendWhatsappMessageInput = {
         to: SUPER_ADMIN_WHATSAPP,
-        message: whatsappMessage,
-        // Using environment variables for credentials by default
+        message: adminMessage,
       };
 
-      const whatsappResult = await sendWhatsappMessage(whatsappPayload);
+      const adminResult = await sendWhatsappMessage(adminPayload);
       
-      if (whatsappResult.success) {
-        return { success: true };
-      } else {
-        return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.' };
+      if (!adminResult.success) {
+        return { success: false, error: adminResult.error || 'Failed to send message to admin.' };
       }
+
+      // 2. Format and send a confirmation copy to the user
+      const userMessage = `Hi ${name},
+
+Thank you for contacting Chip Maestro! We have received your message and will get back to you shortly.
+
+Here is a copy of your submission:
+---
+*Reason:* ${reason}
+*Subject:* ${subject}
+
+*Message:*
+${message}
+---`;
+
+      const userPayload: SendWhatsappMessageInput = {
+        to: whatsappNumber,
+        message: userMessage,
+      };
+      
+      // We send the user copy but don't fail the whole operation if it doesn't succeed.
+      // The primary goal is getting the message to the admin.
+      await sendWhatsappMessage(userPayload);
+
+      return { success: true };
+
     } catch (error) {
       console.error('Error in sendContactMessageFlow:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';

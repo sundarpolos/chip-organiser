@@ -75,7 +75,7 @@ export default function ContactPage() {
       if (result.success) {
         toast({
           title: 'Message Sent!',
-          description: 'Thanks for reaching out. We have received your message and will get back to you shortly.',
+          description: "Thanks for reaching out. We'll send a copy of your submission to your WhatsApp.",
         });
         form.reset();
       } else {
