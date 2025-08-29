@@ -41,7 +41,7 @@ const contactFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   whatsappNumber: z.string()
     .min(1, "WhatsApp number is required.")
-    .regex(/^\d{11,15}$/, 'Please enter a valid number with country code (11-15 digits).'),
+    .regex(/^\d{11,15}$/, 'Please enter a valid number with country code (e.g., 919876543210).'),
   subject: z.string().min(5, 'Subject must be at least 5 characters.'),
   reason: z.enum([
     'General Inquiry',
@@ -58,6 +58,7 @@ export default function ContactPage() {
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
+    mode: 'onBlur',
     defaultValues: {
       name: '',
       whatsappNumber: '',
@@ -70,7 +71,7 @@ export default function ContactPage() {
   async function onSubmit(data: ContactFormValues) {
     setIsSubmitting(true);
     try {
-      const result = await sendContactMessage(data as any); // Casting to handle backend schema difference
+      const result = await sendContactMessage(data);
       if (result.success) {
         toast({
           title: 'Message Sent!',
