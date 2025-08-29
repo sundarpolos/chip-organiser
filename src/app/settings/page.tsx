@@ -364,7 +364,9 @@ const PlayerManagement: FC<{
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>Player Management</CardTitle>
-                        <Button onClick={() => setCreatePlayerOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Player</Button>
+                        {(currentUser.isAdmin) && (
+                           <Button onClick={() => setCreatePlayerOpen(true)}><Plus className="mr-2 h-4 w-4" /> Create Player</Button>
+                        )}
                     </div>
                     <CardDescription>Edit player details, including their assigned club and roles. Players are grouped by club.</CardDescription>
                 </CardHeader>
@@ -859,14 +861,16 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       <PlayerManagement 
-          players={filteredPlayers} 
-          setPlayers={setPlayers} 
-          clubs={filteredClubs} 
-          toast={toast}
-          isSuperAdmin={isSuperAdmin}
-          currentUser={currentUser}
-       />
+       {(currentUser.isAdmin || isSuperAdmin) && filteredPlayers.length > 0 && (
+         <PlayerManagement 
+            players={filteredPlayers} 
+            setPlayers={setPlayers} 
+            clubs={filteredClubs} 
+            toast={toast}
+            isSuperAdmin={isSuperAdmin}
+            currentUser={currentUser}
+         />
+       )}
     </div>
   );
 }
