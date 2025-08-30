@@ -154,79 +154,6 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
-const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
-    const timelineData = useMemo(() => {
-        const dataPoints: { timeLabel: string; profitLoss: number; totalBuyIns: number; finalChips: number }[] = [];
-
-        if (game.startTime) {
-            dataPoints.push({
-                timeLabel: format(new Date(game.startTime), 'p'),
-                profitLoss: 0,
-                totalBuyIns: 0,
-                finalChips: 0,
-            });
-        }
-
-        if (game.progressLog && game.progressLog.length > 0) {
-            game.progressLog.forEach(log => {
-                const playerStat = log.playerStats.find(p => p.playerId === player.id);
-                if (playerStat) {
-                    dataPoints.push({
-                        timeLabel: format(new Date(log.timestamp), 'p'),
-                        profitLoss: playerStat.profitLoss,
-                        totalBuyIns: playerStat.totalBuyIns,
-                        finalChips: playerStat.finalChips,
-                    });
-                }
-            });
-        }
-        
-        const uniqueDataPoints = Array.from(new Map(dataPoints.map(item => [item.timeLabel, item])).values());
-        
-        return uniqueDataPoints.map((point, index, arr) => {
-            const prevPoint = index > 0 ? arr[index - 1] : { profitLoss: 0 };
-            const change = point.profitLoss - prevPoint.profitLoss;
-            return { ...point, change };
-        });
-
-    }, [player.id, game.progressLog, game.startTime]);
-
-    if (timelineData.length < 2) {
-        return <p className="text-sm text-muted-foreground text-center py-4">Not enough saved progress data for a timeline.</p>;
-    }
-
-    return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead className="text-right">Total Buy-in</TableHead>
-                    <TableHead className="text-right">Chip Return</TableHead>
-                    <TableHead className="text-right">P/L</TableHead>
-                    <TableHead className="text-right">Change</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {timelineData.map((data, index) => (
-                    <TableRow key={index}>
-                        <TableCell>{data.timeLabel}</TableCell>
-                        <TableCell className="text-right">₹{data.totalBuyIns}</TableCell>
-                        <TableCell className="text-right">₹{data.finalChips}</TableCell>
-                        <TableCell className={`text-right font-bold ${data.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            ₹{data.profitLoss.toFixed(0)}
-                        </TableCell>
-                         <TableCell className="text-right flex justify-end items-center">
-                            {data.change > 0 && <ArrowUp className="h-4 w-4 text-green-600" />}
-                            {data.change < 0 && <ArrowDown className="h-4 w-4 text-red-600" />}
-                            {data.change === 0 && index > 0 && <Minus className="h-4 w-4 text-muted-foreground" />}
-                        </TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
-    );
-};
-
 const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
     const timelineData = useMemo(() => {
         const dataPoints: { timeLabel: string; profitLoss: number | null }[] = [];
@@ -526,26 +453,6 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
-
-                <Card>
-                    <AccordionItem value="timeline" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Player Timeline Analysis
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                             <Accordion type="multiple" className="w-full">
-                                {calculatedPlayers.map(player => (
-                                    <AccordionItem key={player.id} value={player.id}>
-                                        <AccordionTrigger>{player.name}</AccordionTrigger>
-                                        <AccordionContent>
-                                            <PlayerTimelineTable player={player} game={activeGame} />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
