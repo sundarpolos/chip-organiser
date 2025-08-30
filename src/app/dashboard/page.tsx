@@ -10,7 +10,7 @@ import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -1044,11 +1044,25 @@ function DashboardContent() {
             finalChips: p.finalChips,
             clubId: activeClub.id,
         }));
+        
+        const progressLogEntry: GameProgressLog = {
+            timestamp: new Date().toISOString(),
+            playerStats: finalPlayers.map(p => ({
+                playerId: p.id,
+                name: p.name,
+                totalBuyIns: p.totalBuyIns,
+                finalChips: p.finalChips,
+                profitLoss: p.profitLoss,
+            })),
+        };
+        
+        const updatedProgressLog = [...(activeGame.progressLog || []), progressLogEntry];
 
         const progressGame: GameHistory = {
             ...activeGame,
             clubId: activeClub.id,
             players: serializablePlayers as any,
+            progressLog: updatedProgressLog,
         }
 
         try {
@@ -1198,6 +1212,7 @@ function DashboardContent() {
         players: [],
         startTime: now.toISOString(),
         clubId: activeClub.id,
+        progressLog: [],
     }
     await saveGameHistory(newGame);
     setActiveGame(newGame);
@@ -1318,6 +1333,7 @@ function DashboardContent() {
         startTime: newGameDate.toISOString(),
         endTime: new Date().toISOString(),
         clubId: activeClub.id,
+        progressLog: [],
     };
 
     await saveGameHistory(newGame);

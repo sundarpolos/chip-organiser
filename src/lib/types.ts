@@ -1,9 +1,4 @@
 
-
-
-
-
-
 export interface BuyIn {
   id: string;
   amount: number;
@@ -41,6 +36,19 @@ export interface MasterVenue {
     clubId: string;
 }
 
+export interface PlayerProgress {
+    playerId: string;
+    name: string;
+    totalBuyIns: number;
+    finalChips: number;
+    profitLoss: number;
+}
+
+export interface GameProgressLog {
+    timestamp: string;
+    playerStats: PlayerProgress[];
+}
+
 export interface GameHistory {
     id: string;
     venue: string;
@@ -50,6 +58,7 @@ export interface GameHistory {
     endTime?: string;
     duration?: number; // in milliseconds
     clubId: string;
+    progressLog?: GameProgressLog[];
 }
 
 export interface WhatsappConfig {
