@@ -198,13 +198,27 @@ const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ cal
 const GameLog: FC<{ game: GameHistory }> = ({ game }) => {
     const log = useMemo(() => {
         if (!game) return [];
-        return (game.players || [])
-            .flatMap(p => (p.buyIns || []).map(b => ({ 
-                type: 'Buy-in',
-                timestamp: new Date(b.timestamp),
-                text: `${p.name} bought in for ₹${b.amount}`
-            })))
+        
+        const buyInEvents = (game.players || [])
+            .flatMap(p => 
+                (p.buyIns || []).map(b => ({
+                    type: 'Buy-in',
+                    timestamp: new Date(b.timestamp),
+                    text: `${p.name} bought in for ₹${b.amount}`
+                }))
+            );
+
+        const chipReturnEvents = (game.players || [])
+            .filter(p => p.finalChips > 0 && game.endTime)
+            .map(p => ({
+                type: 'Chip Return',
+                timestamp: new Date(game.endTime!),
+                text: `${p.name} returned chips worth ₹${p.finalChips}`
+            }));
+            
+        return [...buyInEvents, ...chipReturnEvents]
             .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
     }, [game]);
 
     if (log.length === 0) {
