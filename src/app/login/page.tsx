@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, Suspense, type FC } from 'react';
@@ -16,6 +15,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { getClub } from '@/services/club-service';
+import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
 
 
 const countries = [
@@ -343,7 +344,26 @@ function LoginPageContent() {
 
     setIsSending(true);
     try {
-      const result = await sendLoginOtp({ whatsappNumber: fullWhatsappNumber, whatsappConfig: {} });
+        // 1. Check if the user is registered
+        const user = await findUserByWhatsapp(fullWhatsappNumber);
+        if (!user || !user.clubId) {
+            throw new Error("This WhatsApp number is not registered with any club. Please contact your admin.");
+        }
+
+        // 2. Check if the number is on WhatsApp
+        const verificationResult = await verifyWhatsappNumber({ whatsappNumber: fullWhatsappNumber });
+        if (!verificationResult.success || !verificationResult.isOnWhatsApp) {
+            throw new Error(verificationResult.error || "This number is not active on WhatsApp.");
+        }
+        
+        // 3. Get club-specific WhatsApp config
+        const club = await getClub(user.clubId);
+        if (!club) {
+            throw new Error("Could not find the club associated with your account.");
+        }
+
+
+      const result = await sendLoginOtp({ whatsappNumber: fullWhatsappNumber, whatsappConfig: club.whatsappConfig || {} });
       if (result.success && result.otp) {
         setSentOtp(result.otp);
         setIsOtpSent(true);
@@ -423,7 +443,7 @@ function LoginPageContent() {
       >
         Your browser does not support the video tag.
       </video>
-      <div className="absolute top-0 left-0 w-full h-full bg-background/80 backdrop-blur-sm -z-10" />
+      <div className="absolute top-0 left-0 w-full h-full bg-background/50 backdrop-blur-sm -z-10" />
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader className="text-center">
           <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
