@@ -1321,7 +1321,7 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       {currentUser.isAdmin && !isSuperAdmin && activeClub && (
+       {currentUser.isAdmin && activeClub && (
          <AppSettings 
             activeClub={activeClub}
             onSettingsSave={handleSettingsSave}
