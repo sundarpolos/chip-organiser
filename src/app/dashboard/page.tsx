@@ -2509,7 +2509,7 @@ const PlayerTimelineChart: FC<{ player: CalculatedPlayer, gameStartTime?: string
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="time" />
                     <YAxis />
-                    <Tooltip
+                    <RechartsTooltip
                         formatter={(value, name, props) => [`₹${value}`, props.payload.name]}
                     />
                     <Bar dataKey="stack">
