@@ -33,6 +33,7 @@ export async function createClub(club: Omit<Club, 'id'>): Promise<Club> {
 
 export async function updateClub(club: Club): Promise<Club> {
     const docRef = doc(db, CLUBS_COLLECTION, club.id);
+    // Firestore does not like undefined values. We need to convert them to null or strip them.
     const clubToSave = JSON.parse(JSON.stringify(club));
     await setDoc(docRef, clubToSave, { merge: true });
     return club;
