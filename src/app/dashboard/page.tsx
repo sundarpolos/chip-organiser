@@ -10,7 +10,7 @@ import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -2415,6 +2415,23 @@ const ReportsDialog: FC<{
                             </Card>
                         </div>
                         
+                        {/* Player Timeline Analysis */}
+                        <Card>
+                            <CardHeader><CardTitle>Player Timeline Analysis</CardTitle></CardHeader>
+                            <CardContent>
+                                <Accordion type="multiple" className="w-full">
+                                    {sortedStandings.map(player => (
+                                        <AccordionItem key={player.id} value={player.id}>
+                                            <AccordionTrigger>{player.name}</AccordionTrigger>
+                                            <AccordionContent>
+                                                <PlayerTimelineChart player={player} gameStartTime={activeGame.startTime} />
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    ))}
+                                </Accordion>
+                            </CardContent>
+                        </Card>
+
                         {/* Buy-in Log */}
                         <Card>
                              <CardHeader><CardTitle>Buy-in Log</CardTitle></CardHeader>
@@ -2452,6 +2469,59 @@ const ReportsDialog: FC<{
         </Dialog>
     )
 }
+
+const PlayerTimelineChart: FC<{ player: CalculatedPlayer, gameStartTime?: string }> = ({ player, gameStartTime }) => {
+    const timelineData = useMemo(() => {
+        if (!player.buyIns || player.buyIns.length === 0) return [];
+        
+        const sortedBuyIns = [...player.buyIns]
+            .filter(b => b.status === 'verified')
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        let cumulativeBuyIn = 0;
+        const data = sortedBuyIns.map((buyIn, index) => {
+            cumulativeBuyIn += buyIn.amount;
+            return {
+                name: `Buy-in ${index + 1}`,
+                time: format(new Date(buyIn.timestamp), 'p'),
+                stack: cumulativeBuyIn,
+            };
+        });
+        
+        // Add final chip count as the last point
+        data.push({
+            name: 'Final Chips',
+            time: 'End',
+            stack: player.finalChips
+        })
+
+        return data;
+    }, [player]);
+
+    if (timelineData.length === 0) {
+        return <p className="text-sm text-muted-foreground">No verified buy-ins for this player.</p>;
+    }
+
+    return (
+        <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={timelineData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="time" />
+                    <YAxis />
+                    <Tooltip
+                        formatter={(value, name, props) => [`₹${value}`, props.payload.name]}
+                    />
+                    <Bar dataKey="stack">
+                        {timelineData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.name === 'Final Chips' ? (player.profitLoss >= 0 ? '#10b981' : '#ef4444') : '#3b82f6'} />
+                        ))}
+                    </Bar>
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+};
 
 const AnomalyReportDialog: FC<{
     isOpen: boolean,
