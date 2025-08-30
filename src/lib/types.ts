@@ -2,6 +2,7 @@
 
 
 
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -61,4 +62,5 @@ export interface Club {
   name: string;
   ownerId: string;
   whatsappConfig?: WhatsappConfig;
+  deckChangeIntervalHours?: number;
 }

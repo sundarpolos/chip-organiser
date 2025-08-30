@@ -98,6 +98,7 @@ import {
   Building,
   KeyRound,
   FileText,
+  StopCircle,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -279,13 +280,14 @@ const AdminView: FC<{
     currentUser: MasterPlayer | null;
     setAddPlayerModalOpen: (isOpen: boolean) => void;
     setSaveConfirmOpen: (isOpen: boolean) => void;
+    setEndGameConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
     setGameLogModalOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
     activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
     isOtpVerificationEnabled, whatsappConfig, canEdit, currentUser, setAddPlayerModalOpen,
-    setSaveConfirmOpen, setReportsModalOpen, setGameLogModalOpen, toast
+    setSaveConfirmOpen, setEndGameConfirmOpen, setReportsModalOpen, setGameLogModalOpen, toast
 }) => {
     
     const players = activeGame.players || [];
@@ -346,11 +348,18 @@ const AdminView: FC<{
                 <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
                     <div className="flex gap-2">
                         {canEdit && (
-                            <Button onClick={() => setAddPlayerModalOpen(true)}>
-                                <Plus className="mr-2 h-4 w-4" />Add Player(s)
-                            </Button>
+                            <>
+                                <Button onClick={() => setAddPlayerModalOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                                </Button>
+                                <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
+                                    <Save className="mr-2 h-4 w-4" />Save Progress
+                                </Button>
+                                <Button onClick={() => setEndGameConfirmOpen(true)} variant="destructive">
+                                    <StopCircle className="mr-2 h-4 w-4" />End Game
+                                </Button>
+                            </>
                         )}
-                        <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                     </div>
                     <div className="flex gap-2">
                         <Button onClick={() => setGameLogModalOpen(true)} variant="outline"><FileText className="mr-2 h-4 w-4" />Game Log</Button>
@@ -590,6 +599,7 @@ function DashboardContent() {
   const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
+  const [isEndGameConfirmOpen, setEndGameConfirmOpen] = useState(false);
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
   const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
@@ -683,6 +693,7 @@ function DashboardContent() {
             }
             setActiveClub(club);
             setWhatsappConfig(club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
+            setDeckChangeInterval(club.deckChangeIntervalHours || 2);
             
             const [
                 loadedMasterPlayers,
@@ -701,11 +712,6 @@ function DashboardContent() {
             const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
             if (savedOtpPreference !== null) {
                 setOtpVerificationEnabled(JSON.parse(savedOtpPreference));
-            }
-
-            const savedDeckInterval = localStorage.getItem("deckChangeInterval");
-            if (savedDeckInterval) {
-                setDeckChangeInterval(Number(savedDeckInterval));
             }
             
             // Check for active games for non-admins
@@ -849,6 +855,7 @@ function DashboardContent() {
   // Deck change timer effect
   useEffect(() => {
     if (!activeGame?.startTime || activeGame.endTime || deckChangeInterval <= 0) {
+        setShowDeckChangeAlert(false);
         return;
     }
 
@@ -930,70 +937,88 @@ function DashboardContent() {
     await saveGameHistory({ ...activeGame, players: updatedPlayers });
   };
   
-    const handleSaveGame = async (finalPlayers: CalculatedPlayer[]) => {
-    if (!activeGame || !activeClub) return;
+  const handleSaveGameProgress = async (finalPlayers: CalculatedPlayer[]) => {
+        if (!activeGame || !activeClub) return;
 
-    if (finalPlayers.length === 0) {
-        toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
-        return;
-    }
-
-    if (finalPlayers.some(p => !p.name)) {
-        toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
-        return;
-    }
-
-    if (finalPlayers.some(p => (p.buyIns || []).some(b => b.status !== 'verified' && b.amount > 0))) {
-      toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before saving." });
-      return;
-    }
-    
-    const now = new Date();
-    
-    // Create a serializable version of the players
-    const serializablePlayers = finalPlayers.map(p => ({
-        id: p.id,
-        name: p.name,
-        whatsappNumber: p.whatsappNumber,
-        buyIns: p.buyIns.map(b => ({
-            id: b.id,
-            amount: b.amount,
-            timestamp: b.timestamp,
-            status: b.status,
-        })),
-        finalChips: p.finalChips,
-        clubId: activeClub.id,
-    }));
-
-    const finalGame: GameHistory = {
-        ...activeGame,
-        clubId: activeClub.id,
-        players: serializablePlayers as any, // Use `any` to bypass strict type checking for the save
-        endTime: now.toISOString(),
-        duration: activeGame.startTime ? (now.getTime() - new Date(activeGame.startTime).getTime()) : undefined
-    }
-
-    try {
-        const savedGame = await saveGameHistory(finalGame);
-        const existingGameIndex = gameHistory.findIndex(g => g.id === savedGame.id);
-
-        let updatedHistory;
-        if (existingGameIndex !== -1) {
-            updatedHistory = [...gameHistory];
-            updatedHistory[existingGameIndex] = savedGame;
-            toast({ title: "Game Updated!", description: `${finalGame.venue} has been updated in your history.` });
-        } else {
-            updatedHistory = [savedGame, ...gameHistory];
-            toast({ title: "Game Saved!", description: `${finalGame.venue} has been saved to your history.` });
+        if (finalPlayers.length === 0) {
+            toast({ variant: "destructive", title: "Cannot Save Game", description: "There is no active game data to save." });
+            return;
         }
-        
-        setGameHistory(updatedHistory);
-        setSaveConfirmOpen(false);
-    } catch (error) {
-        console.error("Failed to save game:", error);
-        toast({ variant: "destructive", title: "Save Error", description: "Could not save game to the cloud." });
-    }
-  };
+
+        if (finalPlayers.some(p => !p.name)) {
+            toast({ variant: "destructive", title: "Cannot Save Game", description: "Please ensure all players have a name." });
+            return;
+        }
+
+        const serializablePlayers = finalPlayers.map(p => ({
+            id: p.id,
+            name: p.name,
+            whatsappNumber: p.whatsappNumber,
+            buyIns: p.buyIns.map(b => ({ id: b.id, amount: b.amount, timestamp: b.timestamp, status: b.status })),
+            finalChips: p.finalChips,
+            clubId: activeClub.id,
+        }));
+
+        const progressGame: GameHistory = {
+            ...activeGame,
+            clubId: activeClub.id,
+            players: serializablePlayers as any,
+        }
+
+        try {
+            await saveGameHistory(progressGame);
+            toast({ title: "Progress Saved!", description: `${progressGame.venue} has been updated in your history.` });
+            setSaveConfirmOpen(false);
+        } catch (error) {
+            console.error("Failed to save game progress:", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save game progress to the cloud." });
+        }
+    };
+
+    const handleEndGame = async (finalPlayers: CalculatedPlayer[]) => {
+        if (!activeGame || !activeClub) return;
+
+        if (finalPlayers.some(p => (p.buyIns || []).some(b => b.status !== 'verified' && b.amount > 0))) {
+            toast({ variant: "destructive", title: "Unverified Buy-ins", description: "Please verify all buy-ins before ending the game." });
+            return;
+        }
+
+        const now = new Date();
+        const serializablePlayers = finalPlayers.map(p => ({
+            id: p.id,
+            name: p.name,
+            whatsappNumber: p.whatsappNumber,
+            buyIns: p.buyIns.map(b => ({ id: b.id, amount: b.amount, timestamp: b.timestamp, status: b.status })),
+            finalChips: p.finalChips,
+            clubId: activeClub.id,
+        }));
+
+        const finalGame: GameHistory = {
+            ...activeGame,
+            clubId: activeClub.id,
+            players: serializablePlayers as any,
+            endTime: now.toISOString(),
+            duration: activeGame.startTime ? (now.getTime() - new Date(activeGame.startTime).getTime()) : undefined
+        };
+
+        try {
+            const savedGame = await saveGameHistory(finalGame);
+            setGameHistory(prev => {
+                const existingIndex = prev.findIndex(g => g.id === savedGame.id);
+                if (existingIndex !== -1) {
+                    const updated = [...prev];
+                    updated[existingIndex] = savedGame;
+                    return updated;
+                }
+                return [savedGame, ...prev];
+            });
+            toast({ title: "Game Ended!", description: `${finalGame.venue} has been saved to your history.` });
+            setEndGameConfirmOpen(false);
+        } catch (error) {
+            console.error("Failed to save and end game:", error);
+            toast({ variant: "destructive", title: "Save Error", description: "Could not save and end the game." });
+        }
+    };
   
     const handleJoinGame = async (gameId: string) => {
         const gameToJoin = gameHistory.find(g => g.id === gameId);
@@ -1346,6 +1371,7 @@ function DashboardContent() {
                 currentUser={currentUser}
                 setAddPlayerModalOpen={setAddPlayerModalOpen}
                 setSaveConfirmOpen={setSaveConfirmOpen}
+                setEndGameConfirmOpen={setEndGameConfirmOpen}
                 setReportsModalOpen={setReportsModalOpen}
                 setGameLogModalOpen={setGameLogModalOpen}
                 toast={toast}
@@ -1430,7 +1456,20 @@ function DashboardContent() {
         isOpen={isSaveConfirmOpen}
         onOpenChange={setSaveConfirmOpen}
         activeGame={activeGame}
-        onConfirmSave={handleSaveGame}
+        onConfirmSave={handleSaveGameProgress}
+        title="Confirm Game Progress"
+        description="Review and edit chip counts before saving the current progress. This will not end the game."
+        buttonText="Confirm & Save Progress"
+      />
+       <SaveConfirmDialog
+        isOpen={isEndGameConfirmOpen}
+        onOpenChange={setEndGameConfirmOpen}
+        activeGame={activeGame}
+        onConfirmSave={handleEndGame}
+        title="Confirm End Game"
+        description="Review and edit final chip counts before ending the game session. This action will stop the timer and save the final results."
+        buttonText="Confirm & End Game"
+        isEndGame={true}
       />
       <SettlementDialog
         isOpen={isSettlementModalOpen}
@@ -2846,11 +2885,15 @@ Chip Return: 0`;
 };
 
 const SaveConfirmDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    activeGame: GameHistory | null,
-    onConfirmSave: (finalPlayers: CalculatedPlayer[]) => void,
-}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave }) => {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    activeGame: GameHistory | null;
+    onConfirmSave: (finalPlayers: CalculatedPlayer[]) => void;
+    title: string;
+    description: string;
+    buttonText: string;
+    isEndGame?: boolean;
+}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, title, description, buttonText, isEndGame = false }) => {
     const [localPlayers, setLocalPlayers] = useState<CalculatedPlayer[]>([]);
 
     const calculatedPlayers = useMemo(() => {
@@ -2867,7 +2910,6 @@ const SaveConfirmDialog: FC<{
 
     useEffect(() => {
         if (isOpen) {
-            // Deep copy to prevent modifying original state directly
             setLocalPlayers(JSON.parse(JSON.stringify(calculatedPlayers)));
         }
     }, [isOpen, calculatedPlayers]);
@@ -2897,10 +2939,8 @@ const SaveConfirmDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Confirm Game Details</DialogTitle>
-                    <DialogDescription>
-                        Review and edit final chip counts below before saving to your history.
-                    </DialogDescription>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
                 <div className="relative max-h-[60vh] flex flex-col">
                     <Table>
@@ -2948,7 +2988,7 @@ const SaveConfirmDialog: FC<{
                         </TableFoot>
                     </Table>
                 </div>
-                {!isBalanced && (
+                {isEndGame && !isBalanced && (
                     <Alert variant="destructive" className="mt-4">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Totals Do Not Match!</AlertTitle>
@@ -2961,9 +3001,9 @@ const SaveConfirmDialog: FC<{
                     <DialogClose asChild>
                         <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={() => onConfirmSave(localPlayers)} disabled={!isBalanced}>
+                    <Button onClick={() => onConfirmSave(localPlayers)} disabled={isEndGame && !isBalanced}>
                         <Save className="mr-2 h-4 w-4" />
-                        Confirm & Save
+                        {buttonText}
                     </Button>
                 </DialogFooter>
             </DialogContent>

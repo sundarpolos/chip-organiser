@@ -473,12 +473,14 @@ const CreateEditClubDialog: FC<{
     const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
         apiUrl: '', apiToken: '', senderMobile: ''
     });
+    const [deckChangeIntervalHours, setDeckChangeIntervalHours] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (clubToEdit) {
             setClubName(clubToEdit.name);
             setWhatsappConfig(clubToEdit.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
+            setDeckChangeIntervalHours(clubToEdit.deckChangeIntervalHours || 2);
             const clubAdmin = players.find(p => p.clubId === clubToEdit.id && p.isAdmin);
             if (clubAdmin) {
                 setAdminId(clubAdmin.id);
@@ -487,6 +489,7 @@ const CreateEditClubDialog: FC<{
             setClubName('');
             setAdminId('');
             setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '' });
+            setDeckChangeIntervalHours(2);
         }
     }, [clubToEdit, players]);
     
@@ -501,7 +504,7 @@ const CreateEditClubDialog: FC<{
         setIsSaving(true);
         try {
             if (clubToEdit) { // Editing existing club
-                const updatedClubData: Club = { ...clubToEdit, name: clubName, whatsappConfig };
+                const updatedClubData: Club = { ...clubToEdit, name: clubName, whatsappConfig, deckChangeIntervalHours };
                 const savedClub = await updateClub(updatedClubData);
                 toast({ title: 'Club Updated', description: `"${clubName}" has been updated.`});
                 onSave(savedClub);
@@ -515,6 +518,7 @@ const CreateEditClubDialog: FC<{
                     name: clubName,
                     ownerId: currentUser.id,
                     whatsappConfig,
+                    deckChangeIntervalHours,
                 };
                 const newClub = await createClub(newClubPayload);
                 
@@ -566,9 +570,19 @@ const CreateEditClubDialog: FC<{
                         </div>
                     )}
                      <Accordion type="single" collapsible>
+                        <AccordionItem value="app-settings">
+                            <AccordionTrigger>App Settings</AccordionTrigger>
+                            <AccordionContent>
+                                <div className="space-y-2">
+                                    <Label htmlFor="deck-interval">Deck Change Interval (hours)</Label>
+                                    <Input id="deck-interval" type="number" min="0.5" step="0.5" value={deckChangeIntervalHours} onChange={e => setDeckChangeIntervalHours(Number(e.target.value))} />
+                                    <p className="text-xs text-muted-foreground">Set to 0 to disable the timer.</p>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
                         <AccordionItem value="whatsapp">
                             <AccordionTrigger>WhatsApp API Settings</AccordionTrigger>
-                            <AccordionContent className="space-y-4">
+                            <AccordionContent className="space-y-4 pt-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="wa-api-url">API URL</Label>
                                     <Input id="wa-api-url" value={whatsappConfig.apiUrl} onChange={e => setWhatsappConfig(c => ({...c, apiUrl: e.target.value}))} placeholder="e.g., https://api.provider.com/send" />
