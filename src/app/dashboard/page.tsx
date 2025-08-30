@@ -151,53 +151,35 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
-const PlayerTimelineChart: FC<{ player: CalculatedPlayer, gameStartTime?: string }> = ({ player, gameStartTime }) => {
+const PlayerTimelineChart: FC<{ player: CalculatedPlayer }> = ({ player }) => {
     const timelineData = useMemo(() => {
-        if (!player.buyIns || player.buyIns.length === 0) return [];
-        
-        const sortedBuyIns = [...player.buyIns]
-            .filter(b => b.status === 'verified')
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-        let cumulativeBuyIn = 0;
-        const data = sortedBuyIns.map((buyIn, index) => {
-            cumulativeBuyIn += buyIn.amount;
-            return {
-                name: `Buy-in ${index + 1}`,
-                time: format(new Date(buyIn.timestamp), 'p'),
-                stack: cumulativeBuyIn,
-            };
-        });
-        
-        // Add final chip count as the last point
-        data.push({
-            name: 'Final Chips',
-            time: 'End',
-            stack: player.finalChips
-        })
-
-        return data;
+        if (!player) return [];
+        return [
+            {
+                name: player.name,
+                buyIn: player.totalBuyIns,
+                chipReturn: player.finalChips,
+            },
+        ];
     }, [player]);
 
-    if (timelineData.length === 0) {
-        return <p className="text-sm text-muted-foreground">No verified buy-ins for this player.</p>;
+    if (!player || player.totalBuyIns === 0 && player.finalChips === 0) {
+        return <p className="text-sm text-muted-foreground text-center py-4">No financial data for this player.</p>;
     }
 
     return (
         <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={timelineData}>
+                <BarChart data={timelineData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="name" hide />
                     <RechartsTooltip
-                        formatter={(value, name, props) => [`₹${value}`, props.payload.name]}
+                        formatter={(value) => `₹${value}`}
                     />
-                    <Bar dataKey="stack">
-                        {timelineData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.name === 'Final Chips' ? (player.profitLoss >= 0 ? '#10b981' : '#ef4444') : '#3b82f6'} />
-                        ))}
-                    </Bar>
+                    <Legend />
+                    <Bar dataKey="buyIn" name="Total Buy-in" fill="#ef4444" />
+                    <Bar dataKey="chipReturn" name="Final Chip Return" fill="#10b981" />
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -455,7 +437,7 @@ const AdminView: FC<{
                                     <AccordionItem key={player.id} value={player.id}>
                                         <AccordionTrigger>{player.name}</AccordionTrigger>
                                         <AccordionContent>
-                                            <PlayerTimelineChart player={player} gameStartTime={activeGame.startTime} />
+                                            <PlayerTimelineChart player={player} />
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}
@@ -2366,7 +2348,7 @@ const ReportsDialog: FC<{
     const [isBuyInLogExpanded, setIsBuyInLogExpanded] = useState(false);
     const { toast } = useToast();
 
-    const calculatedPlayers = useMemo(() => {
+    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
             const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
@@ -2414,40 +2396,61 @@ const ReportsDialog: FC<{
 
 
     const handleExportPdf = async () => {
-        if (!reportContentRef.current) return;
-        
+        if (!activeGame || !reportContentRef.current) return;
         setIsExporting(true);
-        try {
-            const canvas = await html2canvas(reportContentRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: null,
-            });
-            
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
-            });
 
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-            
-            if (!activeGame) throw new Error("Active game is null");
-            const venueName = activeGame.venue.replace(/\s/g, '_');
-            const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
-            const playerCount = activeGame.players.length;
-            const filename = `${venueName}_${gameDate}_${playerCount}-players.pdf`;
-            
-            pdf.save(filename);
-            toast({ title: "Success", description: "Report has been exported as a PDF." });
-        } catch (error) {
-            console.error("Failed to export PDF:", error);
-            toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
-        } finally {
-            setIsExporting(false);
+        const venueName = activeGame.venue.replace(/\s/g, '_');
+        const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
+        const filename = `${venueName}_${gameDate}.pdf`;
+
+        const doc = new jsPDF();
+        
+        // Title
+        doc.setFontSize(18);
+        doc.text(`Game Report: ${activeGame.venue}`, 14, 22);
+        doc.setFontSize(12);
+        doc.text(format(new Date(activeGame.timestamp), "dd MMMM yyyy"), 14, 30);
+
+        // Summary Table
+        (doc as any).autoTable({
+            startY: 40,
+            head: [['Player', 'Buy-in', 'Return', 'P/L']],
+            body: sortedStandings.map(p => [
+                p.name,
+                `Rs ${p.totalBuyIns}`,
+                `Rs ${p.finalChips}`,
+                `Rs ${p.profitLoss.toFixed(0)}`
+            ]),
+            foot: [[
+                'Totals',
+                `Rs ${grandTotalBuyin}`,
+                `Rs ${grandTotalChips}`,
+                `Rs ${grandTotalProfitLoss.toFixed(0)}`
+            ]],
+            headStyles: { fillColor: [79, 70, 229] },
+            footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: 'bold' }
+        });
+
+        const chartElement = reportContentRef.current.querySelector('#chart-container-for-pdf');
+        if (chartElement) {
+            try {
+                const canvas = await html2canvas(chartElement as HTMLElement, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfWidth = doc.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                doc.addPage();
+                doc.text("Final Chip Distribution", 14, 22);
+                doc.addImage(imgData, 'PNG', 14, 30, pdfWidth - 28, pdfHeight);
+            } catch (error) {
+                console.error("Could not render chart to PDF:", error);
+                toast({ variant: "destructive", title: "Chart Export Failed", description: "Failed to include the chart in the PDF." });
+            }
         }
+
+        doc.save(filename);
+        setIsExporting(false);
+        toast({ title: "Success", description: "Report has been exported as a PDF." });
     };
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
@@ -2561,7 +2564,7 @@ const ReportsDialog: FC<{
                             <Card>
                                 <CardHeader><CardTitle className="text-base sm:text-xl">Final Chip Distribution</CardTitle></CardHeader>
                                 <CardContent>
-                                    <div className="h-[250px] sm:h-[300px]">
+                                    <div id="chart-container-for-pdf" className="h-[250px] sm:h-[300px]">
                                         <ChipDistributionChart data={pieChartData} />
                                     </div>
                                 </CardContent>
@@ -2577,7 +2580,7 @@ const ReportsDialog: FC<{
                                         <AccordionItem key={player.id} value={player.id}>
                                             <AccordionTrigger>{player.name}</AccordionTrigger>
                                             <AccordionContent>
-                                                <PlayerTimelineChart player={player} gameStartTime={activeGame.startTime} />
+                                                <PlayerTimelineChart player={player} />
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))}
@@ -2916,7 +2919,7 @@ const SaveConfirmDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, title, description, buttonText, isEndGame = false }) => {
     const [localPlayers, setLocalPlayers] = useState<CalculatedPlayer[]>([]);
 
-    const calculatedPlayers = useMemo(() => {
+    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
             const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
@@ -3048,7 +3051,7 @@ const SettlementDialog: FC<{
         return activeGame.players.filter(p => p.whatsappNumber);
     }, [activeGame]);
     
-    const calculatedPlayers = useMemo(() => {
+    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
         if (!activeGame || !activeGame.players) return [];
         return activeGame.players.map(p => {
             const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
