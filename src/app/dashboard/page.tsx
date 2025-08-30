@@ -151,36 +151,67 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
-const PlayerTimelineChart: FC<{ player: CalculatedPlayer }> = ({ player }) => {
+const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
     const timelineData = useMemo(() => {
-        if (!player) return [];
-        return [
-            {
-                name: player.name,
-                buyIn: player.totalBuyIns,
-                chipReturn: player.finalChips,
-            },
-        ];
-    }, [player]);
+        if (!player || !player.buyIns || player.buyIns.length === 0) return [];
 
-    if (!player || player.totalBuyIns === 0 && player.finalChips === 0) {
-        return <p className="text-sm text-muted-foreground text-center py-4">No financial data for this player.</p>;
+        const sortedBuyIns = [...player.buyIns]
+            .filter(b => b.status === 'verified')
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        let cumulativeBuyIn = 0;
+        const dataPoints = sortedBuyIns.map(b => {
+            cumulativeBuyIn += b.amount;
+            return {
+                time: new Date(b.timestamp).getTime(),
+                timeLabel: format(new Date(b.timestamp), 'p'),
+                buyIn: cumulativeBuyIn,
+                chipReturn: null,
+            };
+        });
+
+        if (game.endTime && player.finalChips > 0) {
+            dataPoints.push({
+                time: new Date(game.endTime).getTime(),
+                timeLabel: format(new Date(game.endTime), 'p'),
+                buyIn: cumulativeBuyIn,
+                chipReturn: player.finalChips
+            });
+        }
+        
+        // Ensure there are at least two points for a line to be drawn if only one buy-in exists
+        if (dataPoints.length === 1) {
+            const firstPoint = dataPoints[0];
+             dataPoints.unshift({
+                time: new Date(game.startTime!).getTime(),
+                timeLabel: format(new Date(game.startTime!), 'p'),
+                buyIn: 0,
+                chipReturn: null
+            });
+        }
+
+        return dataPoints;
+    }, [player, game.endTime, game.startTime]);
+
+    if (timelineData.length < 2) {
+        return <p className="text-sm text-muted-foreground text-center py-4">Not enough data for timeline chart.</p>;
     }
 
     return (
         <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={timelineData} layout="vertical">
+                <LineChart data={timelineData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="name" hide />
+                    <XAxis dataKey="timeLabel" angle={-45} textAnchor="end" height={60} interval="preserveStartEnd" />
+                    <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                     <RechartsTooltip
-                        formatter={(value) => `₹${value}`}
+                        formatter={(value, name) => [`₹${value}`, name === 'buyIn' ? 'Cumulative Buy-in' : 'Final Chip Return']}
+                        labelFormatter={(label) => `Time: ${label}`}
                     />
                     <Legend />
-                    <Bar dataKey="buyIn" name="Total Buy-in" fill="#ef4444" />
-                    <Bar dataKey="chipReturn" name="Final Chip Return" fill="#10b981" />
-                </BarChart>
+                    <Line type="monotone" dataKey="buyIn" name="Cumulative Buy-in" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
+                    <Line type="stepAfter" dataKey="chipReturn" name="Final Chip Return" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
+                </LineChart>
             </ResponsiveContainer>
         </div>
     );
@@ -437,7 +468,7 @@ const AdminView: FC<{
                                     <AccordionItem key={player.id} value={player.id}>
                                         <AccordionTrigger>{player.name}</AccordionTrigger>
                                         <AccordionContent>
-                                            <PlayerTimelineChart player={player} />
+                                            <PlayerTimelineChart player={player} game={activeGame} />
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}
@@ -2580,7 +2611,7 @@ const ReportsDialog: FC<{
                                         <AccordionItem key={player.id} value={player.id}>
                                             <AccordionTrigger>{player.name}</AccordionTrigger>
                                             <AccordionContent>
-                                                <PlayerTimelineChart player={player} />
+                                                <PlayerTimelineChart player={player} game={activeGame} />
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))}
