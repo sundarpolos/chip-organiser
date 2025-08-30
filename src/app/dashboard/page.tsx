@@ -10,7 +10,7 @@ import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, BuyIn, Club } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -93,9 +93,10 @@ import {
   Merge,
   SortAsc,
   ArrowRight,
-  Map as MapIcon,
+  MapIcon,
   Clock,
   Building,
+  KeyRound,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -586,6 +587,7 @@ function DashboardContent() {
   const [isAddPlayerModalOpen, setAddPlayerModalOpen] = useState(false);
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
   const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
+  const [isOtpModalOpen, setOtpModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -715,7 +717,14 @@ function DashboardContent() {
                 }
             }
             if(isAdmin) {
-                setLoadGameModalOpen(true);
+                // For admins, show OTP modal on login if not already shown this session.
+                const hasSeenOtpModal = sessionStorage.getItem('seenOtpModal');
+                if (!hasSeenOtpModal) {
+                    setOtpModalOpen(true);
+                    sessionStorage.setItem('seenOtpModal', 'true');
+                } else {
+                    setLoadGameModalOpen(true);
+                }
             }
             
         } catch (error) {
@@ -866,6 +875,7 @@ function DashboardContent() {
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
     localStorage.removeItem('chip-maestro-clubId');
+    sessionStorage.removeItem('seenOtpModal');
     setActiveGame(null);
     setJoinableGame(null);
     router.replace('/');
@@ -1441,9 +1451,68 @@ function DashboardContent() {
         isOpen={showDeckChangeAlert}
         onOpenChange={setShowDeckChangeAlert}
       />
+      <OtpVerificationDialog
+        isOpen={isOtpModalOpen}
+        onOpenChange={setOtpModalOpen}
+        currentValue={isOtpVerificationEnabled}
+        onSave={(value) => {
+            setOtpVerificationEnabled(value);
+            setOtpModalOpen(false);
+            setLoadGameModalOpen(true);
+        }}
+        onCancel={() => {
+            setOtpModalOpen(false);
+            setLoadGameModalOpen(true);
+        }}
+      />
     </div>
   )
 }
+
+const OtpVerificationDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    currentValue: boolean;
+    onSave: (value: boolean) => void;
+    onCancel: () => void;
+}> = ({ isOpen, onOpenChange, currentValue, onSave, onCancel }) => {
+    const [isEnabled, setIsEnabled] = useState(currentValue);
+
+    useEffect(() => {
+        setIsEnabled(currentValue);
+    }, [currentValue, isOpen]);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <KeyRound className="h-6 w-6 text-primary" />
+                        Buy-in OTP Verification
+                    </DialogTitle>
+                    <DialogDescription>
+                        Would you like to enable WhatsApp OTP verification for all buy-in requests during this session?
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="otp-toggle" checked={isEnabled} onCheckedChange={setIsEnabled} />
+                        <Label htmlFor="otp-toggle">{isEnabled ? "Enabled" : "Disabled"}</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                        {isEnabled
+                            ? "Admins will need to approve buy-ins and players will verify with an OTP."
+                            : "All buy-ins will be automatically verified without an OTP. This is faster but less secure."}
+                    </p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onCancel}>Skip</Button>
+                    <Button onClick={() => onSave(isEnabled)}>Save Preference</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+};
 
 const BuyInRequestPopover: FC<{
     onBuyInRequest: (amount: number) => void;
