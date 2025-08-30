@@ -97,6 +97,7 @@ import {
   Clock,
   Building,
   KeyRound,
+  FileText,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
@@ -217,7 +218,7 @@ const GameLog: FC<{ game: GameHistory }> = ({ game }) => {
             }));
             
         return [...buyInEvents, ...chipReturnEvents]
-            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     }, [game]);
 
@@ -279,11 +280,12 @@ const AdminView: FC<{
     setAddPlayerModalOpen: (isOpen: boolean) => void;
     setSaveConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
+    setGameLogModalOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
     activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
     isOtpVerificationEnabled, whatsappConfig, canEdit, currentUser, setAddPlayerModalOpen,
-    setSaveConfirmOpen, setReportsModalOpen, toast
+    setSaveConfirmOpen, setReportsModalOpen, setGameLogModalOpen, toast
 }) => {
     
     const players = activeGame.players || [];
@@ -351,6 +353,7 @@ const AdminView: FC<{
                         <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}><Save className="mr-2 h-4 w-4" />Save Game</Button>
                     </div>
                     <div className="flex gap-2">
+                        <Button onClick={() => setGameLogModalOpen(true)} variant="outline"><FileText className="mr-2 h-4 w-4" />Game Log</Button>
                         <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                     </div>
                 </CardFooter>
@@ -375,17 +378,6 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
-
-                <Card>
-                    <AccordionItem value="log" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Game Log
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0 max-h-60">
-                             <GameLog game={activeGame} />
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
@@ -602,6 +594,7 @@ function DashboardContent() {
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
   const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
   const [isOtpModalOpen, setOtpModalOpen] = useState(false);
+  const [isGameLogModalOpen, setGameLogModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -1354,6 +1347,7 @@ function DashboardContent() {
                 setAddPlayerModalOpen={setAddPlayerModalOpen}
                 setSaveConfirmOpen={setSaveConfirmOpen}
                 setReportsModalOpen={setReportsModalOpen}
+                setGameLogModalOpen={setGameLogModalOpen}
                 toast={toast}
             />
         ) : !isAdmin && hasCheckedForGame ? (
@@ -1479,8 +1473,41 @@ function DashboardContent() {
             setLoadGameModalOpen(true);
         }}
       />
+       <GameLogDialog
+        isOpen={isGameLogModalOpen}
+        onOpenChange={setGameLogModalOpen}
+        activeGame={activeGame}
+      />
     </div>
   )
+}
+
+const GameLogDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    activeGame: GameHistory | null;
+}> = ({ isOpen, onOpenChange, activeGame }) => {
+    if (!activeGame) return null;
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Game Log</DialogTitle>
+                    <DialogDescription>
+                        A chronological record of all events in this game.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="h-96">
+                    <GameLog game={activeGame} />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 const OtpVerificationDialog: FC<{
