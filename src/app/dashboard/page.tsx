@@ -153,48 +153,38 @@ const tabColors = [
 
 const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
     const timelineData = useMemo(() => {
-        if (!player || !player.buyIns || player.buyIns.length === 0) return [];
+        const dataPoints: { timeLabel: string; profitLoss: number | null }[] = [];
 
-        const sortedBuyIns = [...player.buyIns]
-            .filter(b => b.status === 'verified')
-            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        // Use progress log if available
+        if (game.progressLog && game.progressLog.length > 0) {
+            game.progressLog.forEach(log => {
+                const playerStat = log.playerStats.find(p => p.playerId === player.id);
+                if (playerStat) {
+                    dataPoints.push({
+                        timeLabel: format(new Date(log.timestamp), 'p'),
+                        profitLoss: playerStat.profitLoss
+                    });
+                }
+            });
+        }
 
-        let cumulativeBuyIn = 0;
-        const dataPoints = sortedBuyIns.map(b => {
-            cumulativeBuyIn += b.amount;
-            return {
-                time: new Date(b.timestamp).getTime(),
-                timeLabel: format(new Date(b.timestamp), 'p'),
-                buyIn: cumulativeBuyIn,
-                chipReturn: null,
-            };
-        });
-
-        if (game.endTime && player.finalChips > 0) {
+        // If game is finished, add the final state as the last point
+        if (game.endTime) {
             dataPoints.push({
-                time: new Date(game.endTime).getTime(),
                 timeLabel: format(new Date(game.endTime), 'p'),
-                buyIn: cumulativeBuyIn,
-                chipReturn: player.finalChips
+                profitLoss: player.profitLoss
             });
         }
         
-        // Ensure there are at least two points for a line to be drawn if only one buy-in exists
-        if (dataPoints.length === 1) {
-            const firstPoint = dataPoints[0];
-             dataPoints.unshift({
-                time: new Date(game.startTime!).getTime(),
-                timeLabel: format(new Date(game.startTime!), 'p'),
-                buyIn: 0,
-                chipReturn: null
-            });
-        }
+        // Remove duplicate timestamps, keeping the last entry
+        const uniqueDataPoints = Array.from(new Map(dataPoints.map(item => [item.timeLabel, item])).values());
+        
+        return uniqueDataPoints;
 
-        return dataPoints;
-    }, [player, game.endTime, game.startTime]);
+    }, [player.id, player.profitLoss, game.progressLog, game.endTime]);
 
     if (timelineData.length < 2) {
-        return <p className="text-sm text-muted-foreground text-center py-4">Not enough data for timeline chart.</p>;
+        return <p className="text-sm text-muted-foreground text-center py-4">Not enough saved progress data for a timeline.</p>;
     }
 
     return (
@@ -205,12 +195,11 @@ const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> =
                     <XAxis dataKey="timeLabel" angle={-45} textAnchor="end" height={60} interval="preserveStartEnd" />
                     <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                     <RechartsTooltip
-                        formatter={(value, name) => [`₹${value}`, name === 'buyIn' ? 'Cumulative Buy-in' : 'Final Chip Return']}
+                        formatter={(value, name) => [`₹${value}`, 'Profit/Loss']}
                         labelFormatter={(label) => `Time: ${label}`}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="buyIn" name="Cumulative Buy-in" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
-                    <Line type="stepAfter" dataKey="chipReturn" name="Final Chip Return" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
+                    <Line type="monotone" dataKey="profitLoss" name="Profit/Loss" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
                 </LineChart>
             </ResponsiveContainer>
         </div>
