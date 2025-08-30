@@ -155,6 +155,14 @@ const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> =
     const timelineData = useMemo(() => {
         const dataPoints: { timeLabel: string; profitLoss: number | null }[] = [];
 
+        // Add the start of the game as the initial point
+        if (game.startTime) {
+            dataPoints.push({
+                timeLabel: format(new Date(game.startTime), 'p'),
+                profitLoss: 0
+            });
+        }
+
         // Use progress log if available
         if (game.progressLog && game.progressLog.length > 0) {
             game.progressLog.forEach(log => {
@@ -181,7 +189,7 @@ const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> =
         
         return uniqueDataPoints;
 
-    }, [player.id, player.profitLoss, game.progressLog, game.endTime]);
+    }, [player.id, player.profitLoss, game.progressLog, game.startTime, game.endTime]);
 
     if (timelineData.length < 2) {
         return <p className="text-sm text-muted-foreground text-center py-4">Not enough saved progress data for a timeline.</p>;
