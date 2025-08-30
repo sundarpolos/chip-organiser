@@ -471,10 +471,14 @@ const CreateEditClubDialog: FC<{
     const [clubName, setClubName] = useState('');
     const [adminId, setAdminId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
+    const [deckChangeIntervalHours, setDeckChangeIntervalHours] = useState(2);
 
     useEffect(() => {
         if (clubToEdit) {
             setClubName(clubToEdit.name);
+            setWhatsappConfig(clubToEdit.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
+            setDeckChangeIntervalHours(clubToEdit.deckChangeIntervalHours || 2);
             const clubAdmin = players.find(p => p.clubId === clubToEdit.id && p.isAdmin);
             if (clubAdmin) {
                 setAdminId(clubAdmin.id);
@@ -482,6 +486,8 @@ const CreateEditClubDialog: FC<{
         } else {
             setClubName('');
             setAdminId('');
+            setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '' });
+            setDeckChangeIntervalHours(2);
         }
     }, [clubToEdit, players]);
     
@@ -496,7 +502,7 @@ const CreateEditClubDialog: FC<{
         setIsSaving(true);
         try {
             if (clubToEdit) { // Editing existing club
-                const updatedClubData: Club = { ...clubToEdit, name: clubName };
+                const updatedClubData: Club = { ...clubToEdit, name: clubName, whatsappConfig, deckChangeIntervalHours };
                 const savedClub = await updateClub(updatedClubData);
                 toast({ title: 'Club Updated', description: `"${clubName}" has been updated.`});
                 onSave(savedClub);
@@ -509,6 +515,8 @@ const CreateEditClubDialog: FC<{
                 const newClubPayload: Omit<Club, 'id'> = {
                     name: clubName,
                     ownerId: currentUser.id,
+                    whatsappConfig,
+                    deckChangeIntervalHours,
                 };
                 const newClub = await createClub(newClubPayload);
                 
@@ -532,14 +540,14 @@ const CreateEditClubDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{clubToEdit ? 'Edit Club' : 'Create New Club'}</DialogTitle>
                     <DialogDescription>
-                        {clubToEdit ? 'Update the details for this club.' : 'Enter a name for the new club and assign an admin.'}
+                        {clubToEdit ? 'Update the details and settings for this club.' : 'Enter a name for the new club, assign an admin, and configure settings.'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div className="space-y-2">
                         <Label htmlFor="club-name">Club Name</Label>
                         <Input id="club-name" value={clubName} onChange={e => setClubName(e.target.value)} />
@@ -559,6 +567,36 @@ const CreateEditClubDialog: FC<{
                             </Select>
                         </div>
                     )}
+
+                    <Accordion type="multiple" className="w-full">
+                        <AccordionItem value="game-settings">
+                            <AccordionTrigger>Game Settings</AccordionTrigger>
+                            <AccordionContent className="pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="deck-interval">Deck Change Interval (hours)</Label>
+                                    <Input id="deck-interval" type="number" min="0.5" step="0.5" value={deckChangeIntervalHours} onChange={e => setDeckChangeIntervalHours(Number(e.target.value))} />
+                                    <p className="text-xs text-muted-foreground">Set to 0 to disable the reminder.</p>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="whatsapp-api">
+                            <AccordionTrigger>WhatsApp API Settings</AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-api-url">API URL</Label>
+                                    <Input id="wa-api-url" value={whatsappConfig.apiUrl} onChange={e => setWhatsappConfig(c => ({...c, apiUrl: e.target.value}))} placeholder="e.g., https://api.provider.com/send" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-api-token">API Token</Label>
+                                    <Input id="wa-api-token" value={whatsappConfig.apiToken} onChange={e => setWhatsappConfig(c => ({...c, apiToken: e.target.value}))} placeholder="Your API token" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-sender-mobile">Sender Mobile</Label>
+                                    <Input id="wa-sender-mobile" value={whatsappConfig.senderMobile} onChange={e => setWhatsappConfig(c => ({...c, senderMobile: e.target.value}))} placeholder="e.g., 14155552671" />
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
@@ -571,87 +609,6 @@ const CreateEditClubDialog: FC<{
         </Dialog>
     )
 };
-
-const AppSettings: FC<{
-    activeClub: Club | null;
-    onSettingsSave: (club: Club) => Promise<void>;
-    toast: ReturnType<typeof useToast>['toast'];
-}> = ({ activeClub, onSettingsSave, toast }) => {
-    const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
-    const [deckChangeIntervalHours, setDeckChangeIntervalHours] = useState(2);
-    const [isSaving, setIsSaving] = useState(false);
-
-    useEffect(() => {
-        if (activeClub) {
-            setWhatsappConfig(activeClub.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
-            setDeckChangeIntervalHours(activeClub.deckChangeIntervalHours || 2);
-        }
-    }, [activeClub]);
-
-    const handleSave = async () => {
-        if (!activeClub) return;
-        setIsSaving(true);
-        try {
-            const updatedClub = { ...activeClub, whatsappConfig, deckChangeIntervalHours };
-            await onSettingsSave(updatedClub);
-            toast({ title: 'Settings Saved', description: `Settings for ${activeClub.name} have been updated.` });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Could not save settings.';
-            toast({ variant: 'destructive', title: 'Error', description: errorMessage });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    
-    if (!activeClub) return null;
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>App Settings for {activeClub.name}</CardTitle>
-                <CardDescription>Configure application-wide settings for the currently selected club.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <Accordion type="multiple" className="w-full">
-                     <AccordionItem value="app-settings">
-                        <AccordionTrigger>Game Settings</AccordionTrigger>
-                        <AccordionContent className="pt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="deck-interval">Deck Change Interval (hours)</Label>
-                                <Input id="deck-interval" type="number" min="0.5" step="0.5" value={deckChangeIntervalHours} onChange={e => setDeckChangeIntervalHours(Number(e.target.value))} />
-                                <p className="text-xs text-muted-foreground">Set to 0 to disable the reminder.</p>
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                    <AccordionItem value="whatsapp-api">
-                        <AccordionTrigger>WhatsApp API Settings</AccordionTrigger>
-                        <AccordionContent className="space-y-4 pt-4">
-                             <div className="space-y-2">
-                                <Label htmlFor="wa-api-url">API URL</Label>
-                                <Input id="wa-api-url" value={whatsappConfig.apiUrl} onChange={e => setWhatsappConfig(c => ({...c, apiUrl: e.target.value}))} placeholder="e.g., https://api.provider.com/send" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="wa-api-token">API Token</Label>
-                                <Input id="wa-api-token" value={whatsappConfig.apiToken} onChange={e => setWhatsappConfig(c => ({...c, apiToken: e.target.value}))} placeholder="Your API token" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="wa-sender-mobile">Sender Mobile</Label>
-                                <Input id="wa-sender-mobile" value={whatsappConfig.senderMobile} onChange={e => setWhatsappConfig(c => ({...c, senderMobile: e.target.value}))} placeholder="e.g., 14155552671" />
-                            </div>
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-            </CardContent>
-            <CardContent>
-                <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
-                    Save App Settings
-                </Button>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 const PlayerManagement: FC<{
     players: MasterPlayer[];
@@ -1284,12 +1241,6 @@ export default function SettingsPage() {
       if (activeClub) return clubs.filter(c => c.id === activeClub.id);
       return [];
   }, [clubs, isSuperAdmin, activeClub]);
-  
-  const handleSettingsSave = async (updatedClub: Club) => {
-    const savedClub = await updateClub(updatedClub);
-    setActiveClub(savedClub);
-    setClubs(prev => prev.map(c => c.id === savedClub.id ? savedClub : c));
-  };
 
 
   if (isLoading || !currentUser) {
@@ -1320,13 +1271,6 @@ export default function SettingsPage() {
             toast={toast} 
             currentUser={currentUser} 
         />
-       )}
-       {currentUser.isAdmin && activeClub && (
-         <AppSettings 
-            activeClub={activeClub}
-            onSettingsSave={handleSettingsSave}
-            toast={toast}
-         />
        )}
        {(currentUser.isAdmin || isSuperAdmin) && (
          <PlayerManagement 

@@ -101,7 +101,7 @@ import {
   StopCircle,
 } from "lucide-react"
 import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
+import "jspdf-autotable"
 import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
