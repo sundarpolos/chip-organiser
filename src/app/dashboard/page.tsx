@@ -3166,9 +3166,9 @@ const SettlementDialog: FC<{
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
 
-    const playersWithNumbers = useMemo(() => {
+    const allPlayersInGame = useMemo(() => {
         if (!activeGame) return [];
-        return activeGame.players.filter(p => p.whatsappNumber);
+        return activeGame.players.sort((a, b) => a.name.localeCompare(b.name));
     }, [activeGame]);
     
     const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
@@ -3190,12 +3190,13 @@ const SettlementDialog: FC<{
 
     useEffect(() => {
         if (isOpen) {
-            setSelectedPlayerIds(playersWithNumbers.map(p => p.id));
+            // Select only players with WhatsApp numbers by default
+            setSelectedPlayerIds(allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id));
             setIsSending(false);
             setSendingStatus(null);
             setProgress(0);
         }
-    }, [isOpen, playersWithNumbers]);
+    }, [isOpen, allPlayersInGame]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3204,7 +3205,7 @@ const SettlementDialog: FC<{
     };
 
     const handleSelectAll = (isChecked: boolean) => {
-        setSelectedPlayerIds(isChecked ? playersWithNumbers.map(p => p.id) : []);
+        setSelectedPlayerIds(isChecked ? allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id) : []);
     };
     
     const formatTransfersForWhatsapp = (game: GameHistory, transfers: string[]): string => {
@@ -3233,7 +3234,7 @@ ${formattedTransfers}
 
         setIsSending(true);
         setProgress(0);
-        const playersToSend = playersWithNumbers.filter(p => selectedPlayerIds.includes(p.id));
+        const playersToSend = allPlayersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
         const message = formatTransfersForWhatsapp(activeGame, transfers);
         
         const totalToSend = playersToSend.length;
@@ -3298,26 +3299,29 @@ ${formattedTransfers}
                             <Checkbox
                                 id="settlement-select-all"
                                 onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                                checked={playersWithNumbers.length > 0 && selectedPlayerIds.length === playersWithNumbers.length}
-                                disabled={playersWithNumbers.length === 0 || isSending}
+                                checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
+                                disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
                             />
                             <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
                         </div>
                         <ScrollArea className="h-40 border rounded-md p-2">
-                            {playersWithNumbers.length > 0 ? (
-                                playersWithNumbers.map(player => (
+                             {allPlayersInGame.length > 0 ? (
+                                allPlayersInGame.map(player => (
                                     <div key={player.id} className="flex items-center space-x-2 p-1">
                                         <Checkbox 
                                             id={`settle-${player.id}`} 
                                             onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
                                             checked={selectedPlayerIds.includes(player.id)}
-                                            disabled={isSending}
+                                            disabled={isSending || !player.whatsappNumber}
                                         />
-                                        <Label htmlFor={`settle-${player.id}`} className="flex-1">{player.name} ({player.whatsappNumber})</Label>
+                                        <Label htmlFor={`settle-${player.id}`} className={cn("flex-1", !player.whatsappNumber && "text-muted-foreground")}>
+                                            {player.name}
+                                            {!player.whatsappNumber && <span className="text-xs"> (No number)</span>}
+                                        </Label>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers found in this game.</p>
+                                <p className="text-sm text-muted-foreground text-center p-4">No players in this game.</p>
                             )}
                         </ScrollArea>
                     </div>
