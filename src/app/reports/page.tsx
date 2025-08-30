@@ -1,10 +1,11 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { getGameHistory } from '@/services/game-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
-import type { GameHistory, MasterPlayer, MasterVenue } from '@/lib/types';
+import type { GameHistory, MasterPlayer, MasterVenue, GameProgressLog, PlayerProgress } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart, Rows, Columns } from 'lucide-react';
+import { Loader2, CalendarIcon, Filter, FileDown, AreaChart, BarChart2, PieChartIcon, ScatterChartIcon, GanttChart, User, ChevronDown, ChevronRight, BarChart, Rows, Columns, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths, startOfToday, endOfYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
@@ -46,6 +47,95 @@ type ChartVisibilityState = {
 const COLORS = ["#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#3b82f6", "#ec4899"];
 const customTicks = [5000, 10000, 25000, 50000, 100000];
 const tickFormatter = (value: number) => `₹${value / 1000}k`;
+
+const GameTimeline: FC<{ game: GameHistory }> = ({ game }) => {
+    const timelineEvents = useMemo(() => {
+        type TimelineEvent = {
+            timestamp: string;
+            type: 'Buy-in' | 'Progress Save';
+            player: string;
+            details: string;
+            profitLoss?: number;
+            previousProfitLoss?: number;
+        };
+        
+        const events: TimelineEvent[] = [];
+        
+        // Process buy-ins
+        (game.players || []).forEach(player => {
+            (player.buyIns || []).forEach(buyIn => {
+                events.push({
+                    timestamp: buyIn.timestamp,
+                    type: 'Buy-in',
+                    player: player.name,
+                    details: `Bought in for ₹${buyIn.amount}`
+                });
+            });
+        });
+
+        // Process progress logs
+        const playerLastProfitLoss = new Map<string, number>();
+        (game.progressLog || []).forEach(log => {
+            log.playerStats.forEach(stat => {
+                const previousProfitLoss = playerLastProfitLoss.get(stat.playerId);
+                events.push({
+                    timestamp: log.timestamp,
+                    type: 'Progress Save',
+                    player: stat.name,
+                    details: `P/L: ₹${stat.profitLoss.toFixed(0)}`,
+                    profitLoss: stat.profitLoss,
+                    previousProfitLoss: previousProfitLoss
+                });
+                playerLastProfitLoss.set(stat.playerId, stat.profitLoss);
+            });
+        });
+        
+        return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    }, [game]);
+    
+    const renderStatus = (event: (typeof timelineEvents)[0]) => {
+        if (event.type !== 'Progress Save' || typeof event.previousProfitLoss === 'undefined') {
+            return <Minus className="h-4 w-4 text-muted-foreground" />;
+        }
+        if (event.profitLoss! > event.previousProfitLoss) {
+            return <ArrowUp className="h-4 w-4 text-green-500" />;
+        }
+        if (event.profitLoss! < event.previousProfitLoss) {
+            return <ArrowDown className="h-4 w-4 text-red-500" />;
+        }
+        return <Minus className="h-4 w-4 text-muted-foreground" />;
+    };
+
+    if (timelineEvents.length === 0) {
+        return <p className="text-center text-muted-foreground py-4">No buy-ins or saved progress for this game.</p>
+    }
+
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Player</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Status</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {timelineEvents.map((event, index) => (
+                    <TableRow key={index}>
+                        <TableCell className="text-muted-foreground">{format(new Date(event.timestamp), 'p')}</TableCell>
+                        <TableCell className="font-medium">{event.player}</TableCell>
+                        <TableCell>{event.type}</TableCell>
+                        <TableCell>{event.details}</TableCell>
+                        <TableCell className="flex justify-center">{renderStatus(event)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
 
 
 export default function GameHistoryPage() {
@@ -166,7 +256,8 @@ export default function GameHistoryPage() {
                         name: p.name,
                         buyIn: buyIn,
                         finalChips: finalChips,
-                        profitLoss: finalChips - buyIn
+                        profitLoss: finalChips - buyIn,
+                        buyIns: p.buyIns, // Keep original buy-ins
                     }
                 });
                 
@@ -182,9 +273,10 @@ export default function GameHistoryPage() {
                 totalChipReturn,
                 profitLoss: totalChipReturn - totalBuyIn,
                 players: gamePlayers,
+                progressLog: game.progressLog, // Keep progress log
             }
         })
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
   
   const playerReportData = useMemo<PlayerReportRow[]>(() => {
@@ -353,11 +445,25 @@ export default function GameHistoryPage() {
                 <CardContent>
                     <PlayerReportTable
                         playerReportData={playerReportData}
-                        filteredGames={filteredGames}
+                        filteredGames={filteredGames as any}
                         isAdmin={isAdmin}
                     />
                 </CardContent>
             </Card>
+            
+            {filteredGames.length > 0 && isAdmin && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Game Timeline</CardTitle>
+                        <CardDescription>
+                            A chronological log of all buy-ins and saved progress for the top game in your filtered results.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <GameTimeline game={filteredGames[0] as any} />
+                    </CardContent>
+                </Card>
+            )}
 
             <Card>
                 <CardHeader>
@@ -545,7 +651,7 @@ const MultiSelectPopover: FC<{
 
 const PlayerReportTable: FC<{
     playerReportData: PlayerReportRow[],
-    filteredGames: any[],
+    filteredGames: GameHistory[],
     isAdmin: boolean
 }> = ({ playerReportData, filteredGames, isAdmin }) => {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -575,12 +681,14 @@ const PlayerReportTable: FC<{
             .map(game => {
                 const playerInGame = (game.players || []).find((p: any) => p.name === playerName);
                 if (playerInGame) {
+                    const buyIn = (playerInGame.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? (bi.amount || 0) : 0), 0);
+                    const finalChips = playerInGame.finalChips || 0;
                     return {
-                        date: game.date,
+                        date: format(new Date(game.timestamp), 'dd MMM yyyy'),
                         venue: game.venue,
-                        buyIn: playerInGame.buyIn || 0,
-                        chipReturn: playerInGame.finalChips || 0,
-                        profitLoss: playerInGame.profitLoss || 0,
+                        buyIn: buyIn,
+                        chipReturn: finalChips,
+                        profitLoss: finalChips - buyIn,
                     };
                 }
                 return null;
