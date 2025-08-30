@@ -1652,6 +1652,7 @@ function DashboardContent() {
         activeGame={activeGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
+        masterPlayers={masterPlayers}
       />
       <BuyInRequestModalDialog
         request={buyInRequestModal}
@@ -3160,7 +3161,8 @@ const SettlementDialog: FC<{
     activeGame: GameHistory | null,
     whatsappConfig: WhatsappConfig,
     toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-}> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast }) => {
+    masterPlayers: MasterPlayer[],
+}> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
@@ -3168,8 +3170,15 @@ const SettlementDialog: FC<{
 
     const allPlayersInGame = useMemo(() => {
         if (!activeGame) return [];
-        return activeGame.players.sort((a, b) => a.name.localeCompare(b.name));
-    }, [activeGame]);
+        // Enhance game players with the latest master player data
+        return activeGame.players.map(p => {
+            const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+            return {
+                ...p,
+                whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
+            }
+        }).sort((a, b) => a.name.localeCompare(b.name));
+    }, [activeGame, masterPlayers]);
     
     const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
         if (!activeGame || !activeGame.players) return [];
