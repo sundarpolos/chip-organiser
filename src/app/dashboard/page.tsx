@@ -487,7 +487,7 @@ const AdminView: FC<{
                 </CardFooter>
             </Card>
 
-            <Accordion type="multiple" defaultValue={['summary']} className="w-full space-y-4">
+            <Accordion type="multiple" defaultValue={['summary', 'performance-chart']} className="w-full space-y-4">
                 <Card>
                     <AccordionItem value="summary" className="border-b-0">
                         <AccordionTrigger className="p-4">
@@ -520,27 +520,22 @@ const AdminView: FC<{
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
-
-                <Card>
-                    <AccordionItem value="timeline" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Player Timeline Analysis
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                            <Accordion type="multiple" className="w-full">
-                                {calculatedPlayers.map(player => (
-                                    <AccordionItem key={player.id} value={player.id}>
-                                        <AccordionTrigger>{player.name}</AccordionTrigger>
-                                        <AccordionContent>
-                                            <PlayerTimelineTable player={player} game={activeGame} />
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
             </Accordion>
+             <Card>
+                <CardHeader>
+                    <CardTitle>Player Timeline Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {calculatedPlayers.map(player => (
+                            <div key={player.id}>
+                                <h4 className="font-semibold mb-2 text-lg border-b pb-2">{player.name}</h4>
+                                <PlayerTimelineTable player={player} game={activeGame} />
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };
