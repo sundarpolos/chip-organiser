@@ -488,7 +488,7 @@ const AdminView: FC<{
                 </CardFooter>
             </Card>
 
-            <Accordion type="multiple" defaultValue={['summary', 'performance-chart']} className="w-full space-y-4">
+            <Accordion type="multiple" defaultValue={['summary']} className="w-full space-y-4">
                 <Card>
                     <AccordionItem value="summary" className="border-b-0">
                         <AccordionTrigger className="p-4">
@@ -507,17 +507,6 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
-
-                <Card>
-                    <AccordionItem value="performance-chart" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                           Overall Player Performance
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                           <OverallPerformanceChart calculatedPlayers={calculatedPlayers} />
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
@@ -2504,61 +2493,43 @@ const ReportsDialog: FC<{
 
 
     const handleExportPdf = async () => {
-        if (!activeGame || !reportContentRef.current) return;
-        setIsExporting(true);
-
-        const venueName = activeGame.venue.replace(/\s/g, '_');
-        const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
-        const filename = `${venueName}_${gameDate}.pdf`;
-
-        const doc = new jsPDF();
-        
-        // Title
-        doc.setFontSize(18);
-        doc.text(`Game Report: ${activeGame.venue}`, 14, 22);
-        doc.setFontSize(12);
-        doc.text(format(new Date(activeGame.timestamp), "dd MMMM yyyy"), 14, 30);
-
-        // Summary Table
-        (doc as any).autoTable({
-            startY: 40,
-            head: [['Player', 'Buy-in', 'Return', 'P/L']],
-            body: sortedStandings.map(p => [
-                p.name,
-                `Rs ${p.totalBuyIns}`,
-                `Rs ${p.finalChips}`,
-                `Rs ${p.profitLoss.toFixed(0)}`
-            ]),
-            foot: [[
-                'Totals',
-                `Rs ${grandTotalBuyin}`,
-                `Rs ${grandTotalChips}`,
-                `Rs ${grandTotalProfitLoss.toFixed(0)}`
-            ]],
-            headStyles: { fillColor: [79, 70, 229] },
-            footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: 'bold' }
-        });
-
-        const chartElement = reportContentRef.current.querySelector('#chart-container-for-pdf');
-        if (chartElement) {
-            try {
-                const canvas = await html2canvas(chartElement as HTMLElement, { scale: 2 });
-                const imgData = canvas.toDataURL('image/png');
-                const imgProps = doc.getImageProperties(imgData);
-                const pdfWidth = doc.internal.pageSize.getWidth();
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                doc.addPage();
-                doc.text("Final Chip Distribution", 14, 22);
-                doc.addImage(imgData, 'PNG', 14, 30, pdfWidth - 28, pdfHeight);
-            } catch (error) {
-                console.error("Could not render chart to PDF:", error);
-                toast({ variant: "destructive", title: "Chart Export Failed", description: "Failed to include the chart in the PDF." });
-            }
+        const reportElement = reportContentRef.current;
+        if (!activeGame || !reportElement) {
+            toast({ variant: "destructive", title: "Export Error", description: "Report content is not available to export." });
+            return;
         }
 
-        doc.save(filename);
-        setIsExporting(false);
-        toast({ title: "Success", description: "Report has been exported as a PDF." });
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(reportElement, {
+                scale: 2, // Higher resolution
+                useCORS: true,
+                backgroundColor: null, // Transparent background for theme compatibility
+            });
+
+            // Compress image to JPEG
+            const imgData = canvas.toDataURL('image/jpeg', 0.8); // 80% quality
+
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+
+            const venueName = activeGame.venue.replace(/\s/g, '_');
+            const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
+            const filename = `${venueName}_${gameDate}_Report.pdf`;
+
+            pdf.save(filename);
+            toast({ title: "Success", description: "Report has been exported as a PDF." });
+        } catch (error) {
+            console.error("Could not export PDF:", error);
+            toast({ variant: "destructive", title: "Export Failed", description: "An error occurred while generating the PDF." });
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
