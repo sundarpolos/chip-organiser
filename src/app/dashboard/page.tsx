@@ -488,7 +488,7 @@ const AdminView: FC<{
                 </CardFooter>
             </Card>
 
-            <Accordion type="multiple" defaultValue={['summary']} className="w-full space-y-4">
+            <Accordion type="single" collapsible defaultValue="summary" className="w-full space-y-4">
                 <Card>
                     <AccordionItem value="summary" className="border-b-0">
                         <AccordionTrigger className="p-4">
@@ -499,33 +499,7 @@ const AdminView: FC<{
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
-
-                <Card>
-                    <AccordionItem value="transfers" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Money Transfers
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                            <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
             </Accordion>
-             <Card>
-                <CardHeader>
-                    <CardTitle>Player Timeline Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {calculatedPlayers.map(player => (
-                            <div key={player.id}>
-                                <h4 className="font-semibold mb-2 text-lg border-b pb-2">{player.name}</h4>
-                                <PlayerTimelineTable player={player} game={activeGame} />
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
         </div>
     );
 };
@@ -2502,14 +2476,14 @@ const ReportsDialog: FC<{
         setIsExporting(true);
         try {
             const canvas = await html2canvas(reportElement, {
-                scale: 2, // Higher resolution
+                scale: 2, // Higher scale for better quality before compression
                 useCORS: true,
-                backgroundColor: null, // Transparent background for theme compatibility
+                backgroundColor: null, // Use transparent background for dark mode compatibility
             });
-
-            // Compress image to JPEG
-            const imgData = canvas.toDataURL('image/jpeg', 0.8); // 80% quality
-
+            
+            // Compress the image by using JPEG format with a quality setting
+            const imgData = canvas.toDataURL('image/jpeg', 0.7); // Quality 0.7 for good compression
+            
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'px',
@@ -2517,7 +2491,7 @@ const ReportsDialog: FC<{
             });
 
             pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-
+            
             const venueName = activeGame.venue.replace(/\s/g, '_');
             const gameDate = format(new Date(activeGame.timestamp), "yyyy-MM-dd");
             const filename = `${venueName}_${gameDate}_Report.pdf`;
@@ -2601,6 +2575,15 @@ const ReportsDialog: FC<{
                                         </TableRow>
                                     </TableFoot>
                                 </Table>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Money Transfers</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <SettlementPreview calculatedPlayers={calculatedPlayers} />
                             </CardContent>
                         </Card>
 
