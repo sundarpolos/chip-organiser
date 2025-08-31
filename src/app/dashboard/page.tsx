@@ -154,58 +154,110 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
-const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
-    const timelineData = useMemo(() => {
-        const dataPoints: {
-            timeLabel: string;
+const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
+    const timelineEvents = useMemo(() => {
+        type TimelineEvent = {
+            timestamp: string;
+            type: 'Buy-in' | 'Progress Save';
+            details: string;
             totalBuyIn: number;
             chipReturn: number;
             profitLoss: number;
-        }[] = [];
+            previousProfitLoss?: number;
+        };
 
-        if (game.progressLog && game.progressLog.length > 0) {
-            game.progressLog.forEach(log => {
+        const events: TimelineEvent[] = [];
+        let runningTotalBuyIn = 0;
+        let lastProfitLoss: number | undefined = undefined;
+
+        // Process buy-ins
+        (player.buyIns || [])
+            .filter(b => b.status === 'verified')
+            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            .forEach(buyIn => {
+                runningTotalBuyIn += buyIn.amount;
+                events.push({
+                    timestamp: buyIn.timestamp,
+                    type: 'Buy-in',
+                    details: `₹${buyIn.amount}`,
+                    totalBuyIn: runningTotalBuyIn,
+                    chipReturn: 0, // Not relevant for a buy-in event
+                    profitLoss: 0, // P/L is only meaningful at progress points
+                });
+            });
+
+        // Process progress logs
+        (game.progressLog || [])
+            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+            .forEach(log => {
                 const playerStat = log.playerStats.find(p => p.playerId === player.id);
                 if (playerStat) {
-                    dataPoints.push({
-                        timeLabel: format(new Date(log.timestamp), 'p'),
+                    events.push({
+                        timestamp: log.timestamp,
+                        type: 'Progress Save',
+                        details: '',
                         totalBuyIn: playerStat.totalBuyIns,
                         chipReturn: playerStat.finalChips,
                         profitLoss: playerStat.profitLoss,
+                        previousProfitLoss: lastProfitLoss,
                     });
+                    lastProfitLoss = playerStat.profitLoss;
                 }
             });
+
+        return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    }, [player, game.progressLog]);
+
+    const renderStatus = (event: (typeof timelineEvents)[0]) => {
+        if (event.type !== 'Progress Save' || typeof event.previousProfitLoss === 'undefined' || event.previousProfitLoss === null) {
+            return <Minus className="h-4 w-4 text-muted-foreground" />;
         }
-        
-        // Remove duplicate timestamps, keeping the last entry
-        return Array.from(new Map(dataPoints.map(item => [item.timeLabel, item])).values());
+        if (event.profitLoss > event.previousProfitLoss) {
+            return <ArrowUp className="h-4 w-4 text-green-500" />;
+        }
+        if (event.profitLoss < event.previousProfitLoss) {
+            return <ArrowDown className="h-4 w-4 text-red-500" />;
+        }
+        return <Minus className="h-4 w-4 text-muted-foreground" />;
+    };
 
-    }, [player.id, game.progressLog]);
-
-    if (timelineData.length === 0) {
-        return <p className="text-sm text-muted-foreground text-center py-4">Not enough saved progress data for a timeline.</p>;
+    if (timelineEvents.length === 0) {
+        return <p className="text-sm text-muted-foreground text-center py-4">No buy-ins or saved progress to display.</p>;
     }
 
     return (
-        <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={timelineData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="timeLabel" angle={-45} textAnchor="end" height={60} interval="preserveStartEnd" />
-                    <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
-                    <RechartsTooltip
-                        formatter={(value, name) => [`₹${value.toFixed(0)}`, name]}
-                        labelFormatter={(label) => `Time: ${label}`}
-                    />
-                    <Legend />
-                    <Bar dataKey="totalBuyIn" name="Total Buy-in" fill="#8884d8" />
-                    <Bar dataKey="chipReturn" name="Final Chip Return" fill="#82ca9d" />
-                    <Bar dataKey="profitLoss" name="Profit/Loss" fill="#ffc658" />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead className="text-right">Total Buy-in</TableHead>
+                    <TableHead className="text-right">Chip Return</TableHead>
+                    <TableHead className="text-right">P/L</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {timelineEvents.map((event, index) => (
+                    <TableRow key={index} className="text-xs">
+                        <TableCell>{format(new Date(event.timestamp), 'p')}</TableCell>
+                        <TableCell>{event.type}</TableCell>
+                        <TableCell>{event.details}</TableCell>
+                        <TableCell className="text-right">₹{event.totalBuyIn.toFixed(0)}</TableCell>
+                        <TableCell className="text-right">{event.type === 'Progress Save' ? `₹${event.chipReturn.toFixed(0)}` : '-'}</TableCell>
+                        <TableCell className={cn("text-right font-semibold", event.type === 'Progress Save' ? (event.profitLoss >= 0 ? 'text-green-600' : 'text-red-600') : '')}>
+                            {event.type === 'Progress Save' ? `₹${event.profitLoss.toFixed(0)}` : '-'}
+                        </TableCell>
+                        <TableCell className="flex justify-center items-center h-full">{renderStatus(event)}</TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
     );
 };
+
 
 const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
     const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
@@ -458,7 +510,7 @@ const AdminView: FC<{
                                     <AccordionItem key={player.id} value={player.id}>
                                         <AccordionTrigger>{player.name}</AccordionTrigger>
                                         <AccordionContent>
-                                            <PlayerTimelineChart player={player} game={activeGame} />
+                                            <PlayerTimelineTable player={player} game={activeGame} />
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}
@@ -2618,7 +2670,7 @@ const ReportsDialog: FC<{
                                         <AccordionItem key={player.id} value={player.id}>
                                             <AccordionTrigger>{player.name}</AccordionTrigger>
                                             <AccordionContent>
-                                                <PlayerTimelineChart player={player} game={activeGame} />
+                                                <PlayerTimelineTable player={player} game={activeGame} />
                                             </AccordionContent>
                                         </AccordionItem>
                                     ))}
