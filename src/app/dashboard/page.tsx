@@ -105,6 +105,7 @@ import {
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
+import html2canvas from 'html2canvas';
 import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
