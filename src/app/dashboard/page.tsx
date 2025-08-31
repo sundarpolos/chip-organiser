@@ -3123,10 +3123,12 @@ const SettlementDialog: FC<{
     const [isSending, setIsSending] = useState(false);
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
+    const [includeSummary, setIncludeSummary] = useState(false);
+    const [includeTimeline, setIncludeTimeline] = useState(false);
+    const [messagePreview, setMessagePreview] = useState("");
 
     const allPlayersInGame = useMemo(() => {
         if (!activeGame) return [];
-        // Enhance game players with the latest master player data
         return activeGame.players.map(p => {
             const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
             return {
@@ -3145,7 +3147,7 @@ const SettlementDialog: FC<{
                 totalBuyIns,
                 profitLoss: p.finalChips - totalBuyIns,
             }
-        });
+        }).sort((a,b) => b.profitLoss - a.profitLoss);
     }, [activeGame]);
 
     const transfers = useMemo(() => {
@@ -3153,15 +3155,80 @@ const SettlementDialog: FC<{
         return calculateInterPlayerTransfers(calculatedPlayers);
     }, [calculatedPlayers]);
 
+    const formatWhatsappMessage = useCallback(() => {
+        if (!activeGame) return "";
+    
+        let message = `*Venue:* ${activeGame.venue}\n`;
+        message += `*Date:* ${format(new Date(activeGame.timestamp), "dd MMMM yyyy")}\n\n`;
+    
+        // Transfers (always included)
+        if (transfers.length > 0) {
+            const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
+            message += `\`\`\`
+-----------------------
+|  Payment Transfers  |
+-----------------------
+${formattedTransfers}
+\`\`\`\n\n`;
+        } else {
+            message += "No transfers needed. Everyone is settled up!\n\n";
+        }
+    
+        // Player Summary
+        if (includeSummary) {
+            let summary = '```\n-----------------------\n|   Player Summary    |\n-----------------------\n';
+            summary += 'Player      | Buy-in | Return | P/L\n';
+            summary += '------------------------------------\n';
+            calculatedPlayers.forEach(p => {
+                const name = p.name.padEnd(12);
+                const buyin = `₹${p.totalBuyIns}`.padStart(7);
+                const ret = `₹${p.finalChips}`.padStart(7);
+                const pl = `₹${p.profitLoss.toFixed(0)}`.padStart(7);
+                summary += `${name}|${buyin} |${ret} |${pl}\n`;
+            });
+            summary += '```\n\n';
+            message += summary;
+        }
+    
+        // Player Timeline
+        if (includeTimeline) {
+            message += '*Player Timelines:*\n';
+            calculatedPlayers.forEach(player => {
+                message += `\n*${player.name}*\n`;
+                const events = (activeGame.progressLog || [])
+                    .map(log => log.playerStats.find(p => p.playerId === player.id))
+                    .filter(Boolean);
+    
+                if (events.length > 0) {
+                    events.forEach((stat, index) => {
+                        if (stat) {
+                            const time = format(new Date((activeGame.progressLog || [])[index].timestamp), 'p');
+                            message += `  - ${time}: P/L ₹${stat.profitLoss.toFixed(0)}\n`;
+                        }
+                    });
+                } else {
+                    message += '  - No saved progress.\n';
+                }
+            });
+        }
+    
+        return message;
+    }, [activeGame, transfers, includeSummary, includeTimeline, calculatedPlayers]);
+
     useEffect(() => {
         if (isOpen) {
-            // Select only players with WhatsApp numbers by default
             setSelectedPlayerIds(allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id));
             setIsSending(false);
             setSendingStatus(null);
             setProgress(0);
+            setIncludeSummary(false);
+            setIncludeTimeline(false);
         }
     }, [isOpen, allPlayersInGame]);
+    
+    useEffect(() => {
+        setMessagePreview(formatWhatsappMessage());
+    }, [includeSummary, includeTimeline, formatWhatsappMessage]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3171,24 +3238,6 @@ const SettlementDialog: FC<{
 
     const handleSelectAll = (isChecked: boolean) => {
         setSelectedPlayerIds(isChecked ? allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id) : []);
-    };
-    
-    const formatTransfersForWhatsapp = (game: GameHistory, transfers: string[]): string => {
-        const venueLine = `*Venue:* ${game.venue}`;
-        const dateLine = `*Date:* ${format(new Date(game.timestamp), "dd MMMM yyyy")}`;
-        
-        if (transfers.length === 0) {
-            return `${venueLine}\n${dateLine}\n\nNo transfers needed. Everyone is settled up!`;
-        }
-        
-        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
-
-        return `${venueLine}\n${dateLine}\n\n\`\`\`
------------------------
-|  Payment Transfers  |
------------------------
-${formattedTransfers}
-\`\`\``;
     };
 
     const handleSend = async () => {
@@ -3200,7 +3249,7 @@ ${formattedTransfers}
         setIsSending(true);
         setProgress(0);
         const playersToSend = allPlayersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
-        const message = formatTransfersForWhatsapp(activeGame, transfers);
+        const message = formatWhatsappMessage();
         
         const totalToSend = playersToSend.length;
         let successfulSends = 0;
@@ -3230,7 +3279,6 @@ ${formattedTransfers}
             
             setProgress(((i + 1) / totalToSend) * 100);
 
-            // Wait for 10 seconds before sending the next message, unless it's the last one
             if (i < totalToSend - 1) {
                 await new Promise(resolve => setTimeout(resolve, 10000));
             }
@@ -3253,54 +3301,78 @@ ${formattedTransfers}
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Send Settlement Details</DialogTitle>
-                    <DialogDescription>Select players to notify via WhatsApp. A 10s delay will be applied between messages.</DialogDescription>
+                    <DialogDescription>Select players and content to include in the WhatsApp message. A 10s delay will be applied between messages.</DialogDescription>
                 </DialogHeader>
-                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        <div className="flex items-center space-x-2 border-b pb-2">
-                            <Checkbox
-                                id="settlement-select-all"
-                                onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                                checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
-                                disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
-                            />
-                            <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
+                     {/* Left Column: Options & Recipients */}
+                    <div className="space-y-4 flex flex-col">
+                        <div className="space-y-2">
+                             <Label>Recipients</Label>
+                             <div className="flex items-center space-x-2 border-b pb-2">
+                                <Checkbox
+                                    id="settlement-select-all"
+                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                    checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
+                                    disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
+                                />
+                                <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
+                            </div>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                {allPlayersInGame.length > 0 ? (
+                                    allPlayersInGame.map(player => (
+                                        <div key={player.id} className="flex items-center space-x-2 p-1">
+                                            <Checkbox 
+                                                id={`settle-${player.id}`} 
+                                                onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                                checked={selectedPlayerIds.includes(player.id)}
+                                                disabled={isSending || !player.whatsappNumber}
+                                            />
+                                            <Label htmlFor={`settle-${player.id}`} className={cn("flex-1", !player.whatsappNumber && "text-muted-foreground")}>
+                                                {player.name}
+                                                {!player.whatsappNumber && <span className="text-xs"> (No number)</span>}
+                                            </Label>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center p-4">No players in this game.</p>
+                                )}
+                            </ScrollArea>
                         </div>
-                        <ScrollArea className="h-40 border rounded-md p-2">
-                             {allPlayersInGame.length > 0 ? (
-                                allPlayersInGame.map(player => (
-                                    <div key={player.id} className="flex items-center space-x-2 p-1">
-                                        <Checkbox 
-                                            id={`settle-${player.id}`} 
-                                            onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
-                                            checked={selectedPlayerIds.includes(player.id)}
-                                            disabled={isSending || !player.whatsappNumber}
-                                        />
-                                        <Label htmlFor={`settle-${player.id}`} className={cn("flex-1", !player.whatsappNumber && "text-muted-foreground")}>
-                                            {player.name}
-                                            {!player.whatsappNumber && <span className="text-xs"> (No number)</span>}
-                                        </Label>
+
+                        <div className="space-y-2">
+                            <Label>Message Options</Label>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="include-summary" checked={includeSummary} onCheckedChange={(c) => setIncludeSummary(!!c)} />
+                                <Label htmlFor="include-summary">Include Player Summary</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id="include-timeline" checked={includeTimeline} onCheckedChange={(c) => setIncludeTimeline(!!c)} />
+                                <Label htmlFor="include-timeline">Include Player Timeline</Label>
+                            </div>
+                        </div>
+
+                         {isSending && (
+                            <div className="space-y-2 mt-auto">
+                                <Progress value={progress} />
+                                {sendingStatus && (
+                                    <div className="flex items-center gap-2 text-sm text-primary">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <p>{sendingStatus}</p>
                                     </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center p-4">No players in this game.</p>
-                            )}
+                                )}
+                            </div>
+                        )}
+                    </div>
+                    {/* Right Column: Preview */}
+                     <div className="space-y-2">
+                        <Label>Message Preview</Label>
+                        <ScrollArea className="h-72 border rounded-md p-4 bg-muted/50">
+                            <pre className="text-sm whitespace-pre-wrap font-sans">{messagePreview}</pre>
                         </ScrollArea>
                     </div>
-                    {isSending && (
-                        <div className="space-y-2">
-                            <Progress value={progress} />
-                            {sendingStatus && (
-                                <div className="flex items-center gap-2 text-sm text-primary">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <p>{sendingStatus}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
