@@ -402,12 +402,11 @@ const AdminView: FC<{
     setSaveConfirmOpen: (isOpen: boolean) => void;
     setEndGameConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
-    setGameLogModalOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
     activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
     isOtpVerificationEnabled, whatsappConfig, canEdit, currentUser, setAddPlayerModalOpen,
-    setSaveConfirmOpen, setEndGameConfirmOpen, setReportsModalOpen, setGameLogModalOpen, toast
+    setSaveConfirmOpen, setEndGameConfirmOpen, setReportsModalOpen, toast
 }) => {
     
     const players = activeGame.players || [];
@@ -466,24 +465,23 @@ const AdminView: FC<{
                     </Tabs>
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         {canEdit && (
                             <>
-                                <Button onClick={() => setAddPlayerModalOpen(true)}>
+                                <Button size="sm" onClick={() => setAddPlayerModalOpen(true)}>
                                     <Plus className="mr-2 h-4 w-4" />Add Player(s)
                                 </Button>
-                                <Button onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
+                                <Button size="sm" onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
                                     <Save className="mr-2 h-4 w-4" />Save Progress
                                 </Button>
-                                <Button onClick={() => setEndGameConfirmOpen(true)} variant="destructive">
+                                <Button size="sm" onClick={() => setEndGameConfirmOpen(true)} variant="destructive">
                                     <StopCircle className="mr-2 h-4 w-4" />End Game
                                 </Button>
                             </>
                         )}
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={() => setGameLogModalOpen(true)} variant="outline"><FileText className="mr-2 h-4 w-4" />Game Log</Button>
-                        <Button onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
+                        <Button size="sm" onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                     </div>
                 </CardFooter>
             </Card>
@@ -496,6 +494,16 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+                <Card>
+                    <AccordionItem value="performance" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                            Overall Player Performance
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0">
+                            <OverallPerformanceChart calculatedPlayers={calculatedPlayers} />
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
@@ -713,7 +721,6 @@ function DashboardContent() {
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
   const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
   const [isOtpModalOpen, setOtpModalOpen] = useState(false);
-  const [isGameLogModalOpen, setGameLogModalOpen] = useState(false);
 
   
   // Specific Modal Content State
@@ -1498,7 +1505,6 @@ function DashboardContent() {
                 setSaveConfirmOpen={setSaveConfirmOpen}
                 setEndGameConfirmOpen={setEndGameConfirmOpen}
                 setReportsModalOpen={setReportsModalOpen}
-                setGameLogModalOpen={setGameLogModalOpen}
                 toast={toast}
             />
         ) : !isAdmin && hasCheckedForGame ? (
@@ -1638,41 +1644,8 @@ function DashboardContent() {
             setLoadGameModalOpen(true);
         }}
       />
-       <GameLogDialog
-        isOpen={isGameLogModalOpen}
-        onOpenChange={setGameLogModalOpen}
-        activeGame={activeGame}
-      />
     </div>
   )
-}
-
-const GameLogDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    activeGame: GameHistory | null;
-}> = ({ isOpen, onOpenChange, activeGame }) => {
-    if (!activeGame) return null;
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Game Log</DialogTitle>
-                    <DialogDescription>
-                        A chronological record of all events in this game.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="h-96">
-                    <GameLog game={activeGame} />
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline">Close</Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
 }
 
 const OtpVerificationDialog: FC<{
