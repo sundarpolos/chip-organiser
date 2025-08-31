@@ -2654,16 +2654,14 @@ const ReportsDialog: FC<{
                         <Card>
                             <CardHeader><CardTitle>Player Timeline Analysis</CardTitle></CardHeader>
                             <CardContent>
-                                <Accordion type="multiple" className="w-full">
+                                <div className="space-y-4">
                                     {sortedStandings.map(player => (
-                                        <AccordionItem key={player.id} value={player.id}>
-                                            <AccordionTrigger>{player.name}</AccordionTrigger>
-                                            <AccordionContent>
-                                                <PlayerTimelineTable player={player} game={activeGame} />
-                                            </AccordionContent>
-                                        </AccordionItem>
+                                        <div key={player.id}>
+                                            <h4 className="font-semibold mb-2 text-lg border-b pb-2">{player.name}</h4>
+                                            <PlayerTimelineTable player={player} game={activeGame} />
+                                        </div>
                                     ))}
-                                </Accordion>
+                                </div>
                             </CardContent>
                         </Card>
 
