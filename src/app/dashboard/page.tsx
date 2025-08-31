@@ -167,24 +167,7 @@ const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> =
         };
 
         const events: TimelineEvent[] = [];
-        let runningTotalBuyIn = 0;
         let lastProfitLoss: number | undefined = undefined;
-
-        // Process buy-ins
-        (player.buyIns || [])
-            .filter(b => b.status === 'verified')
-            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .forEach(buyIn => {
-                runningTotalBuyIn += buyIn.amount;
-                events.push({
-                    timestamp: buyIn.timestamp,
-                    type: 'Buy-in',
-                    details: `₹${buyIn.amount}`,
-                    totalBuyIn: runningTotalBuyIn,
-                    chipReturn: 0, // Not relevant for a buy-in event
-                    profitLoss: 0, // P/L is only meaningful at progress points
-                });
-            });
 
         // Process progress logs
         (game.progressLog || [])
@@ -223,7 +206,7 @@ const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> =
     };
 
     if (timelineEvents.length === 0) {
-        return <p className="text-sm text-muted-foreground text-center py-4">No buy-ins or saved progress to display.</p>;
+        return <p className="text-sm text-muted-foreground text-center py-4">No saved progress to display.</p>;
     }
 
     return (
@@ -232,7 +215,6 @@ const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> =
                 <TableRow>
                     <TableHead>Time</TableHead>
                     <TableHead>Event</TableHead>
-                    <TableHead>Details</TableHead>
                     <TableHead className="text-right">Total Buy-in</TableHead>
                     <TableHead className="text-right">Chip Return</TableHead>
                     <TableHead className="text-right">P/L</TableHead>
@@ -244,7 +226,6 @@ const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> =
                     <TableRow key={index} className="text-xs">
                         <TableCell>{format(new Date(event.timestamp), 'p')}</TableCell>
                         <TableCell>{event.type}</TableCell>
-                        <TableCell>{event.details}</TableCell>
                         <TableCell className="text-right">₹{event.totalBuyIn.toFixed(0)}</TableCell>
                         <TableCell className="text-right">{event.type === 'Progress Save' ? `₹${event.chipReturn.toFixed(0)}` : '-'}</TableCell>
                         <TableCell className={cn("text-right font-semibold", event.type === 'Progress Save' ? (event.profitLoss >= 0 ? 'text-green-600' : 'text-red-600') : '')}>
@@ -255,6 +236,36 @@ const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> =
                 ))}
             </TableBody>
         </Table>
+    );
+};
+
+const OverallPerformanceChart: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
+    const chartData = calculatedPlayers.map(p => ({
+        name: p.name,
+        'Total Buy-in': p.totalBuyIns,
+        'Final Chip Return': p.finalChips,
+        'Profit/Loss': p.profitLoss,
+    })).sort((a,b) => b['Profit/Loss'] - a['Profit/Loss']);
+
+    if (chartData.length === 0) {
+        return <p className="text-center text-muted-foreground py-4">No player data available for chart.</p>;
+    }
+
+    return (
+        <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5, }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <RechartsTooltip formatter={(value: number) => `₹${value.toFixed(0)}`} />
+                    <Legend />
+                    <Bar dataKey="Total Buy-in" fill="#ef4444" />
+                    <Bar dataKey="Final Chip Return" fill="#22c55e" />
+                    <Bar dataKey="Profit/Loss" fill="#3b82f6" />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
     );
 };
 
@@ -495,6 +506,17 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+
+                <Card>
+                    <AccordionItem value="performance-chart" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                           Overall Player Performance
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0">
+                           <OverallPerformanceChart calculatedPlayers={calculatedPlayers} />
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
