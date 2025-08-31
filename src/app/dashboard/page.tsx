@@ -156,62 +156,52 @@ const tabColors = [
 
 const PlayerTimelineChart: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
     const timelineData = useMemo(() => {
-        const dataPoints: { timeLabel: string; profitLoss: number | null }[] = [];
+        const dataPoints: {
+            timeLabel: string;
+            totalBuyIn: number;
+            chipReturn: number;
+            profitLoss: number;
+        }[] = [];
 
-        // Add the start of the game as the initial point
-        if (game.startTime) {
-            dataPoints.push({
-                timeLabel: format(new Date(game.startTime), 'p'),
-                profitLoss: 0
-            });
-        }
-
-        // Use progress log if available
         if (game.progressLog && game.progressLog.length > 0) {
             game.progressLog.forEach(log => {
                 const playerStat = log.playerStats.find(p => p.playerId === player.id);
                 if (playerStat) {
                     dataPoints.push({
                         timeLabel: format(new Date(log.timestamp), 'p'),
-                        profitLoss: playerStat.profitLoss
+                        totalBuyIn: playerStat.totalBuyIns,
+                        chipReturn: playerStat.finalChips,
+                        profitLoss: playerStat.profitLoss,
                     });
                 }
             });
         }
-
-        // If game is finished, add the final state as the last point
-        if (game.endTime) {
-            dataPoints.push({
-                timeLabel: format(new Date(game.endTime), 'p'),
-                profitLoss: player.profitLoss
-            });
-        }
         
         // Remove duplicate timestamps, keeping the last entry
-        const uniqueDataPoints = Array.from(new Map(dataPoints.map(item => [item.timeLabel, item])).values());
-        
-        return uniqueDataPoints;
+        return Array.from(new Map(dataPoints.map(item => [item.timeLabel, item])).values());
 
-    }, [player.id, player.profitLoss, game.progressLog, game.startTime, game.endTime]);
+    }, [player.id, game.progressLog]);
 
-    if (timelineData.length < 2) {
+    if (timelineData.length === 0) {
         return <p className="text-sm text-muted-foreground text-center py-4">Not enough saved progress data for a timeline.</p>;
     }
 
     return (
         <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timelineData}>
+                <BarChart data={timelineData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="timeLabel" angle={-45} textAnchor="end" height={60} interval="preserveStartEnd" />
                     <YAxis tickFormatter={(value) => `₹${value / 1000}k`} />
                     <RechartsTooltip
-                        formatter={(value, name) => [`₹${value}`, 'Profit/Loss']}
+                        formatter={(value, name) => [`₹${value.toFixed(0)}`, name]}
                         labelFormatter={(label) => `Time: ${label}`}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="profitLoss" name="Profit/Loss" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} connectNulls={false}/>
-                </LineChart>
+                    <Bar dataKey="totalBuyIn" name="Total Buy-in" fill="#8884d8" />
+                    <Bar dataKey="chipReturn" name="Final Chip Return" fill="#82ca9d" />
+                    <Bar dataKey="profitLoss" name="Profit/Loss" fill="#ffc658" />
+                </BarChart>
             </ResponsiveContainer>
         </div>
     );
@@ -453,6 +443,26 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <SettlementPreview calculatedPlayers={calculatedPlayers} />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Card>
+
+                <Card>
+                    <AccordionItem value="timeline" className="border-b-0">
+                        <AccordionTrigger className="p-4">
+                            Player Timeline Analysis
+                        </AccordionTrigger>
+                        <AccordionContent className="p-4 pt-0">
+                            <Accordion type="multiple" className="w-full">
+                                {calculatedPlayers.map(player => (
+                                    <AccordionItem key={player.id} value={player.id}>
+                                        <AccordionTrigger>{player.name}</AccordionTrigger>
+                                        <AccordionContent>
+                                            <PlayerTimelineChart player={player} game={activeGame} />
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
