@@ -81,14 +81,6 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('chip-maestro-user');
-    localStorage.removeItem('chip-maestro-clubId');
-    sessionStorage.removeItem('seenOtpModal');
-    setIsLoggedIn(false);
-    router.push('/login');
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-sm">
@@ -111,8 +103,8 @@ export default function HomePage() {
             </nav>
             <div className="flex items-center gap-2">
                  {isLoggedIn ? (
-                    <Button onClick={handleLogout} variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
-                        Logout
+                    <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
+                        <Link href="/dashboard">Dashboard</Link>
                     </Button>
                 ) : (
                     <Button asChild>
