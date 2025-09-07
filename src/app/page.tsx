@@ -71,15 +71,7 @@ const stats = [
 ]
 
 export default function HomePage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    const user = localStorage.getItem('chip-maestro-user');
-    if (user) {
-      setIsLoggedIn(true);
-    }
-  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -102,15 +94,9 @@ export default function HomePage() {
                 </Button>
             </nav>
             <div className="flex items-center gap-2">
-                 {isLoggedIn ? (
-                    <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
-                        <Link href="/dashboard">Dashboard</Link>
-                    </Button>
-                ) : (
-                    <Button asChild>
-                        <Link href="/login">Login</Link>
-                    </Button>
-                )}
+                <Button asChild>
+                    <Link href="/login">Login</Link>
+                </Button>
                 <ThemeToggle />
             </div>
           </div>
