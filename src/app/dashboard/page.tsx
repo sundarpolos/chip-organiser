@@ -99,9 +99,6 @@ import {
   KeyRound,
   FileText,
   StopCircle,
-  ArrowUp,
-  ArrowDown,
-  Minus,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -155,122 +152,6 @@ const tabColors = [
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
 
-const PlayerTimelineTable: FC<{ player: CalculatedPlayer; game: GameHistory }> = ({ player, game }) => {
-    const timelineEvents = useMemo(() => {
-        type TimelineEvent = {
-            timestamp: string;
-            type: 'Buy-in' | 'Progress Save';
-            details: string;
-            totalBuyIn: number;
-            chipReturn: number;
-            profitLoss: number;
-            previousProfitLoss?: number;
-        };
-
-        const events: TimelineEvent[] = [];
-        let lastProfitLoss: number | undefined = undefined;
-
-        // Process progress logs
-        (game.progressLog || [])
-            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-            .forEach(log => {
-                const playerStat = log.playerStats.find(p => p.playerId === player.id);
-                if (playerStat) {
-                    events.push({
-                        timestamp: log.timestamp,
-                        type: 'Progress Save',
-                        details: '',
-                        totalBuyIn: playerStat.totalBuyIns,
-                        chipReturn: playerStat.finalChips,
-                        profitLoss: playerStat.profitLoss,
-                        previousProfitLoss: lastProfitLoss,
-                    });
-                    lastProfitLoss = playerStat.profitLoss;
-                }
-            });
-
-        return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-    }, [player, game.progressLog]);
-
-    const renderStatus = (event: (typeof timelineEvents)[0]) => {
-        if (event.type !== 'Progress Save' || typeof event.previousProfitLoss === 'undefined' || event.previousProfitLoss === null) {
-            return <Minus className="h-4 w-4 text-muted-foreground" />;
-        }
-        if (event.profitLoss > event.previousProfitLoss) {
-            return <ArrowUp className="h-4 w-4 text-green-500" />;
-        }
-        if (event.profitLoss < event.previousProfitLoss) {
-            return <ArrowDown className="h-4 w-4 text-red-500" />;
-        }
-        return <Minus className="h-4 w-4 text-muted-foreground" />;
-    };
-
-    if (timelineEvents.length === 0) {
-        return <p className="text-sm text-muted-foreground text-center py-4">No saved progress to display.</p>;
-    }
-
-    return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Event</TableHead>
-                    <TableHead className="text-right">Total Buy-in</TableHead>
-                    <TableHead className="text-right">Chip Return</TableHead>
-                    <TableHead className="text-right">P/L</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {timelineEvents.map((event, index) => (
-                    <TableRow key={index} className="text-xs">
-                        <TableCell>{format(new Date(event.timestamp), 'p')}</TableCell>
-                        <TableCell>{event.type}</TableCell>
-                        <TableCell className="text-right">₹{event.totalBuyIn.toFixed(0)}</TableCell>
-                        <TableCell className="text-right">{event.type === 'Progress Save' ? `₹${event.chipReturn.toFixed(0)}` : '-'}</TableCell>
-                        <TableCell className={cn("text-right font-semibold", event.type === 'Progress Save' ? (event.profitLoss >= 0 ? 'text-green-600' : 'text-red-600') : '')}>
-                            {event.type === 'Progress Save' ? `₹${event.profitLoss.toFixed(0)}` : '-'}
-                        </TableCell>
-                        <TableCell className="flex justify-center items-center h-full">{renderStatus(event)}</TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
-    );
-};
-
-const OverallPerformanceChart: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
-    const chartData = calculatedPlayers.map(p => ({
-        name: p.name,
-        'Total Buy-in': p.totalBuyIns,
-        'Final Chip Return': p.finalChips,
-        'Profit/Loss': p.profitLoss,
-    })).sort((a,b) => b['Profit/Loss'] - a['Profit/Loss']);
-
-    if (chartData.length === 0) {
-        return <p className="text-center text-muted-foreground py-4">No player data available for chart.</p>;
-    }
-
-    return (
-        <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5, }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <RechartsTooltip formatter={(value: number) => `₹${value.toFixed(0)}`} />
-                    <Legend />
-                    <Bar dataKey="Total Buy-in" fill="#ef4444" />
-                    <Bar dataKey="Final Chip Return" fill="#22c55e" />
-                    <Bar dataKey="Profit/Loss" fill="#3b82f6" />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
-    );
-};
-
-
 const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
     const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
         if (!calculatedPlayers) return { grandTotalBuyin: 0, grandTotalChips: 0, grandTotalProfitLoss: 0 };
@@ -314,76 +195,6 @@ const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ cal
                 </TableRow>
             </TableFoot>
         </Table>
-    );
-};
-
-const GameLog: FC<{ game: GameHistory }> = ({ game }) => {
-    const log = useMemo(() => {
-        if (!game) return [];
-        
-        const buyInEvents = (game.players || [])
-            .flatMap(p => 
-                (p.buyIns || []).map(b => ({
-                    type: 'Buy-in',
-                    timestamp: new Date(b.timestamp),
-                    text: `${p.name} bought in for ₹${b.amount}`
-                }))
-            );
-
-        const chipReturnEvents = (game.players || [])
-            .filter(p => p.finalChips > 0 && game.endTime)
-            .map(p => ({
-                type: 'Chip Return',
-                timestamp: new Date(game.endTime!),
-                text: `${p.name} returned chips worth ₹${p.finalChips}`
-            }));
-            
-        return [...buyInEvents, ...chipReturnEvents]
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    }, [game]);
-
-    if (log.length === 0) {
-        return <p className="text-muted-foreground text-center py-4">No game activity yet.</p>;
-    }
-
-    return (
-        <ScrollArea className="h-full">
-            <div className="space-y-3">
-                {log.map((item, index) => (
-                    <div key={index} className="flex items-start gap-2 text-xs sm:text-sm">
-                        <div className="text-muted-foreground min-w-[45px] sm:min-w-[50px]">{format(item.timestamp, 'p')}</div>
-                        <div>{item.text}</div>
-                    </div>
-                ))}
-            </div>
-        </ScrollArea>
-    );
-};
-
-const SettlementPreview: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
-    const transfers = useMemo(() => {
-        if (!calculatedPlayers) return [];
-        return calculateInterPlayerTransfers(calculatedPlayers);
-    }, [calculatedPlayers]);
-
-    if (transfers.length === 0) {
-        return <p className="text-muted-foreground text-center py-4">No transfers needed yet.</p>;
-    }
-
-    return (
-        <div className="space-y-2">
-            {transfers.map((transfer, index) => (
-                <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50 text-xs sm:text-sm">
-                    <div className="flex items-center gap-2 font-medium">
-                        <span dangerouslySetInnerHTML={{ __html: transfer.split(':')[0] }} />
-                    </div>
-                    <div className="font-bold text-primary">
-                        {transfer.split(':')[1]}
-                    </div>
-                </div>
-            ))}
-        </div>
     );
 };
 
@@ -494,16 +305,6 @@ const AdminView: FC<{
                         </AccordionTrigger>
                         <AccordionContent className="p-4 pt-0">
                             <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
-                <Card>
-                    <AccordionItem value="performance" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Overall Player Performance
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                            <OverallPerformanceChart calculatedPlayers={calculatedPlayers} />
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
@@ -2389,7 +2190,6 @@ const ReportsDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, onSettleUp }) => {
     const reportContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
-    const [isBuyInLogExpanded, setIsBuyInLogExpanded] = useState(false);
     const { toast } = useToast();
 
     const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
@@ -2431,13 +2231,6 @@ const ReportsDialog: FC<{
           .filter(p => p.finalChips > 0)
           .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
-    
-    useEffect(() => {
-        if (isOpen) {
-            setIsBuyInLogExpanded(buyInLog.length <= 5);
-        }
-    }, [isOpen, buyInLog.length]);
-
 
     const handleExportPdf = async () => {
         const reportElement = reportContentRef.current;
@@ -2478,8 +2271,6 @@ const ReportsDialog: FC<{
             setIsExporting(false);
         }
     };
-
-    const logsToShow = isBuyInLogExpanded ? buyInLog : buyInLog.slice(0, 5);
 
     if (!activeGame) {
         return null;
@@ -2551,15 +2342,6 @@ const ReportsDialog: FC<{
                             </CardContent>
                         </Card>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Money Transfers</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <SettlementPreview calculatedPlayers={calculatedPlayers} />
-                            </CardContent>
-                        </Card>
-
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                              {/* Player Performance */}
                              <Card>
@@ -2606,52 +2388,6 @@ const ReportsDialog: FC<{
                             </Card>
                         </div>
                         
-                        {/* Player Timeline Analysis */}
-                        <Card>
-                            <CardHeader><CardTitle>Player Timeline Analysis</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {sortedStandings.map(player => (
-                                        <div key={player.id}>
-                                            <h4 className="font-semibold mb-2 text-lg border-b pb-2">{player.name}</h4>
-                                            <PlayerTimelineTable player={player} game={activeGame} />
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Buy-in Log */}
-                        <Card>
-                             <CardHeader><CardTitle>Buy-in Log</CardTitle></CardHeader>
-                             <CardContent>
-                                 <Table>
-                                     <TableHeader>
-                                         <TableRow>
-                                             <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
-                                             <TableHead className="px-2 sm:px-4 text-right">Amount</TableHead>
-                                             <TableHead className="px-2 sm:px-4 text-right">Time</TableHead>
-                                         </TableRow>
-                                     </TableHeader>
-                                     <TableBody>
-                                         {logsToShow.map((log) => (
-                                             <TableRow key={log.id} className="text-xs sm:text-sm">
-                                                 <TableCell className="font-medium px-2 sm:px-4 text-left">{log.playerName}</TableCell>
-                                                 <TableCell className="px-2 sm:px-4 text-right">₹{log.amount}</TableCell>
-                                                 <TableCell className="px-2 sm:px-4 text-right">{format(new Date(log.timestamp), 'p')}</TableCell>
-                                             </TableRow>
-                                         ))}
-                                     </TableBody>
-                                 </Table>
-                                 {buyInLog.length > 5 && (
-                                     <div className="text-center mt-4">
-                                         <Button variant="link" onClick={() => setIsBuyInLogExpanded(!isBuyInLogExpanded)}>
-                                             {isBuyInLogExpanded ? 'Show Less' : `Show All ${buyInLog.length} Entries`}
-                                         </Button>
-                                     </div>
-                                 )}
-                             </CardContent>
-                        </Card>
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -3079,9 +2815,6 @@ const SettlementDialog: FC<{
     const [isSending, setIsSending] = useState(false);
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
-    const [includeSummary, setIncludeSummary] = useState(false);
-    const [includeTimeline, setIncludeTimeline] = useState(false);
-    const [messagePreview, setMessagePreview] = useState("");
 
     const allPlayersInGame = useMemo(() => {
         if (!activeGame) return [];
@@ -3103,7 +2836,7 @@ const SettlementDialog: FC<{
                 totalBuyIns,
                 profitLoss: p.finalChips - totalBuyIns,
             }
-        }).sort((a,b) => b.profitLoss - a.profitLoss);
+        });
     }, [activeGame]);
 
     const transfers = useMemo(() => {
@@ -3111,80 +2844,14 @@ const SettlementDialog: FC<{
         return calculateInterPlayerTransfers(calculatedPlayers);
     }, [calculatedPlayers]);
 
-    const formatWhatsappMessage = useCallback(() => {
-        if (!activeGame) return "";
-    
-        let message = `*Venue:* ${activeGame.venue}\n`;
-        message += `*Date:* ${format(new Date(activeGame.timestamp), "dd MMMM yyyy")}\n\n`;
-    
-        // Transfers (always included)
-        if (transfers.length > 0) {
-            const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
-            message += `\`\`\`
------------------------
-|  Payment Transfers  |
------------------------
-${formattedTransfers}
-\`\`\`\n\n`;
-        } else {
-            message += "No transfers needed. Everyone is settled up!\n\n";
-        }
-    
-        // Player Summary
-        if (includeSummary) {
-            let summary = '```\n-----------------------\n|   Player Summary    |\n-----------------------\n';
-            summary += 'Player      | Buy-in | Return | P/L\n';
-            summary += '------------------------------------\n';
-            calculatedPlayers.forEach(p => {
-                const name = p.name.padEnd(12);
-                const buyin = `₹${p.totalBuyIns}`.padStart(7);
-                const ret = `₹${p.finalChips}`.padStart(7);
-                const pl = `₹${p.profitLoss.toFixed(0)}`.padStart(7);
-                summary += `${name}|${buyin} |${ret} |${pl}\n`;
-            });
-            summary += '```\n\n';
-            message += summary;
-        }
-    
-        // Player Timeline
-        if (includeTimeline) {
-            message += '*Player Timelines:*\n';
-            calculatedPlayers.forEach(player => {
-                message += `\n*${player.name}*\n`;
-                const events = (activeGame.progressLog || [])
-                    .map(log => log.playerStats.find(p => p.playerId === player.id))
-                    .filter(Boolean);
-    
-                if (events.length > 0) {
-                    events.forEach((stat, index) => {
-                        if (stat) {
-                            const time = format(new Date((activeGame.progressLog || [])[index].timestamp), 'p');
-                            message += `  - ${time}: P/L ₹${stat.profitLoss.toFixed(0)}\n`;
-                        }
-                    });
-                } else {
-                    message += '  - No saved progress.\n';
-                }
-            });
-        }
-    
-        return message;
-    }, [activeGame, transfers, includeSummary, includeTimeline, calculatedPlayers]);
-
     useEffect(() => {
         if (isOpen) {
             setSelectedPlayerIds(allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id));
             setIsSending(false);
             setSendingStatus(null);
             setProgress(0);
-            setIncludeSummary(false);
-            setIncludeTimeline(false);
         }
     }, [isOpen, allPlayersInGame]);
-    
-    useEffect(() => {
-        setMessagePreview(formatWhatsappMessage());
-    }, [includeSummary, includeTimeline, formatWhatsappMessage]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3205,7 +2872,15 @@ ${formattedTransfers}
         setIsSending(true);
         setProgress(0);
         const playersToSend = allPlayersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
-        const message = formatWhatsappMessage();
+        
+        let message = `*Settlement for ${activeGame.venue} on ${format(new Date(activeGame.timestamp), "dd MMM yyyy")}*\n\n`;
+        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
+        message += `\`\`\`
+-----------------------
+|  Payment Transfers  |
+-----------------------
+${formattedTransfers}
+\`\`\``
         
         const totalToSend = playersToSend.length;
         let successfulSends = 0;
@@ -3257,78 +2932,56 @@ ${formattedTransfers}
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Send Settlement Details</DialogTitle>
-                    <DialogDescription>Select players and content to include in the WhatsApp message. A 10s delay will be applied between messages.</DialogDescription>
+                    <DialogDescription>Select players to notify via WhatsApp. A 10s delay will be applied between messages.</DialogDescription>
                 </DialogHeader>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
-                     {/* Left Column: Options & Recipients */}
-                    <div className="space-y-4 flex flex-col">
-                        <div className="space-y-2">
-                             <Label>Recipients</Label>
-                             <div className="flex items-center space-x-2 border-b pb-2">
-                                <Checkbox
-                                    id="settlement-select-all"
-                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                                    checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
-                                    disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
-                                />
-                                <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
-                            </div>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                {allPlayersInGame.length > 0 ? (
-                                    allPlayersInGame.map(player => (
-                                        <div key={player.id} className="flex items-center space-x-2 p-1">
-                                            <Checkbox 
-                                                id={`settle-${player.id}`} 
-                                                onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
-                                                checked={selectedPlayerIds.includes(player.id)}
-                                                disabled={isSending || !player.whatsappNumber}
-                                            />
-                                            <Label htmlFor={`settle-${player.id}`} className={cn("flex-1", !player.whatsappNumber && "text-muted-foreground")}>
-                                                {player.name}
-                                                {!player.whatsappNumber && <span className="text-xs"> (No number)</span>}
-                                            </Label>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-muted-foreground text-center p-4">No players in this game.</p>
-                                )}
-                            </ScrollArea>
+                 <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                         <Label>Recipients</Label>
+                         <div className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox
+                                id="settlement-select-all"
+                                onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
+                                disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
+                            />
+                            <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
                         </div>
-
-                        <div className="space-y-2">
-                            <Label>Message Options</Label>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id="include-summary" checked={includeSummary} onCheckedChange={(c) => setIncludeSummary(!!c)} />
-                                <Label htmlFor="include-summary">Include Player Summary</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id="include-timeline" checked={includeTimeline} onCheckedChange={(c) => setIncludeTimeline(!!c)} />
-                                <Label htmlFor="include-timeline">Include Player Timeline</Label>
-                            </div>
-                        </div>
-
-                         {isSending && (
-                            <div className="space-y-2 mt-auto">
-                                <Progress value={progress} />
-                                {sendingStatus && (
-                                    <div className="flex items-center gap-2 text-sm text-primary">
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        <p>{sendingStatus}</p>
+                        <ScrollArea className="h-48 border rounded-md p-2">
+                            {allPlayersInGame.length > 0 ? (
+                                allPlayersInGame.map(player => (
+                                    <div key={player.id} className="flex items-center space-x-2 p-1">
+                                        <Checkbox 
+                                            id={`settle-${player.id}`} 
+                                            onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                            checked={selectedPlayerIds.includes(player.id)}
+                                            disabled={isSending || !player.whatsappNumber}
+                                        />
+                                        <Label htmlFor={`settle-${player.id}`} className={cn("flex-1", !player.whatsappNumber && "text-muted-foreground")}>
+                                            {player.name}
+                                            {!player.whatsappNumber && <span className="text-xs"> (No number)</span>}
+                                        </Label>
                                     </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    {/* Right Column: Preview */}
-                     <div className="space-y-2">
-                        <Label>Message Preview</Label>
-                        <ScrollArea className="h-72 border rounded-md p-4 bg-muted/50">
-                            <pre className="text-sm whitespace-pre-wrap font-sans">{messagePreview}</pre>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center p-4">No players in this game.</p>
+                            )}
                         </ScrollArea>
                     </div>
+
+                     {isSending && (
+                        <div className="space-y-2">
+                            <Progress value={progress} />
+                            {sendingStatus && (
+                                <div className="flex items-center gap-2 text-sm text-primary">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <p>{sendingStatus}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>
