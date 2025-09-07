@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, Suspense, type FC } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { sendLoginOtp } from '@/ai/flows/send-login-otp';
 import { findUserByWhatsapp } from '@/services/player-service';
@@ -10,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, KeyRound, Check } from 'lucide-react';
+import { Loader2, KeyRound, Check, Crown } from 'lucide-react';
 import type { MasterPlayer } from '@/lib/types';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
@@ -18,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { getClub } from '@/services/club-service';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 
 const countries = [
@@ -433,75 +435,101 @@ function LoginPageContent() {
   const videoUrl = "https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4";
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4">
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        className="absolute top-0 left-0 w-full h-full object-cover -z-20"
-        src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
-      >
-        Your browser does not support the video tag.
-      </video>
-      <div className="absolute top-0 left-0 w-full h-full bg-background/50 backdrop-blur-sm -z-10" />
-      <Card className="w-full max-w-sm mx-auto">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
-            <KeyRound className="h-8 w-8 text-primary-foreground" />
+    <div className="flex flex-col min-h-screen">
+       <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/80 backdrop-blur-sm">
+        <div className="container mx-auto flex h-14 items-center px-4 md:px-6 lg:px-8">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Crown className="h-6 w-6 text-primary" />
+            <span className="font-bold tracking-wider">Chip Maestro</span>
+          </Link>
+          <div className="flex flex-1 items-center justify-end space-x-4">
+            <nav className="hidden md:flex items-center space-x-2 text-sm">
+                <Button variant="ghost" asChild>
+                    <Link href="/#features">Features</Link>
+                </Button>
+                <Button variant="ghost" asChild>
+                    <Link href="/#pricing">Pricing</Link>
+                </Button>
+                <Button variant="ghost" asChild>
+                    <Link href="/contact">Contact</Link>
+                </Button>
+            </nav>
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+            </div>
           </div>
-          <CardTitle>Chip Maestro Login</CardTitle>
-          <CardDescription>
-            {isOtpSent ? `Enter the OTP sent to +${countryCode}${mobileNumber}.` : 'Enter your WhatsApp number to log in.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!isOtpSent ? (
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp-number" className="sr-only">WhatsApp Number</Label>
-              <div className="flex gap-2">
-                <CountryCodePicker value={countryCode} onValueChange={setCountryCode} />
+        </div>
+      </header>
+      <main className="flex-1 flex items-center justify-center p-4 relative">
+        <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute top-0 left-0 w-full h-full object-cover -z-20"
+            src="https://ak03-video-cdn.slidely.com/media/videos/8f/dd/8fddd811b3c3c8238e4f7459bc25f9c6-720p-preview.mp4"
+        >
+            Your browser does not support the video tag.
+        </video>
+        <div className="absolute top-0 left-0 w-full h-full bg-background/50 backdrop-blur-sm -z-10" />
+        <Card className="w-full max-w-sm mx-auto">
+            <CardHeader className="text-center">
+            <div className="mx-auto bg-primary rounded-full p-3 w-fit mb-4">
+                <KeyRound className="h-8 w-8 text-primary-foreground" />
+            </div>
+            <CardTitle>Chip Maestro Login</CardTitle>
+            <CardDescription>
+                {isOtpSent ? `Enter the OTP sent to +${countryCode}${mobileNumber}.` : 'Enter your WhatsApp number to log in.'}
+            </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+            {!isOtpSent ? (
+                <div className="space-y-2">
+                <Label htmlFor="whatsapp-number" className="sr-only">WhatsApp Number</Label>
+                <div className="flex gap-2">
+                    <CountryCodePicker value={countryCode} onValueChange={setCountryCode} />
+                    <Input
+                    id="whatsapp-number"
+                    type="tel"
+                    placeholder="10-digit number"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={handleKeyPress}
+                    />
+                </div>
+                </div>
+            ) : (
+                <div className="space-y-2">
+                <Label htmlFor="otp" className="sr-only">One-Time Password (OTP)</Label>
                 <Input
-                  id="whatsapp-number"
-                  type="tel"
-                  placeholder="10-digit number"
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
-                  onKeyDown={handleKeyPress}
+                    id="otp"
+                    type="text"
+                    placeholder="4-digit code"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    onKeyDown={handleKeyPress}
                 />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="otp" className="sr-only">One-Time Password (OTP)</Label>
-              <Input
-                id="otp"
-                type="text"
-                placeholder="4-digit code"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                onKeyDown={handleKeyPress}
-              />
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-col gap-2">
-          {!isOtpSent ? (
-            <Button onClick={handleSendOtp} disabled={isSending || !mobileNumber} className="w-full">
-              {isSending ? <Loader2 className="animate-spin" /> : 'Send OTP'}
-            </Button>
-          ) : (
-            <>
-              <Button onClick={handleLogin} disabled={isVerifying || !otp} className="w-full">
-                {isVerifying ? <Loader2 className="animate-spin" /> : 'Login'}
-              </Button>
-              <Button variant="link" onClick={() => setIsOtpSent(false)}>
-                Use a different number
-              </Button>
-            </>
-          )}
-        </CardFooter>
-      </Card>
+                </div>
+            )}
+            </CardContent>
+            <CardFooter className="flex flex-col gap-2">
+            {!isOtpSent ? (
+                <Button onClick={handleSendOtp} disabled={isSending || !mobileNumber} className="w-full">
+                {isSending ? <Loader2 className="animate-spin" /> : 'Send OTP'}
+                </Button>
+            ) : (
+                <>
+                <Button onClick={handleLogin} disabled={isVerifying || !otp} className="w-full">
+                    {isVerifying ? <Loader2 className="animate-spin" /> : 'Login'}
+                </Button>
+                <Button variant="link" onClick={() => setIsOtpSent(false)}>
+                    Use a different number
+                </Button>
+                </>
+            )}
+            </CardFooter>
+        </Card>
+      </main>
     </div>
   );
 }
