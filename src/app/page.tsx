@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { ShieldAlert, Users, BarChart, FileDown, Upload, Crown, Server, Bot, Feather, CheckCircle2, Club, FileText } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useRouter } from 'next/navigation';
 
 const features = [
   {
@@ -71,6 +72,7 @@ const stats = [
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const user = localStorage.getItem('chip-maestro-user');
@@ -78,6 +80,14 @@ export default function HomePage() {
       setIsLoggedIn(true);
     }
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('chip-maestro-user');
+    localStorage.removeItem('chip-maestro-clubId');
+    sessionStorage.removeItem('seenOtpModal');
+    setIsLoggedIn(false);
+    router.push('/login');
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -101,8 +111,8 @@ export default function HomePage() {
             </nav>
             <div className="flex items-center gap-2">
                  {isLoggedIn ? (
-                    <Button asChild variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
-                        <Link href="/dashboard">Dashboard</Link>
+                    <Button onClick={handleLogout} variant="outline" className="border-primary text-primary hover:bg-primary/10 hover:text-primary">
+                        Logout
                     </Button>
                 ) : (
                     <Button asChild>
