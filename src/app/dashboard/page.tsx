@@ -99,6 +99,9 @@ import {
   KeyRound,
   FileText,
   StopCircle,
+  Minus,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -151,6 +154,111 @@ const tabColors = [
     "bg-lime-100 dark:bg-lime-900/50 text-lime-800 dark:text-lime-200",
     "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-800 dark:text-cyan-200",
 ];
+
+const PlayerTimelineAnalysis: FC<{
+  game: GameHistory;
+  calculatedPlayers: CalculatedPlayer[];
+  activeTab: string;
+}> = ({ game, calculatedPlayers, activeTab }) => {
+
+  const getPlayerTimeline = (playerName: string) => {
+    type TimelineEvent = {
+        timestamp: string;
+        type: 'Buy-in' | 'Progress Save';
+        details: string;
+        profitLoss?: number;
+        previousProfitLoss?: number;
+    };
+
+    const events: TimelineEvent[] = [];
+
+    const player = game.players.find(p => p.name === playerName);
+    if (player) {
+      (player.buyIns || []).forEach(buyIn => {
+          events.push({
+              timestamp: buyIn.timestamp,
+              type: 'Buy-in',
+              details: `Bought in for ₹${buyIn.amount}`
+          });
+      });
+    }
+
+    const playerLastProfitLoss = new Map<string, number>();
+    (game.progressLog || []).forEach(log => {
+        log.playerStats.forEach(stat => {
+            if (stat.name === playerName) {
+                const previousProfitLoss = playerLastProfitLoss.get(stat.playerId);
+                events.push({
+                    timestamp: log.timestamp,
+                    type: 'Progress Save',
+                    details: `P/L: ₹${stat.profitLoss.toFixed(0)}`,
+                    profitLoss: stat.profitLoss,
+                    previousProfitLoss: previousProfitLoss
+                });
+                playerLastProfitLoss.set(stat.playerId, stat.profitLoss);
+            }
+        });
+    });
+
+    return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  };
+
+  const renderStatus = (event: ReturnType<typeof getPlayerTimeline>[0]) => {
+      if (event.type !== 'Progress Save' || typeof event.previousProfitLoss === 'undefined') {
+          return <Minus className="h-4 w-4 text-muted-foreground" />;
+      }
+      if (event.profitLoss! > event.previousProfitLoss) {
+          return <ArrowUp className="h-4 w-4 text-green-500" />;
+      }
+      if (event.profitLoss! < event.previousProfitLoss) {
+          return <ArrowDown className="h-4 w-4 text-red-500" />;
+      }
+      return <Minus className="h-4 w-4 text-muted-foreground" />;
+  };
+
+  return (
+    <Card>
+        <CardHeader>
+            <CardTitle>Player Timeline Analysis</CardTitle>
+            <CardDescription>Chronological view of buy-ins and saved progress points for each player.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {calculatedPlayers.map(player => (
+              <div key={player.id}>
+                <h3 className="font-semibold text-lg mb-2">{player.name}</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Event</TableHead>
+                      <TableHead>Details</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getPlayerTimeline(player.name).map((event, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="text-muted-foreground">{format(new Date(event.timestamp), 'p')}</TableCell>
+                        <TableCell>{event.type}</TableCell>
+                        <TableCell>{event.details}</TableCell>
+                        <TableCell>{renderStatus(event)}</TableCell>
+                      </TableRow>
+                    ))}
+                    {getPlayerTimeline(player.name).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center">No timeline data available.</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+    </Card>
+  );
+};
 
 const PlayerSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
     const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
@@ -308,6 +416,9 @@ const AdminView: FC<{
                         </AccordionContent>
                     </AccordionItem>
                 </Card>
+                 {activeGame.progressLog && activeGame.progressLog.length > 0 && (
+                     <PlayerTimelineAnalysis game={activeGame} calculatedPlayers={calculatedPlayers} activeTab={activeTab} />
+                 )}
             </Accordion>
         </div>
     );
@@ -2209,6 +2320,11 @@ const ReportsDialog: FC<{
         return [...calculatedPlayers].sort((a, b) => b.profitLoss - a.profitLoss);
     }, [calculatedPlayers]);
     
+    const transfers = useMemo(() => {
+      if (!calculatedPlayers) return [];
+      return calculateInterPlayerTransfers(calculatedPlayers);
+    }, [calculatedPlayers]);
+    
     const buyInLog = useMemo(() => {
         if (!activeGame) return [];
         return (activeGame.players || [])
@@ -2291,11 +2407,11 @@ const ReportsDialog: FC<{
                         )}
                     </div>
                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button onClick={handleExportPdf} disabled={isExporting}>
+                        <Button onClick={handleExportPdf} disabled={isExporting} size="sm">
                             {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
                              Export PDF
                         </Button>
-                        <Button onClick={onSettleUp}>
+                        <Button onClick={onSettleUp} size="sm">
                             <WhatsappIcon />
                             <span className="ml-2">Settlement</span>
                         </Button>
@@ -2387,7 +2503,31 @@ const ReportsDialog: FC<{
                                 </CardContent>
                             </Card>
                         </div>
-                        
+                         {/* Money Transfers */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Money Transfers</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {transfers.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {transfers.map((t, i) => (
+                                            <li key={i} className="flex items-center gap-2 p-2 rounded-md bg-muted" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<strong class="font-bold text-primary">$1</strong>') }} />
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground">No transfers needed. The game is balanced.</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                         {/* Player Timeline Analysis */}
+                        {activeGame.progressLog && activeGame.progressLog.length > 0 && (
+                            <PlayerTimelineAnalysis
+                                game={activeGame}
+                                calculatedPlayers={calculatedPlayers}
+                                activeTab=""
+                            />
+                        )}
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -2815,7 +2955,10 @@ const SettlementDialog: FC<{
     const [isSending, setIsSending] = useState(false);
     const [sendingStatus, setSendingStatus] = useState<string | null>(null);
     const [progress, setProgress] = useState(0);
-
+    const [includeSummary, setIncludeSummary] = useState(false);
+    const [includeTimeline, setIncludeTimeline] = useState(false);
+    const [previewMessage, setPreviewMessage] = useState('');
+    
     const allPlayersInGame = useMemo(() => {
         if (!activeGame) return [];
         return activeGame.players.map(p => {
@@ -2850,8 +2993,55 @@ const SettlementDialog: FC<{
             setIsSending(false);
             setSendingStatus(null);
             setProgress(0);
+            setIncludeSummary(false);
+            setIncludeTimeline(false);
         }
     }, [isOpen, allPlayersInGame]);
+    
+    useEffect(() => {
+        if (!activeGame) return;
+
+        let message = `*Settlement for ${activeGame.venue} on ${format(new Date(activeGame.timestamp), "dd MMM yyyy")}*\n\n`;
+        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
+        message += `\`\`\`
+-----------------------
+|  Payment Transfers  |
+-----------------------
+${formattedTransfers}
+\`\`\`\n\n`;
+        
+        if (includeSummary) {
+            message += "*Player Summary*\n";
+            calculatedPlayers.forEach(p => {
+                message += `${p.name}: Buy-in ₹${p.totalBuyIns}, Return ₹${p.finalChips}, P/L ₹${p.profitLoss.toFixed(0)}\n`;
+            });
+            message += "\n";
+        }
+
+        if (includeTimeline) {
+            message += "*Game Timeline*\n";
+            const allEvents = activeGame.players.flatMap(p => 
+                (p.buyIns || []).map(b => ({
+                    timestamp: new Date(b.timestamp),
+                    text: `${format(new Date(b.timestamp), 'p')} - ${p.name}: Buy-in ₹${b.amount}`
+                }))
+            ).concat(
+                (activeGame.progressLog || []).flatMap(log => 
+                    log.playerStats.map(stat => ({
+                        timestamp: new Date(log.timestamp),
+                        text: `${format(new Date(log.timestamp), 'p')} - ${stat.name}: Progress P/L ₹${stat.profitLoss.toFixed(0)}`
+                    }))
+                )
+            ).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
+            
+            allEvents.forEach(event => {
+                message += `${event.text}\n`;
+            });
+        }
+
+        setPreviewMessage(message);
+
+    }, [activeGame, transfers, calculatedPlayers, includeSummary, includeTimeline]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -2873,15 +3063,6 @@ const SettlementDialog: FC<{
         setProgress(0);
         const playersToSend = allPlayersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
         
-        let message = `*Settlement for ${activeGame.venue} on ${format(new Date(activeGame.timestamp), "dd MMM yyyy")}*\n\n`;
-        const formattedTransfers = transfers.map(t => t.replace(/<strong>(.*?)<\/strong>/g, '*$1*').replace(/<\/?strong>/g, '*')).join('\n');
-        message += `\`\`\`
------------------------
-|  Payment Transfers  |
------------------------
-${formattedTransfers}
-\`\`\``
-        
         const totalToSend = playersToSend.length;
         let successfulSends = 0;
         let failedSends = 0;
@@ -2893,7 +3074,7 @@ ${formattedTransfers}
             try {
                 const result = await sendWhatsappMessage({
                     to: player.whatsappNumber,
-                    message,
+                    message: previewMessage,
                     ...whatsappConfig
                 });
 
@@ -2935,7 +3116,7 @@ ${formattedTransfers}
             <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Send Settlement Details</DialogTitle>
-                    <DialogDescription>Select players to notify via WhatsApp. A 10s delay will be applied between messages.</DialogDescription>
+                    <DialogDescription>Select players and content to notify via WhatsApp. A 10s delay will be applied between messages.</DialogDescription>
                 </DialogHeader>
                  <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -2970,6 +3151,25 @@ ${formattedTransfers}
                             )}
                         </ScrollArea>
                     </div>
+
+                     <div className="space-y-2">
+                        <Label>Optional Content</Label>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="include-summary" checked={includeSummary} onCheckedChange={(c) => setIncludeSummary(!!c)} />
+                            <Label htmlFor="include-summary">Include Player Summary</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="include-timeline" checked={includeTimeline} onCheckedChange={(c) => setIncludeTimeline(!!c)} />
+                            <Label htmlFor="include-timeline">Include Game Timeline</Label>
+                        </div>
+                     </div>
+
+                     <div className="space-y-2">
+                        <Label>Message Preview</Label>
+                        <ScrollArea className="h-40 w-full rounded-md border bg-muted p-4">
+                           <pre className="text-sm whitespace-pre-wrap">{previewMessage}</pre>
+                        </ScrollArea>
+                     </div>
 
                      {isSending && (
                         <div className="space-y-2">
