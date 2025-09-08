@@ -438,20 +438,6 @@ export default function GameHistoryPage() {
                     />
                 </CardContent>
             </Card>
-            
-            {filteredGames.length > 0 && isAdmin && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Game Timeline</CardTitle>
-                        <CardDescription>
-                            A chronological log of all buy-ins and saved progress for the top game in your filtered results.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                       <GameTimeline game={filteredGames[0] as any} />
-                    </CardContent>
-                </Card>
-            )}
 
             <Card>
                 <CardHeader>
