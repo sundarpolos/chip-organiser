@@ -491,7 +491,11 @@ const CreateEditClubDialog: FC<{
         }
     }, [clubToEdit, players]);
     
-    const nonAdminPlayers = players.filter(p => !p.isAdmin || p.whatsappNumber === SUPER_ADMIN_WHATSAPP);
+    const nonAdminPlayers = useMemo(() => {
+        return players
+            .filter(p => !p.isAdmin || p.whatsappNumber === SUPER_ADMIN_WHATSAPP)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [players]);
 
     const handleSave = async () => {
         if (!clubName) {
