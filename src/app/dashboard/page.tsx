@@ -174,13 +174,13 @@ const PlayerTimelineAnalysis: FC<{
 
     const player = game.players.find(p => p.name === playerName);
     if (player) {
-      (player.buyIns || []).forEach(buyIn => {
-          events.push({
-              timestamp: buyIn.timestamp,
-              type: 'Buy-in',
-              details: `Bought in for ₹${buyIn.amount}`
-          });
-      });
+      // (player.buyIns || []).forEach(buyIn => {
+      //     events.push({
+      //         timestamp: buyIn.timestamp,
+      //         type: 'Buy-in',
+      //         details: `Bought in for ₹${buyIn.amount}`
+      //     });
+      // });
     }
 
     const playerLastProfitLoss = new Map<string, number>();
