@@ -173,15 +173,6 @@ const PlayerTimelineAnalysis: FC<{
     const events: TimelineEvent[] = [];
 
     const player = game.players.find(p => p.name === playerName);
-    if (player) {
-      // (player.buyIns || []).forEach(buyIn => {
-      //     events.push({
-      //         timestamp: buyIn.timestamp,
-      //         type: 'Buy-in',
-      //         details: `Bought in for ₹${buyIn.amount}`
-      //     });
-      // });
-    }
 
     const playerLastProfitLoss = new Map<string, number>();
     (game.progressLog || []).forEach(log => {
@@ -200,7 +191,7 @@ const PlayerTimelineAnalysis: FC<{
         });
     });
 
-    return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   };
 
   const renderStatus = (event: ReturnType<typeof getPlayerTimeline>[0]) => {

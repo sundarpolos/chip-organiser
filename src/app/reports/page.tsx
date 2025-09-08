@@ -61,18 +61,6 @@ const GameTimeline: FC<{ game: GameHistory }> = ({ game }) => {
         
         const events: TimelineEvent[] = [];
         
-        // Process buy-ins
-        // (game.players || []).forEach(player => {
-        //     (player.buyIns || []).forEach(buyIn => {
-        //         events.push({
-        //             timestamp: buyIn.timestamp,
-        //             type: 'Buy-in',
-        //             player: player.name,
-        //             details: `Bought in for ₹${buyIn.amount}`
-        //         });
-        //     });
-        // });
-
         // Process progress logs
         const playerLastProfitLoss = new Map<string, number>();
         (game.progressLog || []).forEach(log => {
