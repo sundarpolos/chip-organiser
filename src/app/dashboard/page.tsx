@@ -3117,7 +3117,7 @@ ${formattedTransfers}
                                 id="settlement-select-all"
                                 onCheckedChange={(checked) => handleSelectAll(!!checked)}
                                 checked={allPlayersInGame.filter(p => p.whatsappNumber).length > 0 && selectedPlayerIds.length === allPlayersInGame.filter(p => p.whatsappNumber).length}
-                                disabled={allPlayersInGame.filter(p => p.whatsappNumber).length === 0 || isSending}
+                                disabled={isSending || allPlayersInGame.filter(p => p.whatsappNumber).length === 0}
                             />
                             <Label htmlFor="settlement-select-all" className="font-medium">Select All</Label>
                         </div>
