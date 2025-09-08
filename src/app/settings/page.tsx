@@ -491,9 +491,9 @@ const CreateEditClubDialog: FC<{
         }
     }, [clubToEdit, players]);
     
-    const nonAdminPlayers = useMemo(() => {
+    const adminPlayers = useMemo(() => {
         return players
-            .filter(p => !p.isAdmin || p.whatsappNumber === SUPER_ADMIN_WHATSAPP)
+            .filter(p => p.isAdmin)
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [players]);
 
@@ -564,7 +564,7 @@ const CreateEditClubDialog: FC<{
                                     <SelectValue placeholder="Select a player to be admin..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {nonAdminPlayers.map(p => (
+                                    {adminPlayers.map(p => (
                                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                     ))}
                                 </SelectContent>
