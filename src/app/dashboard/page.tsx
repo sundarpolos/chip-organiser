@@ -303,7 +303,6 @@ const AdminView: FC<{
     setActiveTab: (tab: string) => void;
     updatePlayer: (id: string, newValues: Partial<Player>) => void;
     removePlayer: (id: string) => void;
-    handleRunAnomalyDetection: (player: Player) => void;
     isOtpVerificationEnabled: boolean;
     whatsappConfig: WhatsappConfig;
     canEdit: boolean;
@@ -312,11 +311,12 @@ const AdminView: FC<{
     setSaveConfirmOpen: (isOpen: boolean) => void;
     setEndGameConfirmOpen: (isOpen: boolean) => void;
     setReportsModalOpen: (isOpen: boolean) => void;
+    setSendBuyInSummaryOpen: (isOpen: boolean) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({
-    activeGame, activeTab, setActiveTab, updatePlayer, removePlayer, handleRunAnomalyDetection,
+    activeGame, activeTab, setActiveTab, updatePlayer, removePlayer,
     isOtpVerificationEnabled, whatsappConfig, canEdit, currentUser, setAddPlayerModalOpen,
-    setSaveConfirmOpen, setEndGameConfirmOpen, setReportsModalOpen, toast
+    setSaveConfirmOpen, setEndGameConfirmOpen, setReportsModalOpen, setSendBuyInSummaryOpen, toast
 }) => {
     
     const players = activeGame.players || [];
@@ -362,7 +362,6 @@ const AdminView: FC<{
                                     player={p}
                                     onUpdate={updatePlayer}
                                     onRemove={removePlayer}
-                                    onRunAnomalyCheck={handleRunAnomalyDetection}
                                     isOtpEnabled={isOtpVerificationEnabled}
                                     whatsappConfig={whatsappConfig}
                                     canEdit={canEdit}
@@ -391,6 +390,9 @@ const AdminView: FC<{
                         )}
                     </div>
                     <div className="flex gap-2">
+                        <Button size="sm" onClick={() => setSendBuyInSummaryOpen(true)} variant="outline">
+                            <WhatsappIcon />
+                        </Button>
                         <Button size="sm" onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                     </div>
                 </CardFooter>
@@ -615,8 +617,8 @@ function DashboardContent() {
   const [isVenueModalOpen, setVenueModalOpen] = useState(false);
   const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false);
   const [isReportsModalOpen, setReportsModalOpen] = useState(false);
-  const [isAnomalyModalOpen, setAnomalyModalOpen] = useState(false);
   const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
+  const [isSendBuyInSummaryOpen, setSendBuyInSummaryOpen] = useState(false);
   const [isImportGameModalOpen, setImportGameModalOpen] = useState(false);
   const [isSaveConfirmOpen, setSaveConfirmOpen] = useState(false);
   const [isEndGameConfirmOpen, setEndGameConfirmOpen] = useState(false);
@@ -626,10 +628,6 @@ function DashboardContent() {
   const [isOtpModalOpen, setOtpModalOpen] = useState(false);
 
   
-  // Specific Modal Content State
-  const [anomalyPlayer, setAnomalyPlayer] = useState<Player | null>(null);
-  const [anomalyResult, setAnomalyResult] = useState<{ score: number; explanation: string } | null>(null);
-  const [isAnomalyLoading, setAnomalyLoading] = useState(false);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
   const isBanker = useMemo(() => currentUser?.isBanker === true, [currentUser]);
 
@@ -1177,40 +1175,6 @@ function DashboardContent() {
     toast({ title: "Date Updated", description: `The game date has been changed.` });
   };
 
-  const handleRunAnomalyDetection = async (player: Player) => {
-    setAnomalyPlayer(player);
-    setAnomalyModalOpen(true);
-    setAnomalyLoading(true);
-    setAnomalyResult(null);
-
-    const playerBuyIns = (player.buyIns || []).map(b => ({
-      playerName: player.name,
-      amount: b.amount,
-      timestamp: b.timestamp,
-    }));
-    
-    const historicalBuyIns = gameHistory
-      .flatMap(g => g.players)
-      .filter(p => p.name === player.name)
-      .flatMap(p => (p.buyIns || []))
-      .map(b => ({
-        playerName: player.name,
-        amount: b.amount,
-        timestamp: b.timestamp,
-      }));
-
-    try {
-      const result = await detectAnomalousBuyins({ playerBuyIns, historicalBuyIns });
-      setAnomalyResult({ score: result.anomalyScore, explanation: result.explanation });
-    } catch (error) {
-      console.error("Anomaly detection failed", error);
-      toast({ variant: "destructive", title: "Analysis Failed", description: "Could not run anomaly detection." });
-      setAnomalyResult({ score: -1, explanation: "An error occurred during analysis." });
-    } finally {
-      setAnomalyLoading(false);
-    }
-  };
-
   const handleImportedGame = async (importedGame: { venue: string; timestamp: string; players: Player[] }) => {
     if (!activeClub) return;
 
@@ -1399,7 +1363,6 @@ function DashboardContent() {
                 setActiveTab={setActiveTab}
                 updatePlayer={updatePlayer}
                 removePlayer={removePlayer}
-                handleRunAnomalyDetection={handleRunAnomalyDetection}
                 isOtpVerificationEnabled={isOtpVerificationEnabled}
                 whatsappConfig={whatsappConfig}
                 canEdit={canEditGame}
@@ -1408,6 +1371,7 @@ function DashboardContent() {
                 setSaveConfirmOpen={setSaveConfirmOpen}
                 setEndGameConfirmOpen={setEndGameConfirmOpen}
                 setReportsModalOpen={setReportsModalOpen}
+                setSendBuyInSummaryOpen={setSendBuyInSummaryOpen}
                 toast={toast}
             />
         ) : !isAdmin && hasCheckedForGame ? (
@@ -1466,13 +1430,6 @@ function DashboardContent() {
           setSettlementModalOpen(true);
         }}
       />
-      <AnomalyReportDialog
-        isOpen={isAnomalyModalOpen}
-        onOpenChange={setAnomalyModalOpen}
-        player={anomalyPlayer}
-        isLoading={isAnomalyLoading}
-        result={anomalyResult}
-      />
       <SendMessageDialog
         isOpen={isSendMessageModalOpen}
         onOpenChange={setSendMessageModalOpen}
@@ -1508,6 +1465,14 @@ function DashboardContent() {
       <SettlementDialog
         isOpen={isSettlementModalOpen}
         onOpenChange={setSettlementModalOpen}
+        activeGame={activeGame}
+        whatsappConfig={whatsappConfig}
+        toast={toast}
+        masterPlayers={masterPlayers}
+      />
+      <BuyInSummaryDialog
+        isOpen={isSendBuyInSummaryOpen}
+        onOpenChange={setSendBuyInSummaryOpen}
         activeGame={activeGame}
         whatsappConfig={whatsappConfig}
         toast={toast}
@@ -1811,14 +1776,13 @@ const PlayerCard: FC<{
   player: Player;
   onUpdate: (id: string, newValues: Partial<Player>) => void;
   onRemove: (id: string) => void;
-  onRunAnomalyCheck: (player: Player) => void;
   isOtpEnabled: boolean;
   whatsappConfig: WhatsappConfig;
   canEdit: boolean;
   currentUser: MasterPlayer | null;
   toast: (options: { variant?: "default" | "destructive" | null; title: string; description: string; }) => void;
   activeGame: GameHistory;
-}> = ({ player, onUpdate, onRemove, onRunAnomalyCheck, isOtpEnabled, whatsappConfig, canEdit, currentUser, toast, activeGame }) => {
+}> = ({ player, onUpdate, onRemove, isOtpEnabled, whatsappConfig, canEdit, currentUser, toast, activeGame }) => {
   const isCurrentUser = player.name === currentUser?.name;
 
   const [finalChips, setFinalChips] = useState(player.finalChips);
@@ -1959,19 +1923,6 @@ const PlayerCard: FC<{
             <div className="flex gap-2 items-center">
                 {canEdit && (
                     <>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button onClick={() => onRunAnomalyCheck(player)} variant="ghost" size="icon">
-                                        <ShieldAlert className="h-4 w-4" />
-                                        <span className="sr-only">Analyze Buy-ins</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>Analyze Buy-ins</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="icon" disabled={!canEdit}>
@@ -2523,54 +2474,6 @@ const ReportsDialog: FC<{
                         )}
                     </div>
                 </ScrollArea>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-const AnomalyReportDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    player: Player | null,
-    isLoading: boolean,
-    result: { score: number; explanation: string } | null
-}> = ({ isOpen, onOpenChange, player, isLoading, result }) => {
-    
-    const getScoreColor = (score: number) => {
-        if (score < 0.3) return "text-green-600";
-        if (score < 0.7) return "text-yellow-600";
-        return "text-red-600";
-    }
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Anomaly Report for {player?.name}</DialogTitle>
-                    <DialogDescription>AI-powered analysis of buy-in patterns.</DialogDescription>
-                </DialogHeader>
-                {isLoading && (
-                    <div className="flex flex-col items-center justify-center p-10">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                        <p className="mt-4 text-muted-foreground">Analyzing buy-ins...</p>
-                    </div>
-                )}
-                {result && (
-                    <div className="space-y-4">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Anomaly Score</p>
-                            <p className={`text-6xl font-bold ${getScoreColor(result.score)}`}>{(result.score * 100).toFixed(0)}/100</p>
-                        </div>
-                        <Alert>
-                            <ShieldAlert className="h-4 w-4"/>
-                            <AlertTitle>AI Explanation</AlertTitle>
-                            <AlertDescription>{result.explanation}</AlertDescription>
-                        </Alert>
-                    </div>
-                )}
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )
@@ -3182,6 +3085,138 @@ ${formattedTransfers}
                     </DialogClose>
                     <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
                         {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const BuyInSummaryDialog: FC<{
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    activeGame: GameHistory | null,
+    whatsappConfig: WhatsappConfig,
+    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
+    masterPlayers: MasterPlayer[],
+}> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [isSending, setIsSending] = useState(false);
+    const [message, setMessage] = useState('');
+
+    const playersInGame = useMemo(() => {
+        if (!activeGame) return [];
+        return activeGame.players.map(p => {
+            const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+            return {
+                ...p,
+                whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
+            }
+        }).sort((a, b) => a.name.localeCompare(b.name));
+    }, [activeGame, masterPlayers]);
+
+    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
+        if (!activeGame || !activeGame.players) return [];
+        return activeGame.players.map(p => {
+            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+            return {
+                ...p,
+                totalBuyIns,
+                profitLoss: p.finalChips - totalBuyIns,
+            }
+        });
+    }, [activeGame]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedPlayerIds(playersInGame.filter(p => p.whatsappNumber).map(p => p.id));
+        }
+    }, [isOpen, playersInGame]);
+
+    useEffect(() => {
+        if (!activeGame) return;
+
+        const selectedCalculatedPlayers = calculatedPlayers.filter(p => selectedPlayerIds.includes(p.id));
+        
+        let msg = `*Buy-in Summary for ${activeGame.venue}*\n\n`;
+        selectedCalculatedPlayers.forEach(p => {
+            msg += `*${p.name}*: ₹${p.totalBuyIns}\n`;
+        });
+        
+        setMessage(msg);
+    }, [selectedPlayerIds, calculatedPlayers, activeGame]);
+
+    const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
+        setSelectedPlayerIds(prev => 
+            isSelected ? [...prev, playerId] : prev.filter(id => id !== playerId)
+        );
+    };
+
+    const handleSend = async () => {
+        if (selectedPlayerIds.length === 0) {
+            toast({ variant: 'destructive', title: 'No players selected' });
+            return;
+        }
+        setIsSending(true);
+        try {
+            const playersToSend = playersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
+            const sendPromises = playersToSend.map(p => 
+                sendWhatsappMessage({ to: p.whatsappNumber, message, ...whatsappConfig })
+            );
+            const results = await Promise.all(sendPromises);
+
+            const successfulSends = results.filter(r => r.success).length;
+            const failedSends = results.length - successfulSends;
+
+            if (successfulSends > 0) {
+                toast({ title: 'Success', description: `Sent summaries to ${successfulSends} player(s).`});
+            }
+            if (failedSends > 0) {
+                toast({ variant: 'destructive', title: 'Error', description: `Failed to send summaries to ${failedSends} player(s).`});
+            }
+            onOpenChange(false);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'An unexpected error occurred.'});
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Send Buy-in Summary</DialogTitle>
+                    <DialogDescription>Select players to send their current total buy-in amount via WhatsApp.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Recipients</Label>
+                        <ScrollArea className="h-48 border rounded-md p-2">
+                            {playersInGame.map(player => (
+                                <div key={player.id} className="flex items-center space-x-2 p-1">
+                                    <Checkbox 
+                                        id={`summary-${player.id}`} 
+                                        onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                        checked={selectedPlayerIds.includes(player.id)}
+                                        disabled={!player.whatsappNumber}
+                                    />
+                                    <Label htmlFor={`summary-${player.id}`} className={cn(!player.whatsappNumber && "text-muted-foreground")}>
+                                        {player.name} {!player.whatsappNumber && "(No number)"}
+                                    </Label>
+                                </div>
+                            ))}
+                        </ScrollArea>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Message Preview</Label>
+                        <Textarea value={message} readOnly className="h-32 bg-muted"/>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
+                        {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedPlayerIds.length}`}
                     </Button>
                 </DialogFooter>
             </DialogContent>
