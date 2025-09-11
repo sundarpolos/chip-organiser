@@ -102,6 +102,7 @@ import {
   Minus,
   ArrowDown,
   ArrowUp,
+  TestTube,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -1292,6 +1293,65 @@ function DashboardContent() {
     setImportGameModalOpen(false);
 };
 
+  const handleSendTestReminder = async () => {
+    if (!activeGame || !currentUser) {
+        toast({
+            variant: 'destructive',
+            title: 'No Active Game',
+            description: 'Please start a game to send a test reminder.',
+        });
+        return;
+    }
+    
+    if (!currentUser.whatsappNumber) {
+        toast({
+            variant: 'destructive',
+            title: 'Missing Your Number',
+            description: 'Your WhatsApp number is not saved in your profile.',
+        });
+        return;
+    }
+
+    toast({
+        title: 'Sending Test...',
+        description: 'A sample buy-in summary is being sent to your WhatsApp.',
+    });
+
+    try {
+        const playerInGame = activeGame.players.find(p => p.name === currentUser.name);
+        const totalBuyIns = playerInGame ? (playerInGame.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0) : 0;
+
+        let testMessage = `*TEST: Buy-in Summary for ${activeGame.venue}*\n\n`;
+        testMessage += `Hi *${currentUser.name}*, here is your current summary:\n`;
+        testMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
+        
+        const verifiedBuyIns = playerInGame ? (playerInGame.buyIns || []).filter(bi => bi.status === 'verified') : [];
+        if (verifiedBuyIns.length > 0) {
+            testMessage += `*Details*:\n`;
+            verifiedBuyIns.forEach((bi, index) => {
+                testMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
+            });
+        }
+        
+        const result = await sendWhatsappMessage({ to: currentUser.whatsappNumber, message: testMessage.trim(), ...whatsappConfig });
+
+        if (result.success) {
+            toast({
+                title: 'Test Sent!',
+                description: 'Check your WhatsApp for the test message.',
+            });
+        } else {
+            throw new Error(result.error || 'Failed to send test message.');
+        }
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Test Failed',
+            description: error.message,
+        });
+    }
+  };
+
   if (!isDataReady || !currentUser) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -1391,6 +1451,12 @@ function DashboardContent() {
                                 onCheckedChange={setAutoReminderEnabled}
                             />
                         </DropdownMenuItem>
+                        {autoReminderEnabled && (
+                            <DropdownMenuItem onClick={handleSendTestReminder}>
+                                <TestTube className="h-4 w-4 mr-2" />
+                                Send Test Reminder
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
                         <Upload className="h-4 w-4 mr-2" />
