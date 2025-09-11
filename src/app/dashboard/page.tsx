@@ -3115,18 +3115,6 @@ const BuyInSummaryDialog: FC<{
         }).sort((a, b) => a.name.localeCompare(b.name));
     }, [activeGame, masterPlayers]);
 
-    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
-        if (!activeGame || !activeGame.players) return [];
-        return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            return {
-                ...p,
-                totalBuyIns,
-                profitLoss: p.finalChips - totalBuyIns,
-            }
-        });
-    }, [activeGame]);
-
     useEffect(() => {
         if (isOpen) {
             setSelectedPlayerIds(playersInGame.filter(p => p.whatsappNumber).map(p => p.id));
@@ -3136,15 +3124,28 @@ const BuyInSummaryDialog: FC<{
     useEffect(() => {
         if (!activeGame) return;
 
-        const selectedCalculatedPlayers = calculatedPlayers.filter(p => selectedPlayerIds.includes(p.id));
-        
+        const playersWithDetails = selectedPlayerIds.map(id => {
+            const player = playersInGame.find(p => p.id === id);
+            if (!player) return null;
+            const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+            return { ...player, totalBuyIns };
+        }).filter(Boolean);
+
         let msg = `*Buy-in Summary for ${activeGame.venue}*\n\n`;
-        selectedCalculatedPlayers.forEach(p => {
-            msg += `*${p.name}*: ₹${p.totalBuyIns}\n`;
+
+        playersWithDetails.forEach(p => {
+            if (!p) return;
+            msg += `*${p.name}* - Total: ₹${p.totalBuyIns}\n`;
+            const verifiedBuyIns = (p.buyIns || []).filter(bi => bi.status === 'verified');
+            verifiedBuyIns.forEach((bi, index) => {
+                msg += `  ${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
+            });
+            msg += '\n'; 
         });
         
-        setMessage(msg);
-    }, [selectedPlayerIds, calculatedPlayers, activeGame]);
+        setMessage(msg.trim());
+
+    }, [selectedPlayerIds, playersInGame, activeGame]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3210,7 +3211,9 @@ const BuyInSummaryDialog: FC<{
                     </div>
                     <div className="space-y-2">
                         <Label>Message Preview</Label>
-                        <Textarea value={message} readOnly className="h-32 bg-muted"/>
+                        <ScrollArea className="h-32 bg-muted rounded-md border p-2">
+                            <pre className="text-sm whitespace-pre-wrap">{message}</pre>
+                        </ScrollArea>
                     </div>
                 </div>
                 <DialogFooter>
