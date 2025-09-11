@@ -612,6 +612,7 @@ function DashboardContent() {
   const [deckChangeInterval, setDeckChangeInterval] = useState(2); // in hours
   const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
   const [autoReminderEnabled, setAutoReminderEnabled] = useState(false);
+  const [showAutoReminderAlert, setShowAutoReminderAlert] = useState(false);
 
 
   // Modal & Dialog State
@@ -915,6 +916,7 @@ function DashboardContent() {
         if (!game || game.endTime) return;
         
         console.log(`Sending 15-min reminders for game: ${game.venue}`);
+        setShowAutoReminderAlert(true); // Show alert to admin
 
         const playersInGame = game.players.map(p => {
             const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
@@ -1557,6 +1559,10 @@ function DashboardContent() {
       <DeckChangeAlertDialog
         isOpen={showDeckChangeAlert}
         onOpenChange={setShowDeckChangeAlert}
+      />
+       <AutoReminderAlertDialog
+        isOpen={showAutoReminderAlert}
+        onOpenChange={setShowAutoReminderAlert}
       />
       <OtpVerificationDialog
         isOpen={isOtpModalOpen}
@@ -3320,6 +3326,30 @@ const DeckChangeAlertDialog: FC<{
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogAction onClick={() => onOpenChange(false)}>Got it</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
+const AutoReminderAlertDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+}> = ({ isOpen, onOpenChange }) => {
+    return (
+        <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <div className="flex justify-center mb-4">
+                        <Send className="h-12 w-12 text-primary"/>
+                    </div>
+                    <AlertDialogTitle className="text-center">Auto-Reminders Sent</AlertDialogTitle>
+                    <AlertDialogDescription className="text-center">
+                        The 15-minute automated buy-in summaries have been sent to all players.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogAction onClick={() => onOpenChange(false)}>OK</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
