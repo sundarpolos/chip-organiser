@@ -911,52 +911,51 @@ function DashboardContent() {
   // Automated buy-in reminder effect
   useEffect(() => {
     if (!autoReminderEnabled || !activeGame || activeGame.endTime || autoReminderInterval <= 0) {
-        return; // Do nothing if reminders are off, no game, or game has ended
+      return;
     }
-
+  
     const sendReminders = async () => {
-        const game = activeGame; // Capture current game state
-        if (!game || game.endTime) return;
-        
-        console.log(`Sending ${autoReminderInterval}-min reminders for game: ${game.venue}`);
-        setShowAutoReminderAlert(true); // Show alert to admin
-
-        const playersInGame = game.players.map(p => {
-            const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
-            return {
-                ...p,
-                whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
-            }
-        });
-
-        const playersToSend = playersInGame.filter(p => p.whatsappNumber);
-
-        for (const player of playersToSend) {
-            const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            
-            let playerMessage = `*Buy-in Summary for ${game.venue}*\n\n`;
-            playerMessage += `Hi *${player.name}*, here is your summary:\n`;
-            playerMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
-            
-            const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
-            if (verifiedBuyIns.length > 0) {
-                playerMessage += `*Details*:\n`;
-                verifiedBuyIns.forEach((bi, index) => {
-                    playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
-                });
-            }
-            
-            await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
-            // Optional: add a small delay between messages to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 200)); 
+      const game = activeGame;
+      if (!game || game.endTime) return;
+  
+      console.log(`Sending ${autoReminderInterval}-min reminders for game: ${game.venue}`);
+      setShowAutoReminderAlert(true);
+  
+      const playersInGame = game.players.map(p => {
+        const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+        return {
+          ...p,
+          whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
         }
+      });
+  
+      const playersToSend = playersInGame.filter(p => p.whatsappNumber);
+  
+      for (const player of playersToSend) {
+        const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+        
+        let playerMessage = `*Buy-in Summary for ${game.venue}*\n\n`;
+        playerMessage += `Hi *${player.name}*, here is your summary:\n`;
+        playerMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
+        
+        const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
+        if (verifiedBuyIns.length > 0) {
+            playerMessage += `*Details*:\n`;
+            verifiedBuyIns.forEach((bi, index) => {
+                playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
+            });
+        }
+        
+        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
+        await new Promise(resolve => setTimeout(resolve, 200)); 
+      }
     };
-
+  
     const intervalId = setInterval(sendReminders, autoReminderInterval * 60 * 1000);
-
-    return () => clearInterval(intervalId); // Cleanup interval on effect change
-
-}, [autoReminderEnabled, activeGame, whatsappConfig, masterPlayers, autoReminderInterval]);
+  
+    return () => clearInterval(intervalId);
+  
+  }, [autoReminderEnabled, activeGame, autoReminderInterval, masterPlayers, whatsappConfig]);
 
 
   const handleLogout = () => {
