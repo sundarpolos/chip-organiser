@@ -3102,7 +3102,7 @@ const BuyInSummaryDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
-    const [message, setMessage] = useState('');
+    const [previewMessage, setPreviewMessage] = useState('');
 
     const playersInGame = useMemo(() => {
         if (!activeGame) return [];
@@ -3123,29 +3123,14 @@ const BuyInSummaryDialog: FC<{
 
     useEffect(() => {
         if (!activeGame) return;
-
-        const playersWithDetails = selectedPlayerIds.map(id => {
-            const player = playersInGame.find(p => p.id === id);
-            if (!player) return null;
-            const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            return { ...player, totalBuyIns };
-        }).filter(Boolean);
-
-        let msg = `*Buy-in Summary for ${activeGame.venue}*\n\n`;
-
-        playersWithDetails.forEach(p => {
-            if (!p) return;
-            msg += `*${p.name}* - Total: ₹${p.totalBuyIns}\n`;
-            const verifiedBuyIns = (p.buyIns || []).filter(bi => bi.status === 'verified');
-            verifiedBuyIns.forEach((bi, index) => {
-                msg += `  ${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
-            });
-            msg += '\n'; 
-        });
-        
-        setMessage(msg.trim());
-
-    }, [selectedPlayerIds, playersInGame, activeGame]);
+        setPreviewMessage(
+            `*Buy-in Summary for ${activeGame.venue}*\n\n` +
+            `Hi [Player Name],\n\nHere is your buy-in summary:\n` +
+            `Total: ₹[Total]\n` +
+            `[Buy-in 1]: ₹[Amount] at [Time]\n` +
+            `[Buy-in 2]: ₹[Amount] at [Time]\n...`
+        );
+    }, [activeGame]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3161,9 +3146,25 @@ const BuyInSummaryDialog: FC<{
         setIsSending(true);
         try {
             const playersToSend = playersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
-            const sendPromises = playersToSend.map(p => 
-                sendWhatsappMessage({ to: p.whatsappNumber, message, ...whatsappConfig })
-            );
+
+            const sendPromises = playersToSend.map(player => {
+                const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                
+                let playerMessage = `*Buy-in Summary for ${activeGame?.venue}*\n\n`;
+                playerMessage += `Hi *${player.name}*, here is your summary:\n`;
+                playerMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
+                
+                const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
+                if (verifiedBuyIns.length > 0) {
+                    playerMessage += `*Details*:\n`;
+                    verifiedBuyIns.forEach((bi, index) => {
+                        playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
+                    });
+                }
+                
+                return sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
+            });
+
             const results = await Promise.all(sendPromises);
 
             const successfulSends = results.filter(r => r.success).length;
@@ -3210,10 +3211,11 @@ const BuyInSummaryDialog: FC<{
                         </ScrollArea>
                     </div>
                     <div className="space-y-2">
-                        <Label>Message Preview</Label>
+                        <Label>Message Preview (Template)</Label>
                         <ScrollArea className="h-32 bg-muted rounded-md border p-2">
-                            <pre className="text-sm whitespace-pre-wrap">{message}</pre>
+                            <pre className="text-sm whitespace-pre-wrap">{previewMessage}</pre>
                         </ScrollArea>
+                         <p className="text-xs text-muted-foreground">Each player will receive only their own details.</p>
                     </div>
                 </div>
                 <DialogFooter>
