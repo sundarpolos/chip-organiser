@@ -611,6 +611,7 @@ function DashboardContent() {
   });
   const [deckChangeInterval, setDeckChangeInterval] = useState(2); // in hours
   const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
+  const [autoReminderEnabled, setAutoReminderEnabled] = useState(false);
 
 
   // Modal & Dialog State
@@ -902,6 +903,56 @@ function DashboardContent() {
         }
     };
 }, [activeGame?.startTime, activeGame?.endTime, deckChangeInterval]);
+
+  // Automated 15-minute buy-in reminder effect
+  useEffect(() => {
+    if (!autoReminderEnabled || !activeGame || activeGame.endTime) {
+        return; // Do nothing if reminders are off, no game, or game has ended
+    }
+
+    const sendReminders = async () => {
+        const game = activeGame; // Capture current game state
+        if (!game || game.endTime) return;
+        
+        console.log(`Sending 15-min reminders for game: ${game.venue}`);
+
+        const playersInGame = game.players.map(p => {
+            const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+            return {
+                ...p,
+                whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
+            }
+        });
+
+        const playersToSend = playersInGame.filter(p => p.whatsappNumber);
+
+        for (const player of playersToSend) {
+            const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+            
+            let playerMessage = `*Buy-in Summary for ${game.venue}*\n\n`;
+            playerMessage += `Hi *${player.name}*, here is your summary:\n`;
+            playerMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
+            
+            const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
+            if (verifiedBuyIns.length > 0) {
+                playerMessage += `*Details*:\n`;
+                verifiedBuyIns.forEach((bi, index) => {
+                    playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
+                });
+            }
+            
+            await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
+            // Optional: add a small delay between messages to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 200)); 
+        }
+    };
+
+    const intervalId = setInterval(sendReminders, 15 * 60 * 1000); // 15 minutes
+
+    return () => clearInterval(intervalId); // Cleanup interval on effect change
+
+}, [autoReminderEnabled, activeGame, whatsappConfig, masterPlayers]);
+
 
   const handleLogout = () => {
     localStorage.removeItem('chip-maestro-user');
@@ -1328,6 +1379,15 @@ function DashboardContent() {
                             checked={isOtpVerificationEnabled}
                             onCheckedChange={setOtpVerificationEnabled}
                         />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <Clock className="h-4 w-4 mr-2" />
+                            <Label htmlFor="auto-reminder-toggle" className="pr-2 flex-1">Auto Buy-in Reminders</Label>
+                            <Switch
+                                id="auto-reminder-toggle"
+                                checked={autoReminderEnabled}
+                                onCheckedChange={setAutoReminderEnabled}
+                            />
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
@@ -3102,7 +3162,6 @@ const BuyInSummaryDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
-    const [previewMessage, setPreviewMessage] = useState('');
 
     const playersInGame = useMemo(() => {
         if (!activeGame) return [];
@@ -3120,17 +3179,6 @@ const BuyInSummaryDialog: FC<{
             setSelectedPlayerIds(playersInGame.filter(p => p.whatsappNumber).map(p => p.id));
         }
     }, [isOpen, playersInGame]);
-
-    useEffect(() => {
-        if (!activeGame) return;
-        setPreviewMessage(
-            `*Buy-in Summary for ${activeGame.venue}*\n\n` +
-            `Hi [Player Name],\n\nHere is your buy-in summary:\n` +
-            `Total: ₹[Total]\n` +
-            `[Buy-in 1]: ₹[Amount] at [Time]\n` +
-            `[Buy-in 2]: ₹[Amount] at [Time]\n...`
-        );
-    }, [activeGame]);
 
     const handleSelectPlayer = (playerId: string, isSelected: boolean) => {
         setSelectedPlayerIds(prev => 
@@ -3209,13 +3257,6 @@ const BuyInSummaryDialog: FC<{
                                 </div>
                             ))}
                         </ScrollArea>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Message Preview (Template)</Label>
-                        <ScrollArea className="h-32 bg-muted rounded-md border p-2">
-                            <pre className="text-sm whitespace-pre-wrap">{previewMessage}</pre>
-                        </ScrollArea>
-                         <p className="text-xs text-muted-foreground">Each player will receive only their own details.</p>
                     </div>
                 </div>
                 <DialogFooter>
