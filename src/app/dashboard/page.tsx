@@ -2084,7 +2084,9 @@ const AddPlayerDialog: FC<{
   const gamePlayerNames = useMemo(() => gamePlayers.map(p => p.name), [gamePlayers]);
 
   const availablePlayers = useMemo(() => {
-    return masterPlayers.filter(mp => !gamePlayerNames.includes(mp.name) && (mp.isActive ?? true));
+    return masterPlayers
+      .filter(mp => !gamePlayerNames.includes(mp.name) && (mp.isActive ?? true))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [masterPlayers, gamePlayerNames]);
 
   useEffect(() => {
