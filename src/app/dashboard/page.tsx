@@ -107,7 +107,7 @@ import {
 import jsPDF from "jspdf"
 import "jspdf-autotable"
 import html2canvas from 'html2canvas';
-import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds } from "date-fns"
+import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds, formatDuration } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -615,6 +615,8 @@ function DashboardContent() {
   const [autoReminderEnabled, setAutoReminderEnabled] = useState(true);
   const [autoReminderInterval, setAutoReminderInterval] = useState(15); // in minutes
   const [showAutoReminderAlert, setShowAutoReminderAlert] = useState(false);
+  const [nextReminderTime, setNextReminderTime] = useState<Date | null>(null);
+  const [timeUntilNextReminder, setTimeUntilNextReminder] = useState<string>('');
 
 
   // Modal & Dialog State
@@ -912,45 +914,30 @@ function DashboardContent() {
   const reminderIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    // Clear any existing interval when dependencies change
     if (reminderIntervalRef.current) {
       clearInterval(reminderIntervalRef.current);
       reminderIntervalRef.current = null;
     }
   
     if (!autoReminderEnabled || !activeGame || activeGame.endTime || autoReminderInterval <= 0) {
+      setNextReminderTime(null);
       return;
     }
   
     const sendReminders = async () => {
-      // Use function form of setActiveGame to get latest state if needed, but it's better to rely on props/state
-      // For this, we'll create a local copy of dependencies to ensure the function has the latest data.
-      const game = activeGame;
-      const mPlayers = masterPlayers;
-      const waConfig = whatsappConfig;
-  
-      if (!game || game.endTime) return;
-  
-      console.log(`Sending ${autoReminderInterval}-min reminders for game: ${game.venue}`);
+      console.log(`Sending ${autoReminderInterval}-min reminders for game: ${activeGame.venue}`);
       setShowAutoReminderAlert(true);
   
-      const playersInGame = game.players.map(p => {
-        const masterPlayer = mPlayers.find(mp => mp.name === p.name);
-        return {
-          ...p,
-          whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
-        }
+      const playersInGame = activeGame.players.map(p => {
+        const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+        return { ...p, whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber };
       });
   
       const playersToSend = playersInGame.filter(p => p.whatsappNumber);
   
       for (const player of playersToSend) {
         const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-        
-        let playerMessage = `*Buy-in Summary for ${game.venue}*\n\n`;
-        playerMessage += `Hi *${player.name}*, here is your summary:\n`;
-        playerMessage += `*Total Buy-in*: ₹${totalBuyIns}\n\n`;
-        
+        let playerMessage = `*Buy-in Summary for ${activeGame.venue}*\n\nHi *${player.name}*, here is your summary:\n*Total Buy-in*: ₹${totalBuyIns}\n\n`;
         const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
         if (verifiedBuyIns.length > 0) {
             playerMessage += `*Details*:\n`;
@@ -958,22 +945,45 @@ function DashboardContent() {
                 playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
             });
         }
-        
-        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...waConfig });
+        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
         await new Promise(resolve => setTimeout(resolve, 200)); 
       }
+      setNextReminderTime(new Date(new Date().getTime() + autoReminderInterval * 60 * 1000));
     };
-  
+    
+    setNextReminderTime(new Date(new Date().getTime() + autoReminderInterval * 60 * 1000));
     reminderIntervalRef.current = setInterval(sendReminders, autoReminderInterval * 60 * 1000);
   
-    // Cleanup function to clear interval
     return () => {
       if (reminderIntervalRef.current) {
         clearInterval(reminderIntervalRef.current);
       }
     };
-  
   }, [autoReminderEnabled, activeGame, autoReminderInterval, masterPlayers, whatsappConfig]);
+
+  // Countdown timer for next reminder
+  useEffect(() => {
+    if (!nextReminderTime) {
+      setTimeUntilNextReminder('');
+      return;
+    }
+
+    const countdownInterval = setInterval(() => {
+      const now = new Date();
+      const difference = differenceInMilliseconds(nextReminderTime, now);
+
+      if (difference <= 0) {
+        setTimeUntilNextReminder('00:00');
+        return;
+      }
+      const duration = intervalToDuration({ start: 0, end: difference });
+      const paddedMinutes = String(duration.minutes || 0).padStart(2, '0');
+      const paddedSeconds = String(duration.seconds || 0).padStart(2, '0');
+      setTimeUntilNextReminder(`${paddedMinutes}:${paddedSeconds}`);
+    }, 1000);
+
+    return () => clearInterval(countdownInterval);
+  }, [nextReminderTime]);
 
 
   const handleLogout = () => {
@@ -1345,7 +1355,14 @@ function DashboardContent() {
                         <span>{gameDuration}</span>
                     </div>
                 )}
-                
+                {autoReminderEnabled && timeUntilNextReminder && (
+                    <div className="flex items-center gap-1 text-primary font-medium">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                            {autoReminderInterval}m Auto-Reminder (Next: {timeUntilNextReminder})
+                        </span>
+                    </div>
+                )}
               </>
             )}
            </div>
