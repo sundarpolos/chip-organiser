@@ -909,20 +909,33 @@ function DashboardContent() {
 }, [activeGame?.startTime, activeGame?.endTime, deckChangeInterval]);
 
   // Automated buy-in reminder effect
+  const reminderIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
+    // Clear any existing interval when dependencies change
+    if (reminderIntervalRef.current) {
+      clearInterval(reminderIntervalRef.current);
+      reminderIntervalRef.current = null;
+    }
+  
     if (!autoReminderEnabled || !activeGame || activeGame.endTime || autoReminderInterval <= 0) {
       return;
     }
   
     const sendReminders = async () => {
+      // Use function form of setActiveGame to get latest state if needed, but it's better to rely on props/state
+      // For this, we'll create a local copy of dependencies to ensure the function has the latest data.
       const game = activeGame;
+      const mPlayers = masterPlayers;
+      const waConfig = whatsappConfig;
+  
       if (!game || game.endTime) return;
   
       console.log(`Sending ${autoReminderInterval}-min reminders for game: ${game.venue}`);
       setShowAutoReminderAlert(true);
   
       const playersInGame = game.players.map(p => {
-        const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
+        const masterPlayer = mPlayers.find(mp => mp.name === p.name);
         return {
           ...p,
           whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber,
@@ -946,14 +959,19 @@ function DashboardContent() {
             });
         }
         
-        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
+        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...waConfig });
         await new Promise(resolve => setTimeout(resolve, 200)); 
       }
     };
   
-    const intervalId = setInterval(sendReminders, autoReminderInterval * 60 * 1000);
+    reminderIntervalRef.current = setInterval(sendReminders, autoReminderInterval * 60 * 1000);
   
-    return () => clearInterval(intervalId);
+    // Cleanup function to clear interval
+    return () => {
+      if (reminderIntervalRef.current) {
+        clearInterval(reminderIntervalRef.current);
+      }
+    };
   
   }, [autoReminderEnabled, activeGame, autoReminderInterval, masterPlayers, whatsappConfig]);
 
