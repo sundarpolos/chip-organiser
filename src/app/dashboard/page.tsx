@@ -612,11 +612,6 @@ function DashboardContent() {
   });
   const [deckChangeInterval, setDeckChangeInterval] = useState(2); // in hours
   const [showDeckChangeAlert, setShowDeckChangeAlert] = useState(false);
-  const [autoReminderEnabled, setAutoReminderEnabled] = useState(true);
-  const [autoReminderInterval, setAutoReminderInterval] = useState(15); // in minutes
-  const [showAutoReminderAlert, setShowAutoReminderAlert] = useState(false);
-  const [nextReminderTime, setNextReminderTime] = useState<Date | null>(null);
-  const [timeUntilNextReminder, setTimeUntilNextReminder] = useState<string>('');
 
 
   // Modal & Dialog State
@@ -632,7 +627,6 @@ function DashboardContent() {
   const [isSettlementModalOpen, setSettlementModalOpen] = useState(false);
   const [buyInRequestModal, setBuyInRequestModal] = useState<BuyInRequest | null>(null);
   const [isOtpModalOpen, setOtpModalOpen] = useState(false);
-  const [isAutoReminderModalOpen, setAutoReminderModalOpen] = useState(false);
 
   
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
@@ -757,7 +751,7 @@ function DashboardContent() {
                 // For admins, show OTP and Reminder modals on login if not already shown this session.
                 const hasSeenOtpModal = sessionStorage.getItem('seenOtpModal');
                 if (!hasSeenOtpModal) {
-                    setOtpModalOpen(true); // This will trigger reminder modal after it closes.
+                    setOtpModalOpen(true);
                     sessionStorage.setItem('seenOtpModal', 'true');
                 } else {
                     setLoadGameModalOpen(true);
@@ -909,81 +903,6 @@ function DashboardContent() {
         }
     };
 }, [activeGame?.startTime, activeGame?.endTime, deckChangeInterval]);
-
-  // Automated buy-in reminder effect
-  const reminderIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  useEffect(() => {
-    if (reminderIntervalRef.current) {
-      clearInterval(reminderIntervalRef.current);
-      reminderIntervalRef.current = null;
-    }
-  
-    if (!autoReminderEnabled || !activeGame || activeGame.endTime || autoReminderInterval <= 0) {
-      setNextReminderTime(null);
-      return;
-    }
-  
-    const sendReminders = async () => {
-      console.log(`Sending ${autoReminderInterval}-min reminders for game: ${activeGame.venue}`);
-      setShowAutoReminderAlert(true);
-  
-      const playersInGame = activeGame.players.map(p => {
-        const masterPlayer = masterPlayers.find(mp => mp.name === p.name);
-        return { ...p, whatsappNumber: masterPlayer?.whatsappNumber || p.whatsappNumber };
-      });
-  
-      const playersToSend = playersInGame.filter(p => p.whatsappNumber);
-  
-      for (const player of playersToSend) {
-        const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-        let playerMessage = `*Buy-in Summary for ${activeGame.venue}*\n\nHi *${player.name}*, here is your summary:\n*Total Buy-in*: ₹${totalBuyIns}\n\n`;
-        const verifiedBuyIns = (player.buyIns || []).filter(bi => bi.status === 'verified');
-        if (verifiedBuyIns.length > 0) {
-            playerMessage += `*Details*:\n`;
-            verifiedBuyIns.forEach((bi, index) => {
-                playerMessage += `${index + 1}. ₹${bi.amount} at ${format(new Date(bi.timestamp), 'p')}\n`;
-            });
-        }
-        await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
-        await new Promise(resolve => setTimeout(resolve, 200)); 
-      }
-      setNextReminderTime(new Date(new Date().getTime() + autoReminderInterval * 60 * 1000));
-    };
-    
-    setNextReminderTime(new Date(new Date().getTime() + autoReminderInterval * 60 * 1000));
-    reminderIntervalRef.current = setInterval(sendReminders, autoReminderInterval * 60 * 1000);
-  
-    return () => {
-      if (reminderIntervalRef.current) {
-        clearInterval(reminderIntervalRef.current);
-      }
-    };
-  }, [autoReminderEnabled, activeGame, autoReminderInterval, masterPlayers, whatsappConfig]);
-
-  // Countdown timer for next reminder
-  useEffect(() => {
-    if (!nextReminderTime) {
-      setTimeUntilNextReminder('');
-      return;
-    }
-
-    const countdownInterval = setInterval(() => {
-      const now = new Date();
-      const difference = differenceInMilliseconds(nextReminderTime, now);
-
-      if (difference <= 0) {
-        setTimeUntilNextReminder('00:00');
-        return;
-      }
-      const duration = intervalToDuration({ start: 0, end: difference });
-      const paddedMinutes = String(duration.minutes || 0).padStart(2, '0');
-      const paddedSeconds = String(duration.seconds || 0).padStart(2, '0');
-      setTimeUntilNextReminder(`${paddedMinutes}:${paddedSeconds}`);
-    }, 1000);
-
-    return () => clearInterval(countdownInterval);
-  }, [nextReminderTime]);
 
 
   const handleLogout = () => {
@@ -1355,14 +1274,6 @@ function DashboardContent() {
                         <span>{gameDuration}</span>
                     </div>
                 )}
-                {autoReminderEnabled && timeUntilNextReminder && (
-                    <div className="flex items-center gap-1 text-primary font-medium">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                            {autoReminderInterval}m Auto-Reminder (Next: {timeUntilNextReminder})
-                        </span>
-                    </div>
-                )}
               </>
             )}
            </div>
@@ -1418,15 +1329,6 @@ function DashboardContent() {
                             checked={isOtpVerificationEnabled}
                             onCheckedChange={setOtpVerificationEnabled}
                         />
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                            <Clock className="h-4 w-4 mr-2" />
-                            <Label htmlFor="auto-reminder-toggle" className="pr-2 flex-1">Auto Buy-in Reminders</Label>
-                            <Switch
-                                id="auto-reminder-toggle"
-                                checked={autoReminderEnabled}
-                                onCheckedChange={setAutoReminderEnabled}
-                            />
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setImportGameModalOpen(true)}>
@@ -1597,10 +1499,6 @@ function DashboardContent() {
         isOpen={showDeckChangeAlert}
         onOpenChange={setShowDeckChangeAlert}
       />
-       <AutoReminderAlertDialog
-        isOpen={showAutoReminderAlert}
-        onOpenChange={setShowAutoReminderAlert}
-      />
       <OtpVerificationDialog
         isOpen={isOtpModalOpen}
         onOpenChange={setOtpModalOpen}
@@ -1608,26 +1506,10 @@ function DashboardContent() {
         onSave={(value) => {
             setOtpVerificationEnabled(value);
             setOtpModalOpen(false);
-            setAutoReminderModalOpen(true);
-        }}
-        onCancel={() => {
-            setOtpModalOpen(false);
-            setAutoReminderModalOpen(true);
-        }}
-      />
-      <AutoReminderSettingsDialog
-        isOpen={isAutoReminderModalOpen}
-        onOpenChange={setAutoReminderModalOpen}
-        currentEnabled={autoReminderEnabled}
-        currentInterval={autoReminderInterval}
-        onSave={(enabled, interval) => {
-            setAutoReminderEnabled(enabled);
-            setAutoReminderInterval(interval);
-            setAutoReminderModalOpen(false);
             setLoadGameModalOpen(true);
         }}
         onCancel={() => {
-            setAutoReminderModalOpen(false);
+            setOtpModalOpen(false);
             setLoadGameModalOpen(true);
         }}
       />
@@ -1678,70 +1560,6 @@ const OtpVerificationDialog: FC<{
             </DialogContent>
         </Dialog>
     )
-};
-
-const AutoReminderSettingsDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    currentEnabled: boolean;
-    currentInterval: number;
-    onSave: (enabled: boolean, interval: number) => void;
-    onCancel: () => void;
-}> = ({ isOpen, onOpenChange, currentEnabled, currentInterval, onSave, onCancel }) => {
-    const [isEnabled, setIsEnabled] = useState(currentEnabled);
-    const [interval, setInterval] = useState(currentInterval);
-    const reminderIntervals = [5, 10, 15, 20, 30];
-
-    useEffect(() => {
-        setIsEnabled(currentEnabled);
-        setInterval(currentInterval);
-    }, [currentEnabled, currentInterval, isOpen]);
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Clock className="h-6 w-6 text-primary" />
-                        Auto Buy-in Reminders
-                    </DialogTitle>
-                    <DialogDescription>
-                        Configure automated WhatsApp reminders for player buy-ins during this session.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div className="flex items-center space-x-2">
-                        <Switch id="auto-reminder-toggle-modal" checked={isEnabled} onCheckedChange={setIsEnabled} />
-                        <Label htmlFor="auto-reminder-toggle-modal">{isEnabled ? "Enabled" : "Disabled"}</Label>
-                    </div>
-                     {isEnabled && (
-                        <div className="space-y-2">
-                            <Label htmlFor="reminder-interval">Reminder Interval</Label>
-                             <Select value={String(interval)} onValueChange={(value) => setInterval(Number(value))}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select an interval" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {reminderIntervals.map(i => (
-                                        <SelectItem key={i} value={String(i)}>{i} minutes</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                    <p className="text-sm text-muted-foreground mt-2">
-                        {isEnabled
-                            ? `Players will receive a summary of their buy-ins every ${interval} minutes.`
-                            : "Automated reminders are turned off."}
-                    </p>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={onCancel}>Skip</Button>
-                    <Button onClick={() => onSave(isEnabled, interval)}>Save for Session</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
 };
 
 const BuyInRequestPopover: FC<{
@@ -3443,30 +3261,6 @@ const DeckChangeAlertDialog: FC<{
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogAction onClick={() => onOpenChange(false)}>Got it</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-};
-
-const AutoReminderAlertDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-}> = ({ isOpen, onOpenChange }) => {
-    return (
-        <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <div className="flex justify-center mb-4">
-                        <Send className="h-12 w-12 text-primary"/>
-                    </div>
-                    <AlertDialogTitle className="text-center">Auto-Reminders Sent</AlertDialogTitle>
-                    <AlertDialogDescription className="text-center">
-                        The automated buy-in summaries have been sent to all players.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogAction onClick={() => onOpenChange(false)}>OK</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
