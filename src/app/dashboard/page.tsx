@@ -393,8 +393,9 @@ const AdminView: FC<{
                         )}
                     </div>
                     <div className="flex gap-2">
-                        <Button size="icon" onClick={() => setSendBuyInSummaryOpen(true)} variant="outline" className="bg-green-500 text-white hover:bg-green-600 hover:text-white">
+                        <Button size="sm" onClick={() => setSendBuyInSummaryOpen(true)} variant="outline" className="bg-green-500 text-white hover:bg-green-600 hover:text-white">
                             <WhatsappIcon />
+                            <span className="ml-2">WhatsApp</span>
                         </Button>
                         <Button size="sm" onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
                     </div>
