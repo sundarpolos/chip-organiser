@@ -380,13 +380,14 @@ const AdminView: FC<{
                             <>
                                 <Button size="sm" onClick={() => setAddPlayerModalOpen(true)}>
                                     <Plus className="mr-2 h-4 w-4" />
-                                    <span className="sm:inline">Add Player(s)</span>
+                                    <span className="hidden sm:inline">Add Player(s)</span>
+                                    <span className="sm:hidden">Add</span>
                                 </Button>
                                 <Button size="sm" onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
-                                    <Save className="mr-2 h-4 w-4" />Chip Count
+                                    <Save className="mr-2 h-4 w-4" />Count
                                 </Button>
                                 <Button size="sm" onClick={() => setEndGameConfirmOpen(true)} variant="destructive">
-                                    <StopCircle className="mr-2 h-4 w-4" />End Game
+                                    <StopCircle className="mr-2 h-4 w-4" />End
                                 </Button>
                             </>
                         )}
