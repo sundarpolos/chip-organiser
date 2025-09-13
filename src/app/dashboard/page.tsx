@@ -374,12 +374,13 @@ const AdminView: FC<{
                         ))}
                     </Tabs>
                 </CardContent>
-                <CardFooter className="flex flex-wrap gap-2 justify-between items-center">
+                <CardFooter className="flex flex-col sm:flex-row gap-2 justify-between items-center">
                     <div className="flex flex-wrap gap-2">
                         {canEdit && (
                             <>
                                 <Button size="sm" onClick={() => setAddPlayerModalOpen(true)}>
-                                    <Plus className="mr-2 h-4 w-4" />Add Player(s)
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    <span className="sm:inline">Add Player(s)</span>
                                 </Button>
                                 <Button size="sm" onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
                                     <Save className="mr-2 h-4 w-4" />Chip Count
