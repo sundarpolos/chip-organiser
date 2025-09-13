@@ -382,7 +382,7 @@ const AdminView: FC<{
                                     <Plus className="mr-2 h-4 w-4" />Add Player(s)
                                 </Button>
                                 <Button size="sm" onClick={() => setSaveConfirmOpen(true)} variant="secondary" disabled={!canEdit}>
-                                    <Save className="mr-2 h-4 w-4" />Save Progress
+                                    <Save className="mr-2 h-4 w-4" />Chip Count
                                 </Button>
                                 <Button size="sm" onClick={() => setEndGameConfirmOpen(true)} variant="destructive">
                                     <StopCircle className="mr-2 h-4 w-4" />End Game
@@ -391,7 +391,7 @@ const AdminView: FC<{
                         )}
                     </div>
                     <div className="flex gap-2">
-                        <Button size="sm" onClick={() => setSendBuyInSummaryOpen(true)} variant="outline">
+                        <Button size="icon" onClick={() => setSendBuyInSummaryOpen(true)} variant="outline" className="bg-green-500 text-white hover:bg-green-600 hover:text-white">
                             <WhatsappIcon />
                         </Button>
                         <Button size="sm" onClick={() => setReportsModalOpen(true)} variant="outline"><FileDown className="mr-2 h-4 w-4" />Reports</Button>
@@ -1281,7 +1281,7 @@ function DashboardContent() {
         
         <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
             {(isAdmin || isBanker) && <>
-                <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
+                <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
             </>}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
                 <History className="mr-2 h-4 w-4" />
@@ -1387,7 +1387,7 @@ function DashboardContent() {
                 <h2 className="text-2xl font-semibold mb-2">Welcome to {activeClub?.name}!</h2>
                 <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
                 <div className="flex justify-center gap-4">
-                     <Button onClick={handleNewGame} variant="destructive"><Plus className="mr-2 h-4 w-4" />New Game</Button>
+                     <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
                      <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
                 </div>
             </div>
