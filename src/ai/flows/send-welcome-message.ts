@@ -45,9 +45,11 @@ const welcomeMessagePrompt = ai.definePrompt({
       clubName: z.string(),
     }),
   },
-  prompt: `Hi {{{playerName}}}, welcome to *{{{clubName}}}* on Chip Maestro! 🃏
+  prompt: `Hi {{{playerName}}},
 
-You can log in to the dashboard here:
+Welcome to {{{clubName}}}! We're thrilled to have you.
+
+You can find our tournament schedule, cash game info, and club rules on our website:
 https://turnriver.online`,
 });
 
