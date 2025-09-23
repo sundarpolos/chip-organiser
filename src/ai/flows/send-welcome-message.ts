@@ -45,11 +45,9 @@ const welcomeMessagePrompt = ai.definePrompt({
       clubName: z.string(),
     }),
   },
-  prompt: `Hi {{{playerName}}},
+  prompt: `Hi {{{playerName}}}, welcome to {{{clubName}}}!
 
-Welcome to {{{clubName}}}! We're thrilled to have you.
-
-You can find our tournament schedule, cash game info, and club rules on our website:
+You can log in and view club details here:
 https://turnriver.online`,
 });
 
