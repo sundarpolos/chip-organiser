@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -713,7 +713,50 @@ const PlayerManagement: FC<{
                                         <TableBody>
                                             {clubPlayers.map(player => (
                                                 <TableRow key={player.id}>
-                                                    <TableCell className="font-medium">{player.name}</TableCell>
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{player.name}</span>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <TooltipProvider>
+                                                                    {player.whatsappNumber === SUPER_ADMIN_WHATSAPP && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger><CrownIcon className="h-4 w-4 text-amber-500" /></TooltipTrigger>
+                                                                            <TooltipContent>Super Admin</TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                    {player.isAdmin && player.whatsappNumber !== SUPER_ADMIN_WHATSAPP && (
+                                                                         <Tooltip>
+                                                                            <TooltipTrigger><Shield className="h-4 w-4 text-sky-600" /></TooltipTrigger>
+                                                                            <TooltipContent>Club Admin</TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                    {player.isBanker && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger><Banknote className="h-4 w-4 text-green-600" /></TooltipTrigger>
+                                                                            <TooltipContent>Banker</TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                    {!player.isAdmin && !player.isBanker && (
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger><UserIcon className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+                                                                            <TooltipContent>Player</TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                    {player.isActive ?? true ? (
+                                                                         <Tooltip>
+                                                                            <TooltipTrigger><CheckCircle2 className="h-4 w-4 text-green-500" /></TooltipTrigger>
+                                                                            <TooltipContent>Active</TooltipContent>
+                                                                        </Tooltip>
+                                                                    ) : (
+                                                                         <Tooltip>
+                                                                            <TooltipTrigger><XCircle className="h-4 w-4 text-red-500" /></TooltipTrigger>
+                                                                            <TooltipContent>Inactive</TooltipContent>
+                                                                        </Tooltip>
+                                                                    )}
+                                                                </TooltipProvider>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell>{player.whatsappNumber}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button variant="ghost" size="icon" onClick={() => setPlayerToEdit(player)}>
