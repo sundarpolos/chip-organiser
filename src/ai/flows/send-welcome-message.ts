@@ -46,21 +46,13 @@ const welcomeMessagePrompt = ai.definePrompt({
   },
   prompt: `Hi {{{playerName}}}, welcome to *{{{clubName}}}* on Chip Maestro! 🃏
 
-We're excited to have you. Here’s a quick look at what you can do with our app:
+Here's a quick look at what you can do:
+- *Live Dashboard:* Track your game stats in real-time.
+- *Secure Buy-ins:* Request and verify buy-ins with WhatsApp OTP.
+- *AI Tools:* Get fair play analysis and import game logs.
+- *Full Reports:* Review detailed game summaries and settlements.
 
-*📊 Real-Time Game Dashboard:*
-Track your buy-ins, chip counts, and profit/loss live during any game.
-
-*🔐 Secure Transactions:*
-Request buy-ins directly from the app. For added security, you'll verify them with a WhatsApp OTP.
-
-*🤖 AI-Powered Insights:*
-Our system can analyze game patterns to ensure fair play and even help import game data from text logs.
-
-*📈 Detailed Reports:*
-After each game, get a full report with your performance, final standings, and automated settlement calculations showing who pays whom.
-
-You can log in at any time using this WhatsApp number. We look forward to seeing you at the tables!`,
+Log in anytime with this WhatsApp number. See you at the tables!`,
 });
 
 const sendWelcomeMessageFlow = ai.defineFlow(
