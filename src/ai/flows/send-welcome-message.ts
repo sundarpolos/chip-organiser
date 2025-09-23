@@ -49,17 +49,16 @@ const welcomeMessagePrompt = ai.definePrompt({
 
 Here's a quick look at our top features:
 
-*Live Dashboard*
-> Track your game stats in real-time.
-
-*Secure Buy-ins*
-> Request and verify buy-ins with WhatsApp OTP.
-
-*AI Tools*
-> Get fair play analysis and import game logs.
-
-*Full Reports*
-> Review detailed game summaries and settlements.
+\`\`\`
+---------------------------------
+| Feature         | Benefit     |
+---------------------------------
+| Live Dashboard  | Real-time game stats
+| Secure Buy-ins  | WhatsApp OTP verification
+| AI Tools        | Fair play analysis
+| Full Reports    | Game summaries & settlements
+---------------------------------
+\`\`\`
 
 Log in anytime with this WhatsApp number. See you at the tables!`,
 });
