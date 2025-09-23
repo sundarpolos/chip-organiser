@@ -47,20 +47,12 @@ const welcomeMessagePrompt = ai.definePrompt({
   },
   prompt: `Hi {{{playerName}}}, welcome to *{{{clubName}}}* on Chip Maestro! 🃏
 
-Here's a quick look at our top features:
+You can log in to view game details and your stats at any time using this WhatsApp number.
 
-\`\`\`
----------------------------------
-| Feature         | Benefit     |
----------------------------------
-| Live Dashboard  | Real-time game stats
-| Secure Buy-ins  | WhatsApp OTP verification
-| AI Tools        | Fair play analysis
-| Full Reports    | Game summaries & settlements
----------------------------------
-\`\`\`
+Access the dashboard here:
+https://turnriver.online
 
-Log in anytime with this WhatsApp number. See you at the tables!`,
+See you at the tables!`,
 });
 
 const sendWelcomeMessageFlow = ai.defineFlow(
