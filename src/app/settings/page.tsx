@@ -23,6 +23,7 @@ import { getGameHistory } from '@/services/game-service';
 import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
+import { sendWelcomeMessage } from '@/ai/flows/send-welcome-message';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
@@ -714,9 +715,7 @@ const PlayerManagement: FC<{
                                         <TableBody>
                                             {clubPlayers.map(player => (
                                                 <TableRow key={player.id}>
-                                                    <TableCell className="font-medium">
-                                                        {player.name}
-                                                    </TableCell>
+                                                    <TableCell className="font-medium">{player.name}</TableCell>
                                                     <TableCell>{player.whatsappNumber}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-1.5">
@@ -789,6 +788,7 @@ const PlayerManagement: FC<{
                 isOpen={isCreatePlayerOpen}
                 onOpenChange={setCreatePlayerOpen}
                 clubs={clubs}
+                players={players}
                 onSave={(newPlayer) => {
                     setPlayers(prev => [...prev, newPlayer]);
                 }}
@@ -1039,11 +1039,12 @@ const CreatePlayerDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     clubs: Club[];
+    players: MasterPlayer[];
     onSave: (player: MasterPlayer) => void;
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
     currentUser: MasterPlayer | null;
-}> = ({ isOpen, onOpenChange, clubs, onSave, toast, isSuperAdmin, currentUser }) => {
+}> = ({ isOpen, onOpenChange, clubs, players, onSave, toast, isSuperAdmin, currentUser }) => {
     const [name, setName] = useState('');
     const [countryCode, setCountryCode] = useState('91');
     const [mobileNumber, setMobileNumber] = useState('');
@@ -1082,6 +1083,14 @@ const CreatePlayerDialog: FC<{
         setVerificationStatus('loading');
         setVerificationError(null);
         try {
+            // Check for duplicates first
+            const existingPlayer = players.find(p => p.whatsappNumber === fullNumber);
+            if (existingPlayer) {
+                setVerificationStatus('failed');
+                setVerificationError(`This number is already registered to ${existingPlayer.name}.`);
+                return;
+            }
+
             const result = await verifyWhatsappNumber({ whatsappNumber: fullNumber });
             if (result.success) {
                 setVerificationStatus(result.isOnWhatsApp ? 'verified' : 'failed');
@@ -1110,10 +1119,16 @@ const CreatePlayerDialog: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Player name and club are required.' });
             return;
         }
+        
+        const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
+        const existingPlayer = players.find(p => p.whatsappNumber === fullWhatsappNumber);
+        if (existingPlayer) {
+            toast({ variant: 'destructive', title: 'Duplicate Player', description: `A player with this WhatsApp number (${existingPlayer.name}) already exists.` });
+            return;
+        }
 
         setIsSaving(true);
         try {
-            const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
             const newPlayer: Omit<MasterPlayer, 'id'> = {
                 name,
                 whatsappNumber: fullWhatsappNumber,
@@ -1125,6 +1140,19 @@ const CreatePlayerDialog: FC<{
             const savedPlayer = await saveMasterPlayer(newPlayer);
             onSave(savedPlayer);
             toast({ title: 'Player Created', description: `Successfully created ${name}.` });
+            
+            // Send welcome message
+            const selectedClub = clubs.find(c => c.id === clubId);
+            if (selectedClub && savedPlayer.whatsappNumber) {
+                await sendWelcomeMessage({
+                    playerName: savedPlayer.name,
+                    clubName: selectedClub.name,
+                    whatsappNumber: savedPlayer.whatsappNumber,
+                    whatsappConfig: selectedClub.whatsappConfig || {},
+                });
+                toast({ title: 'Welcome Message Sent', description: `A welcome message has been sent to ${savedPlayer.name}.`});
+            }
+
             onOpenChange(false);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Could not create the player.';
