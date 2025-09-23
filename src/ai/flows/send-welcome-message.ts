@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -46,11 +47,19 @@ const welcomeMessagePrompt = ai.definePrompt({
   },
   prompt: `Hi {{{playerName}}}, welcome to *{{{clubName}}}* on Chip Maestro! 🃏
 
-Here's a quick look at what you can do:
-- *Live Dashboard:* Track your game stats in real-time.
-- *Secure Buy-ins:* Request and verify buy-ins with WhatsApp OTP.
-- *AI Tools:* Get fair play analysis and import game logs.
-- *Full Reports:* Review detailed game summaries and settlements.
+Here's a quick look at our top features:
+
+*Live Dashboard*
+> Track your game stats in real-time.
+
+*Secure Buy-ins*
+> Request and verify buy-ins with WhatsApp OTP.
+
+*AI Tools*
+> Get fair play analysis and import game logs.
+
+*Full Reports*
+> Review detailed game summaries and settlements.
 
 Log in anytime with this WhatsApp number. See you at the tables!`,
 });
