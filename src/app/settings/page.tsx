@@ -1120,11 +1120,14 @@ const CreatePlayerDialog: FC<{
             return;
         }
         
-        const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
-        const existingPlayer = players.find(p => p.whatsappNumber === fullWhatsappNumber);
-        if (existingPlayer) {
-            toast({ variant: 'destructive', title: 'Duplicate Player', description: `A player with this WhatsApp number (${existingPlayer.name}) already exists.` });
-            return;
+        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : '';
+        
+        if (fullWhatsappNumber) {
+            const existingPlayer = players.find(p => p.whatsappNumber === fullWhatsappNumber);
+            if (existingPlayer) {
+                toast({ variant: 'destructive', title: 'Duplicate Player', description: `A player with this WhatsApp number (${existingPlayer.name}) already exists.` });
+                return;
+            }
         }
 
         setIsSaving(true);
@@ -1177,7 +1180,7 @@ const CreatePlayerDialog: FC<{
                         <Input id="create-player-name" value={name} onChange={e => setName(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="create-player-whatsapp">WhatsApp Number</Label>
+                        <Label htmlFor="create-player-whatsapp">WhatsApp Number (Optional)</Label>
                         <div className="flex items-center gap-2">
                              <CountryCodePicker value={countryCode} onValueChange={setCountryCode} />
                              <div className="flex-1 relative">
