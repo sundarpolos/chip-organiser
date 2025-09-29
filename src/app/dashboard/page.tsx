@@ -1873,9 +1873,9 @@ const PlayerCard: FC<{
                 <Accordion type="single" collapsible className="w-full" defaultValue={totalBuyInCount > 4 ? "" : "item-1"}>
                   <AccordionItem value="item-1">
                     <AccordionTrigger>
-                      <div className="text-sm font-medium">
-                        <span className="font-bold">{totalBuyInCount}</span> Buy-in(s)
-                      </div>
+                        <div className="text-sm font-medium">
+                          Show <span className="font-bold">{totalBuyInCount}</span> Buy-in(s)
+                        </div>
                     </AccordionTrigger>
                     <AccordionContent>
                         <div className="space-y-2">
