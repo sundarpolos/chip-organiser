@@ -585,6 +585,7 @@ function DashboardContent() {
   const { toast } = useToast()
   const router = useRouter();
   const searchParams = useSearchParams();
+  const notificationSoundRef = useRef<HTMLAudioElement>(null);
 
 
   // Core State
@@ -897,6 +898,7 @@ function DashboardContent() {
         const timeToAlert = differenceInMilliseconds(alertTime, now);
         alertTimeout = setTimeout(() => {
             setShowDeckChangeAlert(true);
+            notificationSoundRef.current?.play().catch(error => console.error("Audio play failed:", error));
         }, timeToAlert);
     }
     
@@ -1257,6 +1259,7 @@ function DashboardContent() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <audio ref={notificationSoundRef} src="https://actions.google.com/sounds/v1/notifications/card_dismiss.ogg" preload="auto" />
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
           <div className="flex items-baseline gap-3">
