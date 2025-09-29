@@ -157,6 +157,7 @@ export default function GameHistoryPage() {
     playerProfitBar: false,
   });
 
+  const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === '919843350000', [currentUser]);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
 
   // Load user from local storage
@@ -172,41 +173,61 @@ export default function GameHistoryPage() {
   // Load all data on component mount
   useEffect(() => {
     async function loadAllData() {
-      if (!currentUser) return;
+        if (!currentUser) return;
 
-      try {
-        const [games, players, venues] = await Promise.all([
-          getGameHistory(),
-          getMasterPlayers(),
-          getMasterVenues(),
-        ]);
-        setAllGames(games);
-        setMasterPlayers(players);
-        setMasterVenues(venues);
-        
-        if (isAdmin) {
-            // Admins see all players and venues by default
-            setSelectedPlayerIds(players.map(p => p.id));
-            setSelectedVenueIds(venues.map(v => v.id));
-        } else {
-            // Non-admins only see themselves, and all venues
-            setSelectedPlayerIds([currentUser.id]);
-            setSelectedVenueIds(venues.map(v => v.id));
+        try {
+            const clubId = localStorage.getItem('chip-maestro-clubId');
+            
+            const [allGames, allPlayers, allVenues] = await Promise.all([
+                getGameHistory(),
+                getMasterPlayers(),
+                getMasterVenues(),
+            ]);
+
+            if (isSuperAdmin) {
+                // Super admin sees all data
+                setAllGames(allGames);
+                setMasterPlayers(allPlayers);
+                setMasterVenues(allVenues);
+                setSelectedPlayerIds(allPlayers.map(p => p.id));
+                setSelectedVenueIds(allVenues.map(v => v.id));
+            } else {
+                // Regular admin/player sees only their club's data
+                if (!clubId) {
+                    toast({ variant: 'destructive', title: 'Error', description: 'Could not determine your club. Please log in again.'});
+                    router.push('/login');
+                    return;
+                }
+                const clubGames = allGames.filter(g => g.clubId === clubId);
+                const clubPlayers = allPlayers.filter(p => p.clubId === clubId);
+                const clubVenues = allVenues.filter(v => v.clubId === clubId);
+                
+                setAllGames(clubGames);
+                setMasterPlayers(clubPlayers);
+                setMasterVenues(clubVenues);
+                
+                // Set initial filters for non-super-admins
+                setSelectedVenueIds(clubVenues.map(v => v.id));
+                if (isAdmin) { // Club admin sees all players in their club
+                    setSelectedPlayerIds(clubPlayers.map(p => p.id));
+                } else { // Regular player only sees themself
+                    setSelectedPlayerIds([currentUser.id]);
+                }
+            }
+
+        } catch (error) {
+            console.error('Failed to load data for reports:', error);
+            toast({
+            variant: 'destructive',
+            title: 'Error Loading Data',
+            description: 'Could not fetch historical data. Please try again.',
+            });
+        } finally {
+            setIsLoading(false);
         }
-
-      } catch (error) {
-        console.error('Failed to load data for reports:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error Loading Data',
-          description: 'Could not fetch historical data. Please try again.',
-        });
-      } finally {
-        setIsLoading(false);
-      }
     }
     loadAllData();
-  }, [toast, currentUser, isAdmin]);
+  }, [toast, currentUser, isAdmin, isSuperAdmin, router]);
 
   // Memoized filtered data
     const filteredGames = useMemo(() => {
