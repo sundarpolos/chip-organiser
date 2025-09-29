@@ -55,12 +55,23 @@ export default function MergePlayersPage() {
   useEffect(() => {
     async function loadData() {
       try {
+        const clubId = localStorage.getItem('chip-maestro-clubId');
+        if (!clubId) {
+            toast({
+                variant: 'destructive',
+                title: 'No Club Selected',
+                description: 'Please select a club from the dashboard first.',
+            });
+            router.replace('/dashboard');
+            return;
+        }
+
         const [players, games] = await Promise.all([
           getMasterPlayers(),
           getGameHistory(),
         ]);
-        setMasterPlayers(players);
-        setGameHistory(games);
+        setMasterPlayers(players.filter(p => p.clubId === clubId));
+        setGameHistory(games.filter(g => g.clubId === clubId));
       } catch (error) {
         console.error('Failed to load data for merging:', error);
         toast({
@@ -73,7 +84,7 @@ export default function MergePlayersPage() {
       }
     }
     loadData();
-  }, [toast]);
+  }, [toast, router]);
 
   const sortedPlayers = useMemo(() => {
     return [...masterPlayers].sort((a, b) => a.name.localeCompare(b.name));
