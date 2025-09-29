@@ -1870,14 +1870,12 @@ const PlayerCard: FC<{
                     <Label className="text-lg">Buy-ins</Label>
                     <Badge variant="default" className="text-base font-semibold px-3 py-1.5">Total: ₹{totalBuyIns}</Badge>
                 </div>
-                 <Accordion type="single" collapsible className="w-full" defaultValue={totalBuyInCount > 4 ? "" : "item-1"}>
+                <Accordion type="single" collapsible className="w-full" defaultValue={totalBuyInCount > 4 ? "" : "item-1"}>
                   <AccordionItem value="item-1">
                     <AccordionTrigger>
-                        <div className="flex justify-between items-center w-full pr-2">
-                             <div className="text-sm">
-                                <span className="font-bold">{totalBuyInCount}</span> buy-in(s)
-                             </div>
-                        </div>
+                      <div className="text-sm font-medium">
+                        <span className="font-bold">{totalBuyInCount}</span> Buy-in(s)
+                      </div>
                     </AccordionTrigger>
                     <AccordionContent>
                         <div className="space-y-2">
