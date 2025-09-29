@@ -1259,7 +1259,7 @@ function DashboardContent() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <audio ref={notificationSoundRef} src="https://actions.google.com/sounds/v1/notifications/card_dismiss.ogg" preload="auto" />
+      <audio ref={notificationSoundRef} src="/notification.mp3" preload="auto" />
       <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-6 gap-4">
         <div className="flex-1">
           <div className="flex items-baseline gap-3">
@@ -3321,3 +3321,5 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+    
