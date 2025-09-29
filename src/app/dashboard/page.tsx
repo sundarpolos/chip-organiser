@@ -2124,6 +2124,10 @@ const LoadGameDialog: FC<{
     const [sentOtp, setSentOtp] = useState("");
     const [isSendingOtp, setIsSendingOtp] = useState(false);
     const [gameToDelete, setGameToDelete] = useState<GameHistory | null>(null);
+    
+    const sortedGameHistory = useMemo(() => {
+        return [...gameHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }, [gameHistory]);
 
     const handleDeleteRequest = async (game: GameHistory) => {
         setGameToDelete(game);
@@ -2201,8 +2205,8 @@ const LoadGameDialog: FC<{
                 </DialogHeader>
                 <ScrollArea className="h-96 pr-4">
                     <div className="space-y-2">
-                        {gameHistory.length > 0 ? (
-                            gameHistory.map(game => {
+                        {sortedGameHistory.length > 0 ? (
+                            sortedGameHistory.map(game => {
                                 const isFinished = !!game.endTime;
                                 const buttonText = isFinished ? "View" : "Join";
 
@@ -3316,4 +3320,3 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-
