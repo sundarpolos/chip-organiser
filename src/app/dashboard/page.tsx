@@ -401,18 +401,17 @@ const AdminView: FC<{
                     </div>
                 </CardFooter>
             </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Player Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
+                </CardContent>
+            </Card>
 
-            <Accordion type="single" collapsible defaultValue="summary" className="w-full space-y-4">
-                <Card>
-                    <AccordionItem value="summary" className="border-b-0">
-                        <AccordionTrigger className="p-4">
-                            Player Summary
-                        </AccordionTrigger>
-                        <AccordionContent className="p-4 pt-0">
-                            <PlayerSummaryTable calculatedPlayers={calculatedPlayers} />
-                        </AccordionContent>
-                    </AccordionItem>
-                </Card>
+            <Accordion type="single" collapsible className="w-full space-y-4">
                  {activeGame.progressLog && activeGame.progressLog.length > 0 && (
                      <PlayerTimelineAnalysis game={activeGame} calculatedPlayers={calculatedPlayers} activeTab={activeTab} />
                  )}
@@ -3321,7 +3320,5 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-
-    
 
     
