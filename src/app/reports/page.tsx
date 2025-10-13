@@ -655,7 +655,7 @@ const MultiSelectPopover: FC<{
 
 const PlayerBuyInSummaryTable: FC<{ playerReportData: PlayerReportRow[] }> = ({ playerReportData }) => {
     if (playerReportData.length === 0) {
-        return <p className="text-center text-muted-foreground">No player data to display.</p>
+        return <p className="text-center text-muted-foreground">No player data to display for the selected filters.</p>
     }
 
     const sortedData = [...playerReportData].sort((a,b) => a.name.localeCompare(b.name));
@@ -674,10 +674,9 @@ const PlayerBuyInSummaryTable: FC<{ playerReportData: PlayerReportRow[] }> = ({ 
                 <TableBody>
                     <TableRow>
                         <TableCell className="font-medium">No. of Buy-ins</TableCell>
-                         {sortedData.map(player => {
-                            const buyInGames = player.gamesPlayed; // Assuming gamesPlayed is equivalent to games with buy-ins
-                            return <TableCell key={player.id} className="text-right">{buyInGames}</TableCell>
-                        })}
+                         {sortedData.map(player => (
+                            <TableCell key={player.id} className="text-right">{player.gamesPlayed}</TableCell>
+                        ))}
                     </TableRow>
                     <TableRow>
                         <TableCell className="font-medium">Total</TableCell>
@@ -1033,5 +1032,7 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange |
         </div>
     );
 };
+
+    
 
     
