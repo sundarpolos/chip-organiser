@@ -2255,12 +2255,12 @@ const LoadGameDialog: FC<{
 
 const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
     if (!calculatedPlayers || calculatedPlayers.length === 0) {
-        return <p className="text-center text-muted-foreground">No player data to display.</p>
+        return <p className="text-center text-muted-foreground">No player data to display.</p>;
     }
 
-    const sortedData = [...calculatedPlayers].sort((a,b) => a.name.localeCompare(b.name));
-    const totalBuyInCount = sortedData.reduce((sum, p) => sum + (p.buyIns?.length || 0), 0);
-    const grandTotalBuyIn = sortedData.reduce((sum, p) => sum + p.totalBuyIns, 0);
+    const sortedData = [...calculatedPlayers].sort((a, b) => a.name.localeCompare(b.name));
+    const maxBuyIns = Math.max(0, ...sortedData.map(p => p.buyIns?.length || 0));
+    const buyInRows = Array.from({ length: maxBuyIns }, (_, i) => i);
 
     return (
         <div className="w-full overflow-x-auto">
@@ -2271,29 +2271,39 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                         {sortedData.map(player => (
                             <TableHead key={player.id} className="text-right">{player.name}</TableHead>
                         ))}
-                        <TableHead className="text-right font-bold">Total</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow>
-                        <TableCell className="font-medium">No. of Buy-ins</TableCell>
-                         {sortedData.map(player => (
-                            <TableCell key={player.id} className="text-right">{player.buyIns?.length || 0}</TableCell>
-                        ))}
-                        <TableCell className="text-right font-bold">{totalBuyInCount}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell className="font-medium">Total Amount</TableCell>
-                        {sortedData.map(player => (
-                            <TableCell key={player.id} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
-                        ))}
-                        <TableCell className="text-right font-mono font-bold">₹{grandTotalBuyIn.toFixed(0)}</TableCell>
-                    </TableRow>
+                    {buyInRows.map(rowIndex => (
+                        <TableRow key={`buyin-row-${rowIndex}`}>
+                            <TableCell className="font-medium">Buy-in {rowIndex + 1}</TableCell>
+                            {sortedData.map(player => (
+                                <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
+                                    {player.buyIns && player.buyIns[rowIndex] ? `₹${player.buyIns[rowIndex].amount.toFixed(0)}` : '-'}
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
                 </TableBody>
+                <TableFoot>
+                    <TableRow className="font-bold border-t-2 border-primary">
+                        <TableCell>No. of Buy-ins</TableCell>
+                        {sortedData.map(player => (
+                            <TableCell key={`${player.id}-count`} className="text-right">{player.buyIns?.length || 0}</TableCell>
+                        ))}
+                    </TableRow>
+                    <TableRow className="font-bold">
+                        <TableCell>Total Amount</TableCell>
+                        {sortedData.map(player => (
+                            <TableCell key={`${player.id}-total`} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
+                        ))}
+                    </TableRow>
+                </TableFoot>
             </Table>
         </div>
     );
 };
+
 
 const ReportsDialog: FC<{
     isOpen: boolean,
@@ -3413,5 +3423,7 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+    
 
     
