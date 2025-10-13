@@ -2274,6 +2274,7 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
             <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead></TableHead>
                         {sortedData.map(player => (
                             <TableHead key={player.id} className="text-right">{player.name}</TableHead>
                         ))}
@@ -2282,12 +2283,12 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 <TableBody>
                     {buyInRows.map(rowIndex => (
                         <TableRow key={`buyin-row-${rowIndex}`}>
+                            <TableCell className="text-left font-semibold">Buy-in {rowIndex + 1}</TableCell>
                             {sortedData.map(player => (
                                 <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
                                     {player.buyIns && player.buyIns[rowIndex] ? (
                                         <div>
                                             <span>₹{player.buyIns[rowIndex].amount.toFixed(0)}</span>
-                                            <div className="text-xs text-muted-foreground">{format(new Date(player.buyIns[rowIndex].timestamp), 'p')}</div>
                                         </div>
                                     ) : '-'}
                                 </TableCell>
@@ -2296,29 +2297,20 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                     ))}
                 </TableBody>
                 <TableFoot>
-                    <TableRow>
-                       <TableCell colSpan={sortedData.length} className="text-left font-semibold text-base">Summary</TableCell>
+                     <TableRow>
+                       <TableCell className="text-left font-semibold text-base">Summary</TableCell>
+                       <TableCell colSpan={sortedData.length}></TableCell>
                     </TableRow>
                     <TableRow>
+                        <TableCell className="text-left font-semibold">No. of buy-ins</TableCell>
                         {sortedData.map(player => (
                             <TableCell key={`${player.id}-count`} className="text-right font-semibold">{player.buyIns?.length || 0}</TableCell>
                         ))}
                     </TableRow>
                     <TableRow className="font-bold">
+                        <TableCell className="text-left font-semibold">Total Amount</TableCell>
                         {sortedData.map(player => (
                             <TableCell key={`${player.id}-total`} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
-                        ))}
-                    </TableRow>
-                     <TableRow className="font-bold">
-                        {sortedData.map(player => (
-                            <TableCell key={`${player.id}-return`} className="text-right font-mono">₹{player.finalChips.toFixed(0)}</TableCell>
-                        ))}
-                    </TableRow>
-                     <TableRow className="font-bold">
-                        {sortedData.map(player => (
-                            <TableCell key={`${player.id}-pl`} className={cn("text-right font-mono", player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                ₹{player.profitLoss.toFixed(0)}
-                            </TableCell>
                         ))}
                     </TableRow>
                 </TableFoot>
@@ -2485,6 +2477,24 @@ const ReportsDialog: FC<{
                                 </Table>
                             </CardContent>
                         </Card>
+                        
+                         {/* Money Transfers */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Money Transfers</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {transfers.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {transfers.map((t, i) => (
+                                            <li key={i} className="flex items-center gap-2 p-2 rounded-md bg-muted" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<strong class="font-bold text-primary">$1</strong>') }} />
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-muted-foreground">No transfers needed. The game is balanced.</p>
+                                )}
+                            </CardContent>
+                        </Card>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                              {/* Player Performance */}
@@ -2531,23 +2541,6 @@ const ReportsDialog: FC<{
                                 </CardContent>
                             </Card>
                         </div>
-                         {/* Money Transfers */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Money Transfers</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {transfers.length > 0 ? (
-                                    <ul className="space-y-2">
-                                        {transfers.map((t, i) => (
-                                            <li key={i} className="flex items-center gap-2 p-2 rounded-md bg-muted" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<strong class="font-bold text-primary">$1</strong>') }} />
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-muted-foreground">No transfers needed. The game is balanced.</p>
-                                )}
-                            </CardContent>
-                        </Card>
                         <Card>
                             <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
                             <CardContent>
@@ -3408,6 +3401,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
