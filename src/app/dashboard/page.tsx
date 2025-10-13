@@ -2268,6 +2268,7 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
             <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead></TableHead>
                         {sortedData.map(player => (
                             <TableHead key={player.id} className="text-right">{player.name}</TableHead>
                         ))}
@@ -2276,6 +2277,7 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 <TableBody>
                     {buyInRows.map(rowIndex => (
                         <TableRow key={`buyin-row-${rowIndex}`}>
+                             <TableCell className="font-medium text-muted-foreground">Buy-in {rowIndex + 1}</TableCell>
                             {sortedData.map(player => (
                                 <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
                                     {player.buyIns && player.buyIns[rowIndex] ? `₹${player.buyIns[rowIndex].amount.toFixed(0)}` : '-'}
@@ -2286,27 +2288,31 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 </TableBody>
                 <TableFoot>
                     <TableRow className="font-bold border-t-2 border-primary">
-                       <TableCell colSpan={sortedData.length} className="text-left font-semibold text-base">Summary</TableCell>
+                       <TableCell colSpan={sortedData.length + 1} className="text-left font-semibold text-base">Summary</TableCell>
                     </TableRow>
                     <TableRow>
+                         <TableCell className="font-semibold">No. of Buy-ins</TableCell>
                         {sortedData.map(player => (
                             <TableCell key={`${player.id}-count`} className="text-right font-semibold">{player.buyIns?.length || 0} buy-ins</TableCell>
                         ))}
                     </TableRow>
                     <TableRow className="font-bold">
+                        <TableCell>Total Buy-in</TableCell>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-total`} className="text-right font-mono">Total: ₹{player.totalBuyIns.toFixed(0)}</TableCell>
+                            <TableCell key={`${player.id}-total`} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
                         ))}
                     </TableRow>
                      <TableRow className="font-bold">
+                        <TableCell>Final Chip Return</TableCell>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-return`} className="text-right font-mono">Return: ₹{player.finalChips.toFixed(0)}</TableCell>
+                            <TableCell key={`${player.id}-return`} className="text-right font-mono">₹{player.finalChips.toFixed(0)}</TableCell>
                         ))}
                     </TableRow>
                      <TableRow className="font-bold">
+                        <TableCell>Profit/Loss</TableCell>
                         {sortedData.map(player => (
                             <TableCell key={`${player.id}-pl`} className={cn("text-right font-mono", player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                P/L: ₹{player.profitLoss.toFixed(0)}
+                                ₹{player.profitLoss.toFixed(0)}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -3399,4 +3405,5 @@ export default function DashboardPage() {
     
 
     
+
 
