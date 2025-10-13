@@ -1,5 +1,3 @@
-
-
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -2286,11 +2284,7 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                             <TableCell className="text-left font-semibold">Buy-in {rowIndex + 1}</TableCell>
                             {sortedData.map(player => (
                                 <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
-                                    {player.buyIns && player.buyIns[rowIndex] ? (
-                                        <div>
-                                            <span>₹{player.buyIns[rowIndex].amount.toFixed(0)}</span>
-                                        </div>
-                                    ) : '-'}
+                                    {player.buyIns && player.buyIns[rowIndex] ? `₹${player.buyIns[rowIndex].amount.toFixed(0)}` : '-'}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -2478,10 +2472,9 @@ const ReportsDialog: FC<{
                             </CardContent>
                         </Card>
                         
-                         {/* Money Transfers */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>Money Transfers</CardTitle>
+                                <CardTitle>Player Settlement Details</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {transfers.length > 0 ? (
@@ -3395,16 +3388,3 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-
-    
-
-    
-
-    
-
-
-
-
-
-
-
