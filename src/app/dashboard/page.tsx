@@ -2293,7 +2293,7 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                     <TableRow>
                          <TableCell className="font-semibold">No. of Buy-ins</TableCell>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-count`} className="text-right font-semibold">{player.buyIns?.length || 0} buy-ins</TableCell>
+                            <TableCell key={`${player.id}-count`} className="text-right font-semibold">{player.buyIns?.length || 0}</TableCell>
                         ))}
                     </TableRow>
                     <TableRow className="font-bold">
@@ -3405,5 +3405,6 @@ export default function DashboardPage() {
     
 
     
+
 
 
