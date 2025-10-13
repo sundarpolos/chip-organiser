@@ -1,4 +1,5 @@
 
+
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -2267,7 +2268,6 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Player</TableHead>
                         {sortedData.map(player => (
                             <TableHead key={player.id} className="text-right">{player.name}</TableHead>
                         ))}
@@ -2276,7 +2276,6 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 <TableBody>
                     {buyInRows.map(rowIndex => (
                         <TableRow key={`buyin-row-${rowIndex}`}>
-                            <TableCell className="font-medium">Buy-in {rowIndex + 1}</TableCell>
                             {sortedData.map(player => (
                                 <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
                                     {player.buyIns && player.buyIns[rowIndex] ? `₹${player.buyIns[rowIndex].amount.toFixed(0)}` : '-'}
@@ -2287,15 +2286,13 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 </TableBody>
                 <TableFoot>
                     <TableRow className="font-bold border-t-2 border-primary">
-                        <TableCell>No. of Buy-ins</TableCell>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-count`} className="text-right">{player.buyIns?.length || 0}</TableCell>
+                            <TableCell key={`${player.id}-count`} className="text-right">{player.buyIns?.length || 0} buy-ins</TableCell>
                         ))}
                     </TableRow>
                     <TableRow className="font-bold">
-                        <TableCell>Total Amount</TableCell>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-total`} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
+                            <TableCell key={`${player.id}-total`} className="text-right font-mono">Total: ₹{player.totalBuyIns.toFixed(0)}</TableCell>
                         ))}
                     </TableRow>
                 </TableFoot>
@@ -2337,13 +2334,6 @@ const ReportsDialog: FC<{
       return calculateInterPlayerTransfers(calculatedPlayers);
     }, [calculatedPlayers]);
     
-    const buyInLog = useMemo(() => {
-        if (!activeGame) return [];
-        return (activeGame.players || [])
-            .flatMap(p => (p.buyIns || []).map(b => ({ ...b, playerName: p.name })))
-            .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    }, [activeGame]);
-
     const { grandTotalBuyin, grandTotalChips, grandTotalProfitLoss } = useMemo(() => {
         if (!calculatedPlayers) return { grandTotalBuyin: 0, grandTotalChips: 0, grandTotalProfitLoss: 0 };
         return {
