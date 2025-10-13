@@ -33,6 +33,7 @@ type PlayerReportRow = {
   totalBuyIn: number;
   totalChipReturn: number;
   profitLoss: number;
+  buyInCount: number;
 };
 
 type ChartVisibilityState = {
@@ -289,7 +290,7 @@ export default function GameHistoryPage() {
   }, [allGames, masterPlayers, masterVenues, selectedPlayerIds, selectedVenueIds, dateRange]);
   
   const playerReportData = useMemo<PlayerReportRow[]>(() => {
-    const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; profitLoss: number }>();
+    const playerStats = new Map<string, { id: string, name: string; gamesPlayed: number; totalBuyIn: number; totalChipReturn: number; profitLoss: number; buyInCount: number; }>();
     const selectedPlayerNames = masterPlayers.filter(p => selectedPlayerIds.includes(p.id)).map(p => p.name);
 
     filteredGames.forEach(game => {
@@ -305,12 +306,14 @@ export default function GameHistoryPage() {
                     totalBuyIn: 0,
                     totalChipReturn: 0,
                     profitLoss: 0,
+                    buyInCount: 0,
                 };
 
                 stats.gamesPlayed += 1;
                 stats.totalBuyIn += player.buyIn || 0;
                 stats.totalChipReturn += player.finalChips || 0;
                 stats.profitLoss += player.profitLoss || 0;
+                stats.buyInCount += player.buyIns?.length || 0;
 
                 playerStats.set(player.name, stats);
             }
@@ -324,6 +327,7 @@ export default function GameHistoryPage() {
         totalBuyIn: p.totalBuyIn || 0,
         totalChipReturn: p.totalChipReturn || 0,
         profitLoss: p.profitLoss || 0,
+        buyInCount: p.buyInCount || 0,
     })).sort((a,b) => b.profitLoss - a.profitLoss);
   }, [filteredGames, masterPlayers, selectedPlayerIds]);
 
@@ -382,7 +386,7 @@ export default function GameHistoryPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters & Display Options</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Filter className="h-5 w-5"/> Filters &amp; Display Options</CardTitle>
         </CardHeader>
         <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 border-b pb-4 mb-4">
@@ -425,7 +429,7 @@ export default function GameHistoryPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Game History & Reports</h1>
+            <h1 className="text-3xl font-bold">Game History &amp; Reports</h1>
           </div>
           <div className="flex gap-2">
               <Button onClick={handleExportPdf} disabled={playerReportData.length === 0 || isExporting}>
@@ -675,7 +679,7 @@ const PlayerBuyInSummaryTable: FC<{ playerReportData: PlayerReportRow[] }> = ({ 
                     <TableRow>
                         <TableCell className="font-medium">No. of Buy-ins</TableCell>
                          {sortedData.map(player => (
-                            <TableCell key={player.id} className="text-right">{player.gamesPlayed}</TableCell>
+                            <TableCell key={player.id} className="text-right">{player.buyInCount}</TableCell>
                         ))}
                     </TableRow>
                     <TableRow>
