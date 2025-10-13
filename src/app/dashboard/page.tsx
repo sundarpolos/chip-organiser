@@ -2443,41 +2443,6 @@ const ReportsDialog: FC<{
                           </CardContent>
                         </Card>
 
-                        {/* Buy-in Log */}
-                        <Card>
-                            <CardHeader><CardTitle>Buy-in Log</CardTitle></CardHeader>
-                            <CardContent>
-                                {buyInLog.length > 0 ? (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Time</TableHead>
-                                                <TableHead>Player</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {buyInLog.map(b => (
-                                                <TableRow key={b.id}>
-                                                    <TableCell>{format(new Date(b.timestamp), 'p')}</TableCell>
-                                                    <TableCell>{b.playerName}</TableCell>
-                                                    <TableCell className="text-right">₹{b.amount}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={b.status === 'verified' ? 'default' : 'secondary'} className={cn(b.status === 'verified' && 'bg-green-500')}>
-                                                            {b.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                ) : (
-                                    <p className="text-muted-foreground text-center">No buy-ins were recorded for this game.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-
                          {/* Player Summary & Accumulative Report */}
                         <Card>
                             <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
@@ -3423,6 +3388,8 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+    
 
     
 
