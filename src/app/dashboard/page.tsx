@@ -2253,6 +2253,48 @@ const LoadGameDialog: FC<{
     )
 };
 
+const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = ({ calculatedPlayers }) => {
+    if (!calculatedPlayers || calculatedPlayers.length === 0) {
+        return <p className="text-center text-muted-foreground">No player data to display.</p>
+    }
+
+    const sortedData = [...calculatedPlayers].sort((a,b) => a.name.localeCompare(b.name));
+    const totalBuyInCount = sortedData.reduce((sum, p) => sum + (p.buyIns?.length || 0), 0);
+    const grandTotalBuyIn = sortedData.reduce((sum, p) => sum + p.totalBuyIns, 0);
+
+    return (
+        <div className="w-full overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Player</TableHead>
+                        {sortedData.map(player => (
+                            <TableHead key={player.id} className="text-right">{player.name}</TableHead>
+                        ))}
+                        <TableHead className="text-right font-bold">Total</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow>
+                        <TableCell className="font-medium">No. of Buy-ins</TableCell>
+                         {sortedData.map(player => (
+                            <TableCell key={player.id} className="text-right">{player.buyIns?.length || 0}</TableCell>
+                        ))}
+                        <TableCell className="text-right font-bold">{totalBuyInCount}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                        <TableCell className="font-medium">Total Amount</TableCell>
+                        {sortedData.map(player => (
+                            <TableCell key={player.id} className="text-right font-mono">₹{player.totalBuyIns.toFixed(0)}</TableCell>
+                        ))}
+                        <TableCell className="text-right font-mono font-bold">₹{grandTotalBuyIn.toFixed(0)}</TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
+    );
+};
+
 const ReportsDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
@@ -2383,6 +2425,14 @@ const ReportsDialog: FC<{
                 <ScrollArea className="flex-1 -mx-2 md:-mx-6">
                     <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
                         
+                         {/* Player Buy-in Summary */}
+                        <Card>
+                          <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
+                          <CardContent>
+                              <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                          </CardContent>
+                        </Card>
+
                          {/* Player Summary & Accumulative Report */}
                         <Card>
                             <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
@@ -3328,3 +3378,5 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+    
