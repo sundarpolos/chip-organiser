@@ -2284,7 +2284,12 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                         <TableRow key={`buyin-row-${rowIndex}`}>
                             {sortedData.map(player => (
                                 <TableCell key={`${player.id}-buyin-${rowIndex}`} className="text-right font-mono">
-                                    {player.buyIns && player.buyIns[rowIndex] ? `₹${player.buyIns[rowIndex].amount.toFixed(0)}` : '-'}
+                                    {player.buyIns && player.buyIns[rowIndex] ? (
+                                        <div>
+                                            <span>₹{player.buyIns[rowIndex].amount.toFixed(0)}</span>
+                                            <div className="text-xs text-muted-foreground">{format(new Date(player.buyIns[rowIndex].timestamp), 'p')}</div>
+                                        </div>
+                                    ) : '-'}
                                 </TableCell>
                             ))}
                         </TableRow>
@@ -2543,6 +2548,12 @@ const ReportsDialog: FC<{
                                 )}
                             </CardContent>
                         </Card>
+                        <Card>
+                            <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
+                            <CardContent>
+                                <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                            </CardContent>
+                        </Card>
                          {/* Player Timeline Analysis */}
                         {activeGame.progressLog && activeGame.progressLog.length > 0 && (
                             <PlayerTimelineAnalysis
@@ -2551,13 +2562,6 @@ const ReportsDialog: FC<{
                                 activeTab=""
                             />
                         )}
-                        {/* Player Buy-in Summary */}
-                        <Card>
-                          <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
-                          <CardContent>
-                              <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
-                          </CardContent>
-                        </Card>
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -3404,6 +3408,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
