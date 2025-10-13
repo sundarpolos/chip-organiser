@@ -411,16 +411,16 @@ const AdminView: FC<{
                 </CardContent>
             </Card>
 
-            <Accordion type="single" collapsible className="w-full">
-                {activeGame.progressLog && activeGame.progressLog.length > 0 && (
+            {activeGame.progressLog && activeGame.progressLog.length > 0 && (
+                <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                         <AccordionTrigger className="text-lg font-semibold">Player Timeline Analysis</AccordionTrigger>
                         <AccordionContent>
                             <PlayerTimelineAnalysis game={activeGame} calculatedPlayers={calculatedPlayers} activeTab={activeTab} />
                         </AccordionContent>
                     </AccordionItem>
-                 )}
-            </Accordion>
+                </Accordion>
+             )}
         </div>
     );
 };
@@ -1900,6 +1900,9 @@ const PlayerCard: FC<{
                                 />
                               </div>
                             ))}
+                            {totalBuyInCount === 0 && (
+                                <p className="text-center text-muted-foreground text-sm py-4">No buy-ins for this player yet.</p>
+                            )}
                         </div>
                     </AccordionContent>
                   </AccordionItem>

@@ -446,6 +446,15 @@ export default function GameHistoryPage() {
             
             <Card>
                 <CardHeader>
+                    <CardTitle>Player Buy-in Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <PlayerBuyInSummaryTable playerReportData={playerReportData} />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <div className="flex items-center gap-2">
                         <CardTitle>{isAdmin ? "Player Report" : `Your Report, ${currentUser.name}`}</CardTitle>
                         <Badge variant="secondary">{playerReportData.length} players</Badge>
@@ -643,6 +652,44 @@ const MultiSelectPopover: FC<{
         </div>
     )
 }
+
+const PlayerBuyInSummaryTable: FC<{ playerReportData: PlayerReportRow[] }> = ({ playerReportData }) => {
+    if (playerReportData.length === 0) {
+        return <p className="text-center text-muted-foreground">No player data to display.</p>
+    }
+
+    const sortedData = [...playerReportData].sort((a,b) => a.name.localeCompare(b.name));
+
+    return (
+        <div className="w-full overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Player</TableHead>
+                        {sortedData.map(player => (
+                            <TableHead key={player.id} className="text-right">{player.name}</TableHead>
+                        ))}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow>
+                        <TableCell className="font-medium">No. of Buy-ins</TableCell>
+                         {sortedData.map(player => {
+                            const buyInGames = player.gamesPlayed; // Assuming gamesPlayed is equivalent to games with buy-ins
+                            return <TableCell key={player.id} className="text-right">{buyInGames}</TableCell>
+                        })}
+                    </TableRow>
+                    <TableRow>
+                        <TableCell className="font-medium">Total</TableCell>
+                        {sortedData.map(player => (
+                            <TableCell key={player.id} className="text-right font-mono">₹{player.totalBuyIn.toFixed(0)}</TableCell>
+                        ))}
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </div>
+    );
+};
 
 const PlayerReportTable: FC<{
     playerReportData: PlayerReportRow[],
