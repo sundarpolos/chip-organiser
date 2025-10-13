@@ -2286,13 +2286,28 @@ const PlayerBuyInSummaryTable: FC<{ calculatedPlayers: CalculatedPlayer[] }> = (
                 </TableBody>
                 <TableFoot>
                     <TableRow className="font-bold border-t-2 border-primary">
+                       <TableCell colSpan={sortedData.length} className="text-left font-semibold text-base">Summary</TableCell>
+                    </TableRow>
+                    <TableRow>
                         {sortedData.map(player => (
-                            <TableCell key={`${player.id}-count`} className="text-right">{player.buyIns?.length || 0} buy-ins</TableCell>
+                            <TableCell key={`${player.id}-count`} className="text-right font-semibold">{player.buyIns?.length || 0} buy-ins</TableCell>
                         ))}
                     </TableRow>
                     <TableRow className="font-bold">
                         {sortedData.map(player => (
                             <TableCell key={`${player.id}-total`} className="text-right font-mono">Total: ₹{player.totalBuyIns.toFixed(0)}</TableCell>
+                        ))}
+                    </TableRow>
+                     <TableRow className="font-bold">
+                        {sortedData.map(player => (
+                            <TableCell key={`${player.id}-return`} className="text-right font-mono">Return: ₹{player.finalChips.toFixed(0)}</TableCell>
+                        ))}
+                    </TableRow>
+                     <TableRow className="font-bold">
+                        {sortedData.map(player => (
+                            <TableCell key={`${player.id}-pl`} className={cn("text-right font-mono", player.profitLoss >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                P/L: ₹{player.profitLoss.toFixed(0)}
+                            </TableCell>
                         ))}
                     </TableRow>
                 </TableFoot>
@@ -3384,3 +3399,4 @@ export default function DashboardPage() {
     
 
     
+
