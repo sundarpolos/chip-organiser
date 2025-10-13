@@ -2446,14 +2446,6 @@ const ReportsDialog: FC<{
                 <ScrollArea className="flex-1 -mx-2 md:-mx-6">
                     <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
                         
-                         {/* Player Buy-in Summary */}
-                        <Card>
-                          <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
-                          <CardContent>
-                              <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
-                          </CardContent>
-                        </Card>
-
                          {/* Player Summary & Accumulative Report */}
                         <Card>
                             <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
@@ -2559,6 +2551,13 @@ const ReportsDialog: FC<{
                                 activeTab=""
                             />
                         )}
+                        {/* Player Buy-in Summary */}
+                        <Card>
+                          <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
+                          <CardContent>
+                              <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                          </CardContent>
+                        </Card>
                     </div>
                 </ScrollArea>
             </DialogContent>
@@ -3405,6 +3404,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
