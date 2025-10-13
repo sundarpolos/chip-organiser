@@ -450,15 +450,6 @@ export default function GameHistoryPage() {
             
             <Card>
                 <CardHeader>
-                    <CardTitle>Player Buy-in Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <PlayerBuyInSummaryTable playerReportData={playerReportData} />
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
                     <div className="flex items-center gap-2">
                         <CardTitle>{isAdmin ? "Player Report" : `Your Report, ${currentUser.name}`}</CardTitle>
                         <Badge variant="secondary">{playerReportData.length} players</Badge>
@@ -1040,4 +1031,5 @@ const PlayerProfitBarChart: FC<{ data: PlayerReportRow[], dateRange: DateRange |
     
 
     
+
 
