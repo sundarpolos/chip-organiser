@@ -490,7 +490,7 @@ const CreateEditClubDialog: FC<{
             setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '' });
             setDeckChangeIntervalHours(2);
         }
-    }, [clubToEdit, players]);
+    }, [clubToEdit, players, isOpen]);
     
     const adminPlayers = useMemo(() => {
         return players
@@ -1364,3 +1364,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

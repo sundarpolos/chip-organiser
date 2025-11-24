@@ -34,8 +34,13 @@ export async function createClub(club: Omit<Club, 'id'>): Promise<Club> {
 export async function updateClub(club: Club): Promise<Club> {
     const docRef = doc(db, CLUBS_COLLECTION, club.id);
     // Firestore does not like undefined values. We need to convert them to null or strip them.
-    const clubToSave = JSON.parse(JSON.stringify(club));
-    await setDoc(docRef, clubToSave, { merge: true });
+    const clubData = {
+        name: club.name,
+        ownerId: club.ownerId,
+        whatsappConfig: club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' },
+        deckChangeIntervalHours: club.deckChangeIntervalHours || 0,
+    };
+    await setDoc(docRef, clubData, { merge: true });
     return club;
 }
 
@@ -62,7 +67,7 @@ export async function deleteClub(clubId: string): Promise<void> {
 
 
 export async function findClubByName(name: string): Promise<Club | null> {
-    const q = query(collection(db, CLUBS_COLLECTION), where("name", "==", name));
+    const q = query(collection(db, CLUBS_COLlection), where("name", "==", name));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];
@@ -70,3 +75,5 @@ export async function findClubByName(name: string): Promise<Club | null> {
     }
     return null;
 }
+
+    
