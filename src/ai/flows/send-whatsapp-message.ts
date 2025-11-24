@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -52,10 +53,19 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
 
     try {
-      const url = `${finalApiUrl}?token=${finalApiToken}&sender=${finalSenderMobile}&number=${to}&message=${encodeURIComponent(message)}`;
+      const payload = {
+        token: finalApiToken,
+        sender: finalSenderMobile,
+        number: to,
+        message: message,
+      };
 
-      const response = await fetch(url, {
-        method: 'GET',
+      const response = await fetch(finalApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       const responseText = await response.text();
