@@ -60,9 +60,7 @@ const sendBuyInOtpPrompt = ai.definePrompt({
         totalBuyInAmount: z.number(),
         newTotalBuyInAmount: z.number(),
     })},
-    prompt: `Hi {{{playerName}}}, your OTP is {{{otp}}} for your {{{buyInOrdinal}}} buy-in.
-Amount: ₹{{{buyInAmount}}}
-Previous Total: ₹{{{totalBuyInAmount}}}
+    prompt: `Hi {{{playerName}}}, your OTP for your {{{buyInOrdinal}}} buy-in of ₹{{{buyInAmount}}} is {{{otp}}}.
 After verification, your new grand total will be ₹{{{newTotalBuyInAmount}}}.`,
 });
 

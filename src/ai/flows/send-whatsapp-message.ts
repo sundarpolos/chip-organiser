@@ -54,19 +54,18 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
     try {
       // Corrected payload structure for wazoneindia.com
-      const payload = {
-        token: finalApiToken,
-        sender: finalSenderMobile,
-        number: to, // Changed from 'receiver'
-        message: message, // Changed from 'msg'
-      };
+      const payload = new URLSearchParams();
+      payload.append('token', finalApiToken);
+      payload.append('sender', finalSenderMobile);
+      payload.append('number', to);
+      payload.append('message', message);
 
       const response = await fetch(finalApiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(payload), // Send the payload directly
+        body: payload,
       });
 
       const responseText = await response.text();
