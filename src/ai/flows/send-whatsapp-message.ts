@@ -52,17 +52,10 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
 
     try {
-      const formData = new URLSearchParams();
-      formData.append('receiver', to);
-      formData.append('msgtext', message);
-      formData.append('token', finalApiToken);
-      
-      const response = await fetch(finalApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
+      const url = `${finalApiUrl}?token=${finalApiToken}&sender=${finalSenderMobile}&number=${to}&message=${encodeURIComponent(message)}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
       });
 
       const responseText = await response.text();
@@ -75,14 +68,14 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 100)}...` };
       }
       
-      if (!response.ok || String(responseData.success).toLowerCase() !== 'true') {
-        const apiError = responseData.error || responseData.message || `API returned status ${response.status} with 'success: false'`;
+      if (responseData.status !== 'success') {
+        const apiError = responseData.error || responseData.message || `API returned status ${responseData.status}`;
         console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
         return { success: false, error: `API Error: ${apiError}` };
       }
       
       console.log('Successfully sent WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
-      return { success: true, messageId: responseData.message_id || responseData.messageId || 'N/A' };
+      return { success: true, messageId: responseData.message_id || responseData.id || 'N/A' };
 
     } catch (error) {
       console.error('An unexpected network or fetch error occurred in sendWhatsappMessageFlow:', error);
