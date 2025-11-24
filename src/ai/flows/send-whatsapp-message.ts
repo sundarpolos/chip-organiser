@@ -53,11 +53,12 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
 
     try {
+      // Corrected payload structure for wazoneindia.com
       const payload = {
         token: finalApiToken,
         sender: finalSenderMobile,
-        number: to,
-        message: message,
+        number: to, // Changed from 'receiver'
+        message: message, // Changed from 'msg'
       };
 
       const response = await fetch(finalApiUrl, {
@@ -65,7 +66,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload), // Send the payload directly
       });
 
       const responseText = await response.text();
@@ -78,6 +79,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 100)}...` };
       }
       
+      // wazoneindia.com uses `status: 'success'`
       if (responseData.status !== 'success') {
         const apiError = responseData.error || responseData.message || `API returned status ${responseData.status}`;
         console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
