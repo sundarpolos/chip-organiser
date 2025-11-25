@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, type FC, useMemo } from 'react';
@@ -8,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
 import { sendWelcomeMessage } from '@/ai/flows/send-welcome-message';
+import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
@@ -472,6 +474,7 @@ const CreateEditClubDialog: FC<{
     const [clubName, setClubName] = useState('');
     const [adminId, setAdminId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
     const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
     const [deckChangeIntervalHours, setDeckChangeIntervalHours] = useState(2);
 
@@ -543,6 +546,31 @@ const CreateEditClubDialog: FC<{
         }
     };
 
+    const handleTestWhatsapp = async () => {
+        if (!whatsappConfig.apiUrl || !whatsappConfig.apiToken || !currentUser.whatsappNumber) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: 'API settings and your WhatsApp number are required to send a test.' });
+            return;
+        }
+        setIsTesting(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: currentUser.whatsappNumber,
+                message: 'This is a test message from Chip Maestro.',
+                ...whatsappConfig,
+            });
+            if (result.success) {
+                toast({ title: 'Test Successful!', description: 'A test message was sent to your WhatsApp number.' });
+            } else {
+                throw new Error(result.error || 'Failed to send test message.');
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+            toast({ variant: 'destructive', title: 'Test Failed', description: errorMessage });
+        } finally {
+            setIsTesting(false);
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
@@ -598,6 +626,12 @@ const CreateEditClubDialog: FC<{
                                 <div className="space-y-2">
                                     <Label htmlFor="wa-sender-mobile">Sender Mobile</Label>
                                     <Input id="wa-sender-mobile" value={whatsappConfig.senderMobile} onChange={e => setWhatsappConfig(c => ({...c, senderMobile: e.target.value}))} placeholder="e.g., 14155552671" />
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button variant="secondary" onClick={handleTestWhatsapp} disabled={isTesting}>
+                                        {isTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                        Test Settings
+                                    </Button>
                                 </div>
                             </AccordionContent>
                         </AccordionItem>
