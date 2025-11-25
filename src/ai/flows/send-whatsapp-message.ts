@@ -65,7 +65,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: body.toString(),
+        body: body,
       });
       
       const responseText = await response.text();
