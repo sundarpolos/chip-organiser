@@ -46,26 +46,28 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
     const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
-    if (!finalApiToken || !finalApiUrl || !finalSenderMobile) {
-      const errorMsg = 'WhatsApp API credentials are not fully configured. Please provide them in the WA Settings or in the .env file.';
+    if (!finalApiToken || !finalApiUrl) {
+      const errorMsg = 'WhatsApp API URL and Token are not configured. Please provide them in the WA Settings or in the .env file.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
     try {
-      // Use URLSearchParams for x-www-form-urlencoded content type
-      const payload = new URLSearchParams();
-      payload.append('token', finalApiToken);
-      payload.append('sender', finalSenderMobile);
-      payload.append('number', to);
-      payload.append('message', message);
+      // Construct the URL with query parameters for a GET request
+      const params = new URLSearchParams({
+        token: finalApiToken,
+        receiver: to,
+        msgtext: message,
+      });
+      // The sender parameter might also be needed, depending on the API
+      if (finalSenderMobile) {
+        params.append('sender', finalSenderMobile);
+      }
+      
+      const url = `${finalApiUrl}?${params.toString()}`;
 
-      const response = await fetch(finalApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: payload.toString(),
+      const response = await fetch(url, {
+        method: 'GET', // Use GET as per the PHP example
       });
 
       const responseText = await response.text();
@@ -74,25 +76,23 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       try {
         responseData = JSON.parse(responseText);
       } catch (e) {
-        console.error(`Failed to parse API response as JSON. Status: ${response.status}. Raw response:`, responseText);
-        // Handle cases where the API might return non-JSON success responses.
-        // If the status is OK but the body isn't JSON, we might still consider it a success.
+        // If parsing fails, check if the request was still successful
         if (response.ok) {
-            console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Non-JSON response:`, responseText);
-            return { success: true, messageId: 'N/A' };
+          console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Non-JSON response:`, responseText);
+          return { success: true, messageId: 'N/A - Non-JSON response' };
         }
-        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 150)}...` };
+        console.error(`Failed to parse API response as JSON. Status: ${response.status}. Raw response:`, responseText);
+        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Response: ${responseText.substring(0, 150)}...` };
       }
       
-      // wazoneindia.com uses `status: 'success'` in their JSON response
-      if (responseData.status !== 'success') {
+      if (response.ok && (responseData.status === 'success' || responseData.success === true)) {
+        console.log('Successfully sent WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
+        return { success: true, messageId: responseData.message_id || responseData.id || 'N/A' };
+      } else {
         const apiError = responseData.error || responseData.message || `API returned status '${responseData.status}'`;
         console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
         return { success: false, error: `API Error: ${apiError}` };
       }
-      
-      console.log('Successfully sent WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
-      return { success: true, messageId: responseData.message_id || responseData.id || 'N/A' };
 
     } catch (error) {
       console.error('An unexpected network or fetch error occurred in sendWhatsappMessageFlow:', error);
