@@ -59,7 +59,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       });
 
       console.log(`Attempting to send WhatsApp message via POST to: ${finalApiUrl}`);
-
+      
       const response = await fetch(finalApiUrl, {
         method: 'POST',
         headers: {
@@ -83,8 +83,11 @@ const sendWhatsappMessageFlow = ai.defineFlow(
             return { success: false, error: `API Error: ${responseData.error}` };
           }
         } catch (e) {
-          console.error(`Failed to parse JSON response, but request was OK. Status: ${response.status}. Response:`, responseText);
-          return { success: false, error: `API returned a non-JSON response: ${responseText.substring(0, 200)}...`};
+           // This case handles non-JSON success responses, like "OK" or just a string.
+           // If we get here, it means the request was successful (response.ok is true), but the body wasn't valid JSON.
+           // We can treat this as a success, as some APIs might respond this way.
+          console.log(`Successfully sent WhatsApp message with non-JSON response. Status: ${response.status}. Response:`, responseText);
+          return { success: true, messageId: 'N/A' };
         }
       } else {
         let apiError = `API returned status ${response.status}`;
