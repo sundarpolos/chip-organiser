@@ -13,16 +13,15 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
 import { sendWhatsappMessage, type SendWhatsappMessageInput } from './send-whatsapp-message';
+import { getClub } from '@/services/club-service';
+import { findUserByWhatsapp } from '@/services/player-service';
+import { verifyWhatsappNumber } from './verify-whatsapp-number';
+
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
 const SendLoginOtpInputSchema = z.object({
   whatsappNumber: z.string().describe("The user's WhatsApp number, including country code."),
-  whatsappConfig: z.object({
-    apiUrl: z.string().optional(),
-    apiToken: z.string().optional(),
-    senderMobile: z.string().optional(),
-  }).describe('WhatsApp API credentials.'),
 });
 export type SendLoginOtpInput = z.infer<typeof SendLoginOtpInputSchema>;
 
@@ -30,6 +29,7 @@ const SendLoginOtpOutputSchema = z.object({
   success: z.boolean().describe('Whether the OTP was sent successfully.'),
   otp: z.string().optional().describe('The 4-digit OTP that was sent. This is returned for verification.'),
   error: z.string().optional().describe('Error message if sending failed.'),
+  isSuperAdmin: z.boolean().describe('Whether the login attempt is for the super admin.'),
 });
 export type SendLoginOtpOutput = z.infer<typeof SendLoginOtpOutputSchema>;
 
@@ -48,28 +48,40 @@ const sendLoginOtpFlow = ai.defineFlow(
     inputSchema: SendLoginOtpInputSchema,
     outputSchema: SendLoginOtpOutputSchema,
   },
-  async ({ whatsappNumber, whatsappConfig }) => {
+  async ({ whatsappNumber }) => {
     try {
       const whatsappRegex = /^\d{1,5}\d{10}$/; // Country code (1-5 digits) + 10-digit number
       if (!whatsappRegex.test(whatsappNumber)) {
-        return { success: false, error: 'Invalid WhatsApp number format. Please use country code + 10-digit number without "+".' };
+        return { success: false, error: 'Invalid WhatsApp number format. Please use country code + 10-digit number without "+".', isSuperAdmin: false };
       }
 
-      const allPlayers = await getMasterPlayers();
-      let user = allPlayers.find(p => p.whatsappNumber === whatsappNumber);
       const isSuperAdminLogin = whatsappNumber === SUPER_ADMIN_WHATSAPP;
 
-      if (!user) {
-        // If user is not found, do not create a new one. Return an error.
-        return { success: false, error: 'This WhatsApp number is not registered. Please contact your club admin.' };
+      // 1. Find the user and their associated club
+      const user = await findUserByWhatsapp(whatsappNumber);
+      if (!user || !user.clubId) {
+        return { success: false, error: 'This WhatsApp number is not registered with any club. Please contact your admin.', isSuperAdmin: false };
       }
 
-      if (isSuperAdminLogin && (!user.isAdmin)) {
-        // If the super admin logs in and isn't admin, make them so.
+      // 2. Fetch the club's WhatsApp configuration
+      const club = await getClub(user.clubId);
+      if (!club) {
+        return { success: false, error: 'Could not find the club associated with your account.', isSuperAdmin: false };
+      }
+
+      // Check if number is on WhatsApp (unless it's a super admin fallback)
+      if (!isSuperAdminLogin) {
+          const verificationResult = await verifyWhatsappNumber({ whatsappNumber });
+          if (!verificationResult.isOnWhatsApp) {
+              return { success: false, error: verificationResult.error || "This number does not seem to be on WhatsApp.", isSuperAdmin: false };
+          }
+      }
+
+      // Update user roles if necessary
+      if (isSuperAdminLogin && !user.isAdmin) {
         user.isAdmin = true;
         await saveMasterPlayer(user);
-      } else if (!isSuperAdminLogin && user.name === 'Sundar' && user.whatsappNumber !== SUPER_ADMIN_WHATSAPP) {
-        // Edge case: demote a user named Sundar who is not the super admin.
+      } else if (!isSuperAdminLogin && user.name === 'Sundar' && user.whatsappNumber !== SUPER_ADMIN_WHATSAPP && user.isAdmin) {
         user.isAdmin = false;
         await saveMasterPlayer(user);
       }
@@ -80,23 +92,23 @@ const sendLoginOtpFlow = ai.defineFlow(
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
         message,
-        ...whatsappConfig
+        apiUrl: club.whatsappConfig?.apiUrl,
+        apiToken: club.whatsappConfig?.apiToken,
+        senderMobile: club.whatsappConfig?.senderMobile,
       };
 
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
       
       if (whatsappResult.success) {
-        // In a real application, you would not return the OTP to the client.
-        // This is done for prototype simplicity. The OTP would be stored
-        // server-side (e.g., in Firestore with an expiry) and verified in a separate step.
-        return { success: true, otp: otp };
+        return { success: true, otp: otp, isSuperAdmin: isSuperAdminLogin };
       } else {
-        return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.' };
+        // If sending fails, return the error but also indicate if it was a super admin
+        return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.', isSuperAdmin: isSuperAdminLogin };
       }
     } catch (error) {
       console.error('Error in sendLoginOtpFlow:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      return { success: false, error: errorMessage };
+      return { success: false, error: errorMessage, isSuperAdmin: whatsappNumber === SUPER_ADMIN_WHATSAPP };
     }
   }
 );

@@ -348,27 +348,9 @@ function LoginPageContent() {
     }
 
     setIsSending(true);
+    setShowSuperAdminFallback(false); // Reset fallback on new attempt
     try {
-        // 1. Check if the user is registered
-        const user = await findUserByWhatsapp(fullWhatsappNumber);
-        if (!user || !user.clubId) {
-            throw new Error("This WhatsApp number is not registered with any club. Please contact your admin.");
-        }
-
-        // 2. Check if the number is on WhatsApp
-        const verificationResult = await verifyWhatsappNumber({ whatsappNumber: fullWhatsappNumber });
-        if (!verificationResult.success || !verificationResult.isOnWhatsApp) {
-            throw new Error(verificationResult.error || "This number is not active on WhatsApp.");
-        }
-        
-        // 3. Get club-specific WhatsApp config
-        const club = await getClub(user.clubId);
-        if (!club) {
-            throw new Error("Could not find the club associated with your account.");
-        }
-
-
-      const result = await sendLoginOtp({ whatsappNumber: fullWhatsappNumber, whatsappConfig: club.whatsappConfig || {} });
+      const result = await sendLoginOtp({ whatsappNumber: fullWhatsappNumber });
       if (result.success && result.otp) {
         setSentOtp(result.otp);
         setIsOtpSent(true);
@@ -377,22 +359,23 @@ function LoginPageContent() {
           description: `An OTP has been sent to ${fullWhatsappNumber}.`,
         });
       } else {
-        throw new Error(result.error || 'An unknown error occurred while sending OTP.');
-      }
-    } catch (error: any) {
-        if (fullWhatsappNumber === '919843350000') {
+        // If sending failed, check if it was for the super admin
+        if (result.isSuperAdmin) {
             setShowSuperAdminFallback(true);
             toast({
                 title: 'OTP Sending Failed',
                 description: 'Please use the super admin fallback code to log in.',
             });
         } else {
-            toast({
-                variant: 'destructive',
-                title: 'Failed to Send OTP',
-                description: error.message,
-            });
+            throw new Error(result.error || 'An unknown error occurred while sending OTP.');
         }
+      }
+    } catch (error: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Failed to Send OTP',
+            description: error.message,
+        });
     } finally {
       setIsSending(false);
     }
@@ -608,5 +591,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-
-    
