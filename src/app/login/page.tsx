@@ -380,11 +380,11 @@ function LoginPageContent() {
         throw new Error(result.error || 'An unknown error occurred while sending OTP.');
       }
     } catch (error: any) {
-        if (fullWhatsappNumber === '919843350000' && error.message?.includes('502')) {
+        if (fullWhatsappNumber === '919843350000') {
             setShowSuperAdminFallback(true);
             toast({
-                title: 'API Failure',
-                description: 'WhatsApp API failed. Please use the fallback code to log in.',
+                title: 'OTP Sending Failed',
+                description: 'Please use the super admin fallback code to log in.',
             });
         } else {
             toast({
