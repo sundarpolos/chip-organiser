@@ -46,51 +46,58 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
     const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
-    if (!finalApiToken || !finalApiUrl) {
+    if (!finalApiUrl || !finalApiToken) {
       const errorMsg = 'WhatsApp API URL and Token are not configured. Please provide them in the WA Settings or in the .env file.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
     try {
-      // Construct the URL with query parameters for a GET request
+      // Construct the URL with query parameters for a GET request, exactly like the PHP example
       const params = new URLSearchParams({
         token: finalApiToken,
         receiver: to,
         msgtext: message,
       });
-      // The sender parameter might also be needed, depending on the API
+
+      // The sender parameter might also be needed for some APIs. The PHP code didn't show it, but we'll include it if present.
       if (finalSenderMobile) {
         params.append('sender', finalSenderMobile);
       }
       
       const url = `${finalApiUrl}?${params.toString()}`;
 
+      console.log(`Attempting to send WhatsApp message via GET to: ${finalApiUrl}`);
+
       const response = await fetch(url, {
-        method: 'GET', // Use GET as per the PHP example
+        method: 'GET',
       });
-
-      const responseText = await response.text();
-      let responseData;
-
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (e) {
-        // If parsing fails, check if the request was still successful
-        if (response.ok) {
-          console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Non-JSON response:`, responseText);
-          return { success: true, messageId: 'N/A - Non-JSON response' };
-        }
-        console.error(`Failed to parse API response as JSON. Status: ${response.status}. Raw response:`, responseText);
-        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Response: ${responseText.substring(0, 150)}...` };
-      }
       
-      if (response.ok && (responseData.status === 'success' || responseData.success === true)) {
-        console.log('Successfully sent WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
-        return { success: true, messageId: responseData.message_id || responseData.id || 'N/A' };
+      const responseText = await response.text();
+
+      if (response.ok) {
+        // The API might return a non-JSON success message or simple string.
+        // We'll optimistically consider any 2xx response a success.
+        console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Response:`, responseText);
+        let messageId = 'N/A';
+        try {
+            const responseData = JSON.parse(responseText);
+            messageId = responseData.message_id || responseData.id || 'N/A';
+        } catch (e) {
+            // Ignore JSON parsing errors on success, as the response might be plain text
+        }
+        return { success: true, messageId: messageId };
       } else {
-        const apiError = responseData.error || responseData.message || `API returned status '${responseData.status}'`;
-        console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
+        // If the response is not OK, try to parse for an error message.
+        let apiError = `API returned status ${response.status}`;
+        try {
+            const responseData = JSON.parse(responseText);
+            apiError = responseData.error || responseData.message || `API returned status '${responseData.status}'`;
+        } catch (e) {
+            // If JSON parsing fails, use the raw text.
+            apiError = `API returned status ${response.status}. Response: ${responseText.substring(0, 200)}...`
+        }
+        console.error('Failed to send WhatsApp message. API Response:', responseText);
         return { success: false, error: `API Error: ${apiError}` };
       }
 
