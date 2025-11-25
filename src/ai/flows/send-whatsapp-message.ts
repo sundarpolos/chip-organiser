@@ -52,7 +52,6 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
 
     try {
-      // Replicate the PHP cURL example: POST with x-www-form-urlencoded
       const body = new URLSearchParams({
         receiver: to,
         msgtext: message,
@@ -74,12 +73,14 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       if (response.ok) {
         try {
           const responseData = JSON.parse(responseText);
-          if (responseData.success === true) {
+          // According to the provided PHP logic, success is determined by the absence of an 'error' key.
+          if (responseData.error === undefined) {
             console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Response:`, responseText);
             return { success: true, messageId: responseData.message_id || 'N/A' };
           } else {
-            console.error('API indicated failure. API Response:', responseText);
-            return { success: false, error: `API Error: ${responseData.error || 'Unknown API error'}` };
+            // The API returned a 200 OK status but included an error field in the JSON.
+            console.error('API indicated failure with an error key. API Response:', responseText);
+            return { success: false, error: `API Error: ${responseData.error}` };
           }
         } catch (e) {
           console.error(`Failed to parse JSON response, but request was OK. Status: ${response.status}. Response:`, responseText);
