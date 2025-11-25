@@ -57,11 +57,8 @@ const sendBuyInOtpPrompt = ai.definePrompt({
         otp: z.string(),
         buyInOrdinal: z.string(),
         buyInAmount: z.number(),
-        totalBuyInAmount: z.number(),
-        newTotalBuyInAmount: z.number(),
     })},
-    prompt: `Hi {{{playerName}}}, your OTP for your {{{buyInOrdinal}}} buy-in of ₹{{{buyInAmount}}} is {{{otp}}}.
-After verification, your new grand total will be ₹{{{newTotalBuyInAmount}}}.`,
+    prompt: `Hi {{{playerName}}}, your OTP for your {{{buyInOrdinal}}} buy-in of ₹{{{buyInAmount}}} is {{{otp}}}.`,
 });
 
 
@@ -77,15 +74,12 @@ const sendBuyInOtpFlow = ai.defineFlow(
     }
 
     const otp = generateOtp();
-    const newTotal = totalBuyInAmount + buyInAmount;
     
     const response = await sendBuyInOtpPrompt({
         playerName,
         otp,
         buyInOrdinal: getOrdinalSuffix(buyInCount),
         buyInAmount,
-        totalBuyInAmount,
-        newTotalBuyInAmount: newTotal,
     });
     const message = response.text;
 
@@ -93,9 +87,7 @@ const sendBuyInOtpFlow = ai.defineFlow(
       const whatsappPayload: SendWhatsappMessageInput = { 
         to: whatsappNumber, 
         message,
-        apiUrl: whatsappConfig.apiUrl,
-        apiToken: whatsappConfig.apiToken,
-        senderMobile: whatsappConfig.senderMobile,
+        ...whatsappConfig
       };
 
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
