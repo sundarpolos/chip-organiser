@@ -87,7 +87,9 @@ const sendBuyInOtpFlow = ai.defineFlow(
       const whatsappPayload: SendWhatsappMessageInput = { 
         to: whatsappNumber, 
         message,
-        ...whatsappConfig
+        apiUrl: whatsappConfig.apiUrl,
+        apiToken: whatsappConfig.apiToken,
+        senderMobile: whatsappConfig.senderMobile,
       };
 
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
