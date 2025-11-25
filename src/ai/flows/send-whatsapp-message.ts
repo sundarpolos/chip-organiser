@@ -53,7 +53,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
 
     try {
-      // Corrected payload structure for wazoneindia.com
+      // Use URLSearchParams for x-www-form-urlencoded content type
       const payload = new URLSearchParams();
       payload.append('token', finalApiToken);
       payload.append('sender', finalSenderMobile);
@@ -65,7 +65,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: payload,
+        body: payload.toString(),
       });
 
       const responseText = await response.text();
@@ -75,12 +75,18 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         responseData = JSON.parse(responseText);
       } catch (e) {
         console.error(`Failed to parse API response as JSON. Status: ${response.status}. Raw response:`, responseText);
-        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 100)}...` };
+        // Handle cases where the API might return non-JSON success responses.
+        // If the status is OK but the body isn't JSON, we might still consider it a success.
+        if (response.ok) {
+            console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Non-JSON response:`, responseText);
+            return { success: true, messageId: 'N/A' };
+        }
+        return { success: false, error: `Received an invalid or non-JSON response from the API. Status: ${response.status}. Check API provider docs. Response: ${responseText.substring(0, 150)}...` };
       }
       
-      // wazoneindia.com uses `status: 'success'`
+      // wazoneindia.com uses `status: 'success'` in their JSON response
       if (responseData.status !== 'success') {
-        const apiError = responseData.error || responseData.message || `API returned status ${responseData.status}`;
+        const apiError = responseData.error || responseData.message || `API returned status '${responseData.status}'`;
         console.error('Failed to send WhatsApp message. API Response:', JSON.stringify(responseData, null, 2));
         return { success: false, error: `API Error: ${apiError}` };
       }
