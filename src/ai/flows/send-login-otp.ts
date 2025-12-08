@@ -82,9 +82,7 @@ const sendLoginOtpFlow = ai.defineFlow(
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
         message,
-        apiUrl: club.whatsappConfig?.apiUrl,
-        apiToken: club.whatsappConfig?.apiToken,
-        senderMobile: club.whatsappConfig?.senderMobile,
+        ...club.whatsappConfig
       };
 
       // 5. Send the message
