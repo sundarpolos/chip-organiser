@@ -5,18 +5,16 @@
  * @fileOverview A flow for handling user login/signup via WhatsApp OTP.
  *
  * - sendLoginOtp - A function that handles user lookup/creation and sends an OTP.
- * - SendLoginOtpInput - The input type for the sendLoginOtp function.
+ * - SendLoginOtpInput - The input type for the sendLoginotp function.
  * - SendLoginOtpOutput - The return type for the sendLoginOtp function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getMasterPlayers, saveMasterPlayer } from '@/services/player-service';
+import { findUserByWhatsapp } from '@/services/player-service';
 import { sendWhatsappMessage, type SendWhatsappMessageInput } from './send-whatsapp-message';
 import { getClub } from '@/services/club-service';
-import { findUserByWhatsapp } from '@/services/player-service';
 import { verifyWhatsappNumber } from './verify-whatsapp-number';
-
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -69,26 +67,18 @@ const sendLoginOtpFlow = ai.defineFlow(
         return { success: false, error: 'Could not find the club associated with your account.', isSuperAdmin: false };
       }
 
-      // Check if number is on WhatsApp (unless it's a super admin fallback)
+      // 3. Verify number is on whatsapp (skip for super admin to allow fallback)
       if (!isSuperAdminLogin) {
           const verificationResult = await verifyWhatsappNumber({ whatsappNumber });
           if (!verificationResult.isOnWhatsApp) {
-              return { success: false, error: verificationResult.error || "This number does not seem to be on WhatsApp.", isSuperAdmin: false };
+              return { success: false, error: verificationResult.error || "This number does not appear to be on WhatsApp.", isSuperAdmin: false };
           }
-      }
-
-      // Update user roles if necessary
-      if (isSuperAdminLogin && !user.isAdmin) {
-        user.isAdmin = true;
-        await saveMasterPlayer(user);
-      } else if (!isSuperAdminLogin && user.name === 'Sundar' && user.whatsappNumber !== SUPER_ADMIN_WHATSAPP && user.isAdmin) {
-        user.isAdmin = false;
-        await saveMasterPlayer(user);
       }
 
       const otp = generateOtp();
       const message = `Your Chip Maestro login code is ${otp}. This code will expire in 10 minutes.`;
 
+      // 4. Construct payload with club-specific credentials
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
         message,
@@ -97,6 +87,7 @@ const sendLoginOtpFlow = ai.defineFlow(
         senderMobile: club.whatsappConfig?.senderMobile,
       };
 
+      // 5. Send the message
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
       
       if (whatsappResult.success) {
