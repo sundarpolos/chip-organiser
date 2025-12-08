@@ -63,40 +63,37 @@ const sendLoginOtpFlow = ai.defineFlow(
 
       // 2. Fetch the club's WhatsApp configuration
       const club = await getClub(user.clubId);
-      if (!club) {
+      if (!club && !isSuperAdminLogin) {
         return { success: false, error: 'Could not find the club associated with your account.', isSuperAdmin: false };
-      }
-
-      // 3. Verify number is on whatsapp (skip for super admin to allow fallback)
-      if (!isSuperAdminLogin) {
-          const verificationResult = await verifyWhatsappNumber({ whatsappNumber });
-          if (!verificationResult.isOnWhatsApp) {
-              return { success: false, error: verificationResult.error || "This number does not appear to be on WhatsApp.", isSuperAdmin: false };
-          }
       }
 
       const otp = generateOtp();
       const message = `Your Chip Maestro login code is ${otp}. This code will expire in 10 minutes.`;
+      
+      // Use club-specific credentials if available and not super admin, otherwise fall back to environment variables.
+      const whatsappConfig = (club && club.whatsappConfig && !isSuperAdminLogin) 
+        ? club.whatsappConfig
+        : {};
 
-      // 4. Construct payload with club-specific credentials
+      // 3. Construct payload
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
         message,
-        ...club.whatsappConfig
+        ...whatsappConfig
       };
 
-      // 5. Send the message
+      // 4. Send the message
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
       
       if (whatsappResult.success) {
         return { success: true, otp: otp, isSuperAdmin: isSuperAdminLogin };
       } else {
-        // If sending fails, return the error but also indicate if it was a super admin
+        console.error(`Login OTP send failure for ${whatsappNumber}:`, whatsappResult.error);
         return { success: false, error: whatsappResult.error || 'Failed to send WhatsApp message.', isSuperAdmin: isSuperAdminLogin };
       }
     } catch (error) {
-      console.error('Error in sendLoginOtpFlow:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      console.error('Critical error in sendLoginOtpFlow:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown server error occurred.';
       return { success: false, error: errorMessage, isSuperAdmin: whatsappNumber === SUPER_ADMIN_WHATSAPP };
     }
   }
