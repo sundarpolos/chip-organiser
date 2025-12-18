@@ -337,23 +337,37 @@ const CountryCodePicker: FC<{
 }
 
 const SeatBookingManagement: FC<{
-    activeClub: Club;
+    isSuperAdmin: boolean;
+    allClubs: Club[];
+    activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ activeClub, toast }) => {
+}> = ({ isSuperAdmin, allClubs, activeClub, toast }) => {
     const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [clubForNewGame, setClubForNewGame] = useState<Club | null>(null);
 
     useEffect(() => {
-        getScheduledGamesForClub(activeClub.id)
-            .then(setScheduledGames)
-            .finally(() => setIsLoading(false));
-    }, [activeClub.id]);
+        async function loadGames() {
+            setIsLoading(true);
+            const allScheduledGames: ScheduledGame[] = [];
+            const clubIdsToFetch = isSuperAdmin ? allClubs.map(c => c.id) : (activeClub ? [activeClub.id] : []);
 
-    const handleCreateGame = async (gameDate: string, totalSeats: number) => {
+            for (const clubId of clubIdsToFetch) {
+                const games = await getScheduledGamesForClub(clubId);
+                allScheduledGames.push(...games);
+            }
+            
+            setScheduledGames(allScheduledGames.sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
+            setIsLoading(false);
+        }
+        loadGames();
+    }, [isSuperAdmin, allClubs, activeClub]);
+
+    const handleCreateGame = async (clubId: string, gameDate: string, totalSeats: number) => {
         try {
             const newGame = await createScheduledGame({
-                clubId: activeClub.id,
+                clubId: clubId,
                 gameDate,
                 totalSeats,
             });
@@ -373,77 +387,154 @@ const SeatBookingManagement: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete the scheduled game.' });
         }
     };
+    
+    const openCreateModal = (club: Club) => {
+        setClubForNewGame(club);
+        setCreateModalOpen(true);
+    };
 
+    const gamesByClub = useMemo(() => {
+        const grouped = new Map<string, ScheduledGame[]>();
+        scheduledGames.forEach(game => {
+            const clubId = game.clubId;
+            if (!grouped.has(clubId)) {
+                grouped.set(clubId, []);
+            }
+            grouped.get(clubId)!.push(game);
+        });
+        return Array.from(grouped.entries());
+    }, [scheduledGames]);
+
+    const getClubName = (clubId: string) => allClubs.find(c => c.id === clubId)?.name || 'Unknown Club';
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader><CardTitle>Advance Seat Booking</CardTitle></CardHeader>
+                <CardContent className="flex justify-center items-center h-24">
+                    <Loader2 className="animate-spin" />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isSuperAdmin) {
+        return (
+             <>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Advance Seat Booking Management</CardTitle>
+                        <CardDescription>Schedule and manage upcoming games for all clubs.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Accordion type="multiple" className="w-full">
+                            {allClubs.map(club => (
+                                <AccordionItem value={club.id} key={club.id}>
+                                    <AccordionTrigger>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-lg">{club.name}</span>
+                                            <span className="text-sm text-muted-foreground">({gamesByClub.find(([id]) => id === club.id)?.[1]?.length || 0} games)</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        <div className="flex justify-end mb-4">
+                                            <Button size="sm" onClick={() => openCreateModal(club)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>
+                                        </div>
+                                        <GamesTable games={gamesByClub.find(([id]) => id === club.id)?.[1] || []} onDelete={handleDeleteGame} />
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </CardContent>
+                </Card>
+                {clubForNewGame && (
+                    <ScheduleGameDialog
+                        isOpen={isCreateModalOpen}
+                        onOpenChange={setCreateModalOpen}
+                        club={clubForNewGame}
+                        onSchedule={handleCreateGame}
+                    />
+                )}
+            </>
+        )
+    }
+
+    // View for regular Admin
     return (
         <>
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>Advance Seat Booking</CardTitle>
-                        <Button onClick={() => setCreateModalOpen(true)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>
+                        {activeClub && <Button onClick={() => openCreateModal(activeClub)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>}
                     </div>
                     <CardDescription>Schedule upcoming games to allow players to book their seats in advance.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isLoading ? (
-                        <Loader2 className="animate-spin" />
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Game Date</TableHead>
-                                    <TableHead>Total Seats</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {scheduledGames.map(game => (
-                                    <TableRow key={game.id}>
-                                        <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
-                                        <TableCell>{game.totalSeats}</TableCell>
-                                        <TableCell className="text-right">
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>This will delete the scheduled game for {format(new Date(game.gameDate), 'PPP')} and remove all player bookings.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteGame(game.id)}>Delete</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {scheduledGames.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="text-center">No games scheduled yet.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
+                     <GamesTable games={scheduledGames} onDelete={handleDeleteGame} />
                 </CardContent>
             </Card>
-            <ScheduleGameDialog
-                isOpen={isCreateModalOpen}
-                onOpenChange={setCreateModalOpen}
-                onSchedule={handleCreateGame}
-            />
+            {clubForNewGame && (
+                <ScheduleGameDialog
+                    isOpen={isCreateModalOpen}
+                    onOpenChange={setCreateModalOpen}
+                    club={clubForNewGame}
+                    onSchedule={handleCreateGame}
+                />
+            )}
         </>
     );
 };
 
+const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => void }> = ({ games, onDelete }) => (
+    <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>Game Date</TableHead>
+                <TableHead>Total Seats</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            {games.map(game => (
+                <TableRow key={game.id}>
+                    <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
+                    <TableCell>{game.totalSeats}</TableCell>
+                    <TableCell className="text-right">
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>This will delete the scheduled game for {format(new Date(game.gameDate), 'PPP')} and remove all player bookings.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDelete(game.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </TableCell>
+                </TableRow>
+            ))}
+            {games.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={3} className="text-center">No games scheduled yet.</TableCell>
+                </TableRow>
+            )}
+        </TableBody>
+    </Table>
+);
+
+
 const ScheduleGameDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onSchedule: (gameDate: string, totalSeats: number) => void;
-}> = ({ isOpen, onOpenChange, onSchedule }) => {
+    club: Club;
+    onSchedule: (clubId: string, gameDate: string, totalSeats: number) => void;
+}> = ({ isOpen, onOpenChange, club, onSchedule }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [seats, setSeats] = useState(10);
     const [isSaving, setIsSaving] = useState(false);
@@ -452,7 +543,7 @@ const ScheduleGameDialog: FC<{
         if (date && seats > 0) {
             setIsSaving(true);
             // Pass date in YYYY-MM-DD format to be timezone-safe
-            onSchedule(format(date, 'yyyy-MM-dd'), seats);
+            onSchedule(club.id, format(date, 'yyyy-MM-dd'), seats);
             setIsSaving(false);
             onOpenChange(false);
         }
@@ -462,7 +553,7 @@ const ScheduleGameDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Schedule New Game</DialogTitle>
+                    <DialogTitle>Schedule Game for {club.name}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -1566,8 +1657,13 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       {isAdmin && activeClub && (
-          <SeatBookingManagement activeClub={activeClub} toast={toast} />
+       {isAdmin && (
+          <SeatBookingManagement 
+            isSuperAdmin={isSuperAdmin}
+            allClubs={clubs}
+            activeClub={activeClub} 
+            toast={toast} 
+          />
        )}
        {isAdmin && (
          <PlayerManagement 
@@ -1582,7 +1678,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
-
-    
