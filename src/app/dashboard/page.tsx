@@ -1,5 +1,3 @@
-
-
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -1496,7 +1494,7 @@ function DashboardContent() {
         onConfirmSave={handleSaveGameProgress}
         title="Confirm Game Progress"
         description="Review and edit chip counts before saving the current progress. This will not end the game."
-        buttonText="Confirm & Save Progress"
+        buttonText="Confirm &amp; Save Progress"
       />
        <SaveConfirmDialog
         isOpen={isEndGameConfirmOpen}
@@ -1505,7 +1503,7 @@ function DashboardContent() {
         onConfirmSave={handleEndGame}
         title="Confirm End Game"
         description="Review and edit final chip counts before ending the game session. This action will stop the timer and save the final results."
-        buttonText="Confirm & End Game"
+        buttonText="Confirm &amp; End Game"
         isEndGame={true}
       />
       <SettlementDialog
@@ -1683,7 +1681,7 @@ const AddDirectBuyInPopover: FC<{
                         disabled={!amount || Number(amount) <= 0}
                         className="w-full"
                     >
-                        Add & Verify
+                        Add &amp; Verify
                     </Button>
                 </div>
             </PopoverContent>
@@ -1800,7 +1798,7 @@ const BuyInRow: FC<{
             
             {canEdit && isOtpEnabled && buyIn.status === 'requested' && (
                 <Button onClick={handleSendOtp} disabled={isSending} className="w-full h-9">
-                    {isSending ? <Loader2 className="animate-spin" /> : <>Approve & Send OTP</>}
+                    {isSending ? <Loader2 className="animate-spin" /> : <>Approve &amp; Send OTP</>}
                 </Button>
             )}
 
@@ -2229,7 +2227,7 @@ const LoadGameDialog: FC<{
                       <DialogFooter>
                           <Button variant="outline" onClick={() => setGameToDelete(null)}>Cancel</Button>
                           <Button variant="destructive" onClick={confirmDelete}>
-                              Confirm & Delete
+                              Confirm &amp; Delete
                           </Button>
                       </DialogFooter>
                   </DialogContent>
@@ -3184,9 +3182,7 @@ ${formattedTransfers}
                     )}
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline" disabled={isSending}>Cancel</Button>
-                    </DialogClose>
+                    <DialogClose asChild><Button variant="outline" disabled={isSending}>Cancel</Button></DialogClose>
                     <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
                         {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
                     </Button>
@@ -3369,7 +3365,7 @@ const BuyInRequestModalDialog: FC<{
                         <Button variant="outline">Close</Button>
                     </DialogClose>
                     <Button onClick={() => request && onApprove(request.playerId, request.id)}>
-                        Approve & Send OTP
+                        Approve &amp; Send OTP
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -3464,7 +3460,7 @@ const BookingView: FC<{
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games & Bookings</CardTitle>
+                <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games &amp; Bookings</CardTitle>
                 <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
             </CardHeader>
             <CardContent>
@@ -3661,8 +3657,8 @@ const GameBookingCard: FC<{
         if (playerBooking?.status === 'pending_otp') {
             return (
                 <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="Enter WhatsApp OTP" className="max-w-xs" />
-                    <Button onClick={handleConfirmOtp} disabled={isSubmitting}>
+                    <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="Enter WhatsApp OTP" className="w-full sm:max-w-xs" />
+                    <Button onClick={handleConfirmOtp} disabled={isSubmitting} className="w-full sm:w-auto">
                         {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirm Seat'}
                     </Button>
                 </div>
@@ -3726,5 +3722,6 @@ const GameBookingCard: FC<{
 
 
     
+
 
 
