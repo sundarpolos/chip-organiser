@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -1591,10 +1592,7 @@ const SendGameAnnouncementDialog: FC<{
 
     useEffect(() => {
         if (isOpen) {
-            // Pre-select all active players with whatsapp numbers
             setSelectedPlayerIds(playersWithWhatsapp.map(p => p.id));
-            
-            // Generate initial message
             setIsGenerating(true);
             generatePokerReminder({
                 gameDate: format(new Date(game.gameDate), 'EEEE, PPP'),
@@ -1605,7 +1603,6 @@ const SendGameAnnouncementDialog: FC<{
                 if (result.reminderTemplate) {
                     setMessage(result.reminderTemplate);
                 } else {
-                    // Fallback message
                     setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'EEEE, PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
                 }
             }).catch(() => {
@@ -1629,28 +1626,53 @@ const SendGameAnnouncementDialog: FC<{
             toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select recipients and enter a message.' });
             return;
         }
+
         setIsSending(true);
-        try {
-            const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
-            const sendPromises = selectedPlayers.map(player => {
-                const personalizedMessage = message.replace(/\[Player Name\]/g, player.name);
-                return sendWhatsappMessage({
+        const playersToSend = players.filter(p => selectedPlayerIds.includes(p.id));
+        const totalToSend = playersToSend.length;
+        
+        onOpenChange(false);
+        const { id: toastId, update } = toast({
+            title: `Sending ${totalToSend} announcement(s)...`,
+            description: <Progress value={0} className="w-full" />,
+        });
+
+        let successfulSends = 0;
+        let failedSends = 0;
+
+        for (let i = 0; i < totalToSend; i++) {
+            const player = playersToSend[i];
+            const personalizedMessage = message.replace(/\[Player Name\]/g, player.name);
+            try {
+                const result = await sendWhatsappMessage({
                     to: player.whatsappNumber,
                     message: personalizedMessage,
                     ...(club.whatsappConfig || {}),
                 });
-            });
-            const results = await Promise.all(sendPromises);
-            const successfulSends = results.filter(r => r.success).length;
+                if (result.success) {
+                    successfulSends++;
+                } else {
+                    failedSends++;
+                    console.error(`Failed to send announcement to ${player.name}: ${result.error}`);
+                }
+            } catch (e) {
+                failedSends++;
+                console.error(`Exception sending announcement to ${player.name}:`, e);
+            }
+            const progress = ((i + 1) / totalToSend) * 100;
+            update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
 
-            toast({ title: 'Announcements Sent!', description: `Successfully sent messages to ${successfulSends} player(s).` });
-            onOpenChange(false);
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to send messages.';
-            toast({ variant: 'destructive', title: 'Error Sending Messages', description: errorMessage });
-        } finally {
-            setIsSending(false);
+            if (i < totalToSend - 1) {
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
         }
+
+        setIsSending(false);
+        update({
+            id: toastId,
+            title: 'Sending Complete!',
+            description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
+        });
     };
 
     return (

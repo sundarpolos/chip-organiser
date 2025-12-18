@@ -2951,8 +2951,6 @@ const SettlementDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
-    const [sendingStatus, setSendingStatus] = useState<string | null>(null);
-    const [progress, setProgress] = useState(0);
     const [includeSummary, setIncludeSummary] = useState(false);
     const [includeTimeline, setIncludeTimeline] = useState(false);
     const [previewMessage, setPreviewMessage] = useState('');
@@ -2989,8 +2987,6 @@ const SettlementDialog: FC<{
         if (isOpen) {
             setSelectedPlayerIds(allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id));
             setIsSending(false);
-            setSendingStatus(null);
-            setProgress(0);
             setIncludeSummary(false);
             setIncludeTimeline(false);
         }
@@ -3058,16 +3054,22 @@ ${formattedTransfers}
         }
 
         setIsSending(true);
-        setProgress(0);
         const playersToSend = allPlayersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
         
         const totalToSend = playersToSend.length;
+        
+        // Close modal immediately and show a toast
+        onOpenChange(false);
+        const { id: toastId, update } = toast({
+            title: `Sending ${totalToSend} settlement message(s)...`,
+            description: <Progress value={0} className="w-full" />,
+        });
+
         let successfulSends = 0;
         let failedSends = 0;
 
         for (let i = 0; i < totalToSend; i++) {
             const player = playersToSend[i];
-            setSendingStatus(`Sending to ${player.name} (${i + 1} of ${totalToSend})...`);
             
             try {
                 const result = await sendWhatsappMessage({
@@ -3087,26 +3089,21 @@ ${formattedTransfers}
                 console.error(`Exception while sending to ${player.name}:`, error);
             }
             
-            setProgress(((i + 1) / totalToSend) * 100);
+            const progress = ((i + 1) / totalToSend) * 100;
+            update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
 
             if (i < totalToSend - 1) {
                 await new Promise(resolve => setTimeout(resolve, 10000));
             }
         }
         
-        setSendingStatus(null);
         setIsSending(false);
 
-        if (successfulSends > 0) {
-            toast({ title: 'Settlement Sent!', description: `Successfully sent notifications to ${successfulSends} player(s).` });
-        }
-        if (failedSends > 0) {
-            toast({ variant: 'destructive', title: 'Sending Failed', description: `Could not send notifications to ${failedSends} player(s). Check console for details.` });
-        }
-        
-        if (failedSends === 0) {
-            onOpenChange(false);
-        }
+        update({
+            id: toastId,
+            title: 'Sending Complete!',
+            description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
+        });
     };
 
     return (
@@ -3168,18 +3165,6 @@ ${formattedTransfers}
                            <pre className="text-sm whitespace-pre-wrap">{previewMessage}</pre>
                         </ScrollArea>
                      </div>
-
-                     {isSending && (
-                        <div className="space-y-2">
-                            <Progress value={progress} />
-                            {sendingStatus && (
-                                <div className="flex items-center gap-2 text-sm text-primary">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <p>{sendingStatus}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline" disabled={isSending}>Cancel</Button></DialogClose>
@@ -3722,6 +3707,7 @@ const GameBookingCard: FC<{
 
 
     
+
 
 
 
