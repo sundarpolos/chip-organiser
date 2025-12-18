@@ -1,3 +1,4 @@
+
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -3631,7 +3632,7 @@ const ManageBookingsDialog: FC<{
     onBookingChange: () => void;
 }> = ({ isOpen, onOpenChange, game, clubId, bookings, toast, onBookingChange }) => {
     const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
-    const [playerToAdd, setPlayerToAdd] = useState('');
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -3639,32 +3640,37 @@ const ManageBookingsDialog: FC<{
             getMasterPlayers().then(allPlayers => {
                 setMasterPlayers(allPlayers.filter(p => p.clubId === clubId && p.isActive));
             });
+            setSelectedPlayerIds([]);
         }
     }, [isOpen, clubId]);
 
     const handleAdminAddBooking = async () => {
-        const player = masterPlayers.find(p => p.id === playerToAdd);
-        if (!player) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please select a player.' });
+        if (selectedPlayerIds.length === 0) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please select one or more players.' });
             return;
         }
 
         setIsSaving(true);
         try {
-            await createSeatBooking({
-                scheduledGameId: game.id,
-                clubId: clubId,
-                playerId: player.id,
-                playerName: player.name,
-                playerWhatsappNumber: player.whatsappNumber,
-                status: 'confirmed',
-                confirmationType: 'admin',
-            });
-            toast({ title: 'Player Added', description: `${player.name} has been added to the game.` });
+            const playersToAdd = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
+            const promises = playersToAdd.map(player => 
+                createSeatBooking({
+                    scheduledGameId: game.id,
+                    clubId: clubId,
+                    playerId: player.id,
+                    playerName: player.name,
+                    playerWhatsappNumber: player.whatsappNumber,
+                    status: 'confirmed',
+                    confirmationType: 'admin',
+                })
+            );
+
+            await Promise.all(promises);
+            toast({ title: 'Players Added', description: `${playersToAdd.length} player(s) have been added to the game.` });
             onBookingChange();
-            setPlayerToAdd('');
+            setSelectedPlayerIds([]);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to add player.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to add players.' });
         } finally {
             setIsSaving(false);
         }
@@ -3677,6 +3683,14 @@ const ManageBookingsDialog: FC<{
             onBookingChange();
         } catch {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to remove booking.' });
+        }
+    };
+
+    const handleSelectPlayer = (id: string, isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedPlayerIds(prev => [...prev, id]);
+        } else {
+            setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
         }
     };
     
@@ -3711,26 +3725,40 @@ const ManageBookingsDialog: FC<{
                                     </TableCell>
                                 </TableRow>
                             ))}
+                             {bookings.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="text-center text-muted-foreground">No bookings yet.</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
 
                     <Separator className="my-6" />
 
                     <div className="space-y-2">
-                        <Label>Add Player Manually</Label>
-                        <div className="flex gap-2">
-                            <Select value={playerToAdd} onValueChange={setPlayerToAdd}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a player to add..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availablePlayers.map(p => (
-                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Button onClick={handleAdminAddBooking} disabled={isSaving || !playerToAdd}>
-                                {isSaving ? <Loader2 className="animate-spin" /> : 'Add'}
+                        <Label>Add Player(s) Manually</Label>
+                        <ScrollArea className="h-48 border rounded-md p-2">
+                           {availablePlayers.length > 0 ? (
+                             availablePlayers.map(player => (
+                                <div key={player.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted">
+                                  <Checkbox
+                                    id={`manage-add-${player.id}`}
+                                    checked={selectedPlayerIds.includes(player.id)}
+                                    onCheckedChange={checked => handleSelectPlayer(player.id, !!checked)}
+                                  />
+                                  <Label htmlFor={`manage-add-${player.id}`} className="flex-1 cursor-pointer">
+                                    {player.name}
+                                  </Label>
+                                </div>
+                              ))
+                           ) : (
+                             <p className="text-center text-muted-foreground p-4">All active players are already booked.</p>
+                           )}
+                        </ScrollArea>
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={handleAdminAddBooking} disabled={isSaving || selectedPlayerIds.length === 0}>
+                                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
+                                Add Selected ({selectedPlayerIds.length})
                             </Button>
                         </div>
                     </div>
