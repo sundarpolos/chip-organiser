@@ -1127,6 +1127,13 @@ function DashboardContent() {
   const handleLoadGame = async (gameId: string) => {
     const gameToLoad = gameHistory.find(g => g.id === gameId);
     if (gameToLoad && currentUser) {
+        if (!gameToLoad.endTime) {
+            // It's an active game, admins can load, players should join
+            if (!isAdmin) {
+                handleJoinGame(gameId);
+                return;
+            }
+        }
         await loadGameIntoState(gameToLoad);
         setLoadGameModalOpen(false);
         toast({ title: "Game Loaded", description: `Loaded game from ${format(new Date(gameToLoad.timestamp), "dd/MMM/yy")}.` });
@@ -1316,7 +1323,7 @@ function DashboardContent() {
         </div>
         
         <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
-            {isAdmin && <>
+            {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
             </>}
              <TooltipProvider>
@@ -3518,7 +3525,7 @@ const GameBookingCard: FC<{
                 await createSeatBooking(bookingData);
                 
                 // Send WhatsApp notification for waiting list
-                sendWhatsappMessage({
+                await sendWhatsappMessage({
                     to: currentUser.whatsappNumber,
                     message: `Hi ${currentUser.name}, you have been added to the waiting list for the game on ${format(new Date(game.gameDate), 'PPP')}. We will notify you if a seat becomes available.`,
                     ...(activeClub.whatsappConfig || {})
@@ -3602,7 +3609,7 @@ const GameBookingCard: FC<{
                 
                 // Notify promoted player
                 if (firstInWaiting.playerWhatsappNumber && activeClub) {
-                    sendWhatsappMessage({
+                    await sendWhatsappMessage({
                         to: firstInWaiting.playerWhatsappNumber,
                         message: `Great news, ${firstInWaiting.playerName}! A spot has opened up for the game on ${format(new Date(game.gameDate), 'PPP')}. Your seat is now confirmed!`,
                         ...(activeClub.whatsappConfig || {})
@@ -3714,6 +3721,7 @@ const GameBookingCard: FC<{
 
 
     
+
 
 
 

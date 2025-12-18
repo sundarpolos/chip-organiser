@@ -18,17 +18,23 @@
 - **Banker**: A trusted player role with permissions to manage buy-ins and chip counts during a game.
 - **Player**: Can join games, request buy-ins, and view their own game history.
 
-### 3. Real-Time Game Management
+### 3. Advance Seat Booking & Waiting Lists
+- **Schedule Games**: Admins can schedule games for future dates, setting the start time and total number of available seats.
+- **Player Booking**: Players see a list of all upcoming games on their dashboard and can book a seat with a single click.
+- **WhatsApp OTP Confirmation**: To prevent fake bookings, players confirm their seat by entering a 4-digit OTP sent directly to their WhatsApp.
+- **Automated Waiting List**: If a game is full, players can join a waiting list. When a confirmed player cancels, the first person on the waiting list is automatically promoted and notified via WhatsApp that their seat is confirmed.
+
+### 4. Real-Time Game Management
 - **Live Dashboard**: The central hub for active games. Admins and Bankers can see player buy-ins, chip counts, and profit/loss in real-time.
 - **Secure Buy-in Workflow**: Players can request buy-ins directly from their dashboard. Admins receive instant notifications to approve requests.
 - **OTP Verification**: For enhanced security, an optional WhatsApp-based OTP system ensures that every buy-in is verified by the player before it's confirmed.
 - **Save Progress**: Admins can save snapshots of the game's state at any point, creating a timeline of player performance.
 
-### 4. Powerful AI-Driven Tools
+### 5. Powerful AI-Driven Tools
 - **Anomaly Detection**: Leverage AI to analyze a player's buy-in patterns in the current game against their historical data. The system flags unusual activity with an "anomaly score" and provides a detailed explanation.
 - **AI-Powered Game Import**: Seamlessly import game logs from other applications. Paste the raw text, and the AI will parse it into a structured game history, automatically creating new player profiles as needed.
 
-### 5. Comprehensive Reporting & Analytics
+### 6. Comprehensive Reporting & Analytics
 - **Game Reports**: At the end of each game, generate a detailed report that includes:
   - Player summaries (P/L, total buy-ins).
   - Final chip distribution charts.
@@ -36,7 +42,7 @@
 - **Historical Analysis**: The reports page provides powerful filtering options by date range, players, and venues, allowing for in-depth analysis of performance over time.
 - **Visual Dashboards**: View historical data through various charts, including bar, line, pie, and scatter plots for deeper insights.
 
-### 6. Administrative Tools
+### 7. Administrative Tools
 - **Player & Venue Merging**: Clean up your data by merging duplicate player profiles or venue entries. The system automatically updates all historical game records to reflect the changes.
 - **Group Messaging**: Admins can send broadcast messages to all club members via WhatsApp directly from the dashboard.
 
