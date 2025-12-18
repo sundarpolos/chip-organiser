@@ -129,7 +129,7 @@ import { getClub, getClubs } from "@/services/club-service"
 import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking } from "@/services/booking-service"
 
 
-const WhatsappIcon = () => (
+const WhatsappIcon = ({ className }: { className?: string }) => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="24"
@@ -140,7 +140,7 @@ const WhatsappIcon = () => (
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4"
+      className={cn("h-4 w-4", className)}
     >
       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
     </svg>
@@ -610,6 +610,7 @@ function DashboardContent() {
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [activeClub, setActiveClub] = useState<Club | null>(null);
   const [greeting, setGreeting] = useState('');
+  const [whatsappStatus, setWhatsappStatus] = useState<'checking' | 'open' | 'closed'>('checking');
 
 
   // Master Data State
@@ -714,6 +715,31 @@ function DashboardContent() {
         }
   }, [currentUser, isAdmin]);
 
+  // Check WhatsApp status periodically
+    useEffect(() => {
+        if (!whatsappConfig.apiToken) return;
+
+        const checkStatus = async () => {
+            try {
+                const response = await fetch(`https://cloud.wazoneindia.com/api/connection-state?token=${whatsappConfig.apiToken}`);
+                if (!response.ok) {
+                    setWhatsappStatus('closed');
+                    return;
+                }
+                const data = await response.json();
+                setWhatsappStatus(data.state === 'open' ? 'open' : 'closed');
+            } catch (error) {
+                console.error("Failed to fetch WhatsApp status", error);
+                setWhatsappStatus('closed');
+            }
+        };
+
+        checkStatus();
+        const interval = setInterval(checkStatus, 30000); // Check every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [whatsappConfig.apiToken]);
+
 
   // Load data from Firestore on initial render
   useEffect(() => {
@@ -764,14 +790,6 @@ function DashboardContent() {
                     } else {
                         setJoinableGame(activeGameForToday);
                     }
-                }
-            }
-            if(isAdmin) {
-                // For admins, show OTP modal on first login of session.
-                const hasSeenOtpModal = sessionStorage.getItem('seenOtpModal');
-                if (!hasSeenOtpModal) {
-                    setOtpModalOpen(true);
-                    sessionStorage.setItem('seenOtpModal', 'true');
                 }
             }
             
@@ -1302,6 +1320,18 @@ function DashboardContent() {
             {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
             </>}
+             <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <Button variant="outline" size="icon" disabled={whatsappStatus === 'checking'}>
+                            {whatsappStatus === 'open' ? <WhatsappIcon className="text-green-500" /> : <WhatsappIcon className="text-red-500" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>WhatsApp Status: {whatsappStatus}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
                 <History className="mr-2 h-4 w-4" />
                 Load Game
@@ -3696,3 +3726,4 @@ const GameBookingCard: FC<{
 
 
     
+
