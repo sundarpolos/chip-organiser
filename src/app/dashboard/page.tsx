@@ -1,4 +1,5 @@
 
+
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -3546,12 +3547,25 @@ const GameBookingCard: FC<{
     };
 
     const handleConfirmOtp = async () => {
-        if (!playerBooking || !playerBooking.otp) return;
+        if (!playerBooking || !playerBooking.otp || !activeClub) return;
         setIsSubmitting(true);
         if (playerBooking.otp === otp) {
-            await updateSeatBooking(playerBooking.id, { status: 'confirmed' });
-            toast({ title: 'Seat Confirmed!', description: 'Your seat is booked.' });
-            onBookingChange();
+            try {
+                await updateSeatBooking(playerBooking.id, { status: 'confirmed' });
+                toast({ title: 'Seat Confirmed!', description: 'Your seat is booked.' });
+
+                // Send confirmation message
+                const message = `Hi ${currentUser.name}, your seat for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime} is confirmed. See you at the table!\n\n- ${activeClub.name}`;
+                await sendWhatsappMessage({
+                    to: currentUser.whatsappNumber,
+                    message: message,
+                    ...(activeClub.whatsappConfig || {})
+                });
+
+                onBookingChange();
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not confirm your seat.' });
+            }
         } else {
             toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The code is incorrect.' });
         }
