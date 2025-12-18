@@ -1597,7 +1597,7 @@ const SendGameAnnouncementDialog: FC<{
             // Generate initial message
             setIsGenerating(true);
             generatePokerReminder({
-                gameDate: format(new Date(game.gameDate), 'PPP'),
+                gameDate: format(new Date(game.gameDate), 'EEEE, PPP'),
                 gameTime: game.gameStartTime,
                 clubName: club.name,
                 customMessage: 'A new game has been scheduled! Book your seat now.',
@@ -1606,10 +1606,10 @@ const SendGameAnnouncementDialog: FC<{
                     setMessage(result.reminderTemplate);
                 } else {
                     // Fallback message
-                    setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
+                    setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'EEEE, PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
                 }
             }).catch(() => {
-                setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
+                setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'EEEE, PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
             }).finally(() => {
                 setIsGenerating(false);
             });

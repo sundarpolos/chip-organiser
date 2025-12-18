@@ -236,7 +236,7 @@ Please be on time!`;
         setIsGeneratingTemplate(true);
         try {
             const result = await generatePokerReminder({
-                gameDate: format(new Date(game.gameDate), 'PPP'),
+                gameDate: format(new Date(game.gameDate), 'EEEE, PPP'),
                 gameTime: game.gameStartTime,
                 clubName: activeClub.name,
                 customMessage: customText,
@@ -248,7 +248,7 @@ Please be on time!`;
             console.error("Template generation failed:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not generate message template.' });
             // Fallback to a simpler message
-            setWhatsappMessage(`Hi [Player Name],\n\nThis is a reminder for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Please be on time.\n\n- ${activeClub.name}`);
+            setWhatsappMessage(`Hi [Player Name],\n\nThis is a reminder for the game on ${format(new Date(game.gameDate), 'EEEE, PPP')} at ${game.gameStartTime}. Please be on time.\n\n- ${activeClub.name}`);
         } finally {
             setIsGeneratingTemplate(false);
         }
