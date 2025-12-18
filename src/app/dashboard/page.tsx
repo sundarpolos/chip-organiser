@@ -766,13 +766,11 @@ function DashboardContent() {
                 }
             }
             if(isAdmin) {
-                // For admins, show OTP and Reminder modals on login if not already shown this session.
+                // For admins, show OTP modal on first login of session.
                 const hasSeenOtpModal = sessionStorage.getItem('seenOtpModal');
                 if (!hasSeenOtpModal) {
                     setOtpModalOpen(true);
                     sessionStorage.setItem('seenOtpModal', 'true');
-                } else {
-                    setLoadGameModalOpen(true);
                 }
             }
             
