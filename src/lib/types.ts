@@ -74,3 +74,25 @@ export interface Club {
   whatsappConfig?: WhatsappConfig;
   deckChangeIntervalHours?: number;
 }
+
+export interface ScheduledGame {
+  id: string;
+  clubId: string;
+  gameDate: string; // YYYY-MM-DD
+  totalSeats: number;
+  createdAt: string;
+}
+
+export interface SeatBooking {
+  id: string;
+  scheduledGameId: string;
+  clubId: string;
+  playerId: string;
+  playerName: string;
+  playerWhatsappNumber: string;
+  status: 'pending_otp' | 'confirmed' | 'cancelled';
+  confirmationType: 'otp' | 'admin';
+  bookedAt: string;
+  otp?: string;
+  otpExpiresAt?: string;
+}
