@@ -27,6 +27,9 @@ import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
 import { sendWelcomeMessage } from '@/ai/flows/send-welcome-message';
 import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
+import { generatePokerReminder } from '@/ai/flows/generate-poker-reminder';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
@@ -341,11 +344,14 @@ const SeatBookingManagement: FC<{
     allClubs: Club[];
     activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isSuperAdmin, allClubs, activeClub, toast }) => {
+    players: MasterPlayer[];
+}> = ({ isSuperAdmin, allClubs, activeClub, toast, players }) => {
     const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [clubForNewGame, setClubForNewGame] = useState<Club | null>(null);
+    const [gameForAnnouncement, setGameForAnnouncement] = useState<ScheduledGame | null>(null);
+    const [isAnnouncementModalOpen, setAnnouncementModalOpen] = useState(false);
 
     useEffect(() => {
         async function loadGames() {
@@ -374,6 +380,10 @@ const SeatBookingManagement: FC<{
             });
             setScheduledGames(prev => [...prev, newGame].sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
             toast({ title: 'Game Scheduled', description: `A game has been scheduled for ${format(new Date(gameDate), 'PPP')}.` });
+            
+            // Open announcement modal
+            setGameForAnnouncement(newGame);
+            setAnnouncementModalOpen(true);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to schedule the game.' });
         }
@@ -419,15 +429,18 @@ const SeatBookingManagement: FC<{
         );
     }
 
-    if (isSuperAdmin) {
-        return (
-             <>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Advance Seat Booking Management</CardTitle>
-                        <CardDescription>Schedule and manage upcoming games for all clubs.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+    return (
+         <>
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Advance Seat Booking</CardTitle>
+                        {isSuperAdmin ? null : (activeClub && <Button onClick={() => openCreateModal(activeClub)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>)}
+                    </div>
+                     <CardDescription>{isSuperAdmin ? 'Schedule and manage upcoming games for all clubs.' : 'Schedule upcoming games to allow players to book their seats in advance.'}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isSuperAdmin ? (
                         <Accordion type="multiple" className="w-full">
                             {allClubs.map(club => (
                                 <AccordionItem value={club.id} key={club.id}>
@@ -446,33 +459,9 @@ const SeatBookingManagement: FC<{
                                 </AccordionItem>
                             ))}
                         </Accordion>
-                    </CardContent>
-                </Card>
-                {clubForNewGame && (
-                    <ScheduleGameDialog
-                        isOpen={isCreateModalOpen}
-                        onOpenChange={setCreateModalOpen}
-                        club={clubForNewGame}
-                        onSchedule={handleCreateGame}
-                    />
-                )}
-            </>
-        )
-    }
-
-    // View for regular Admin
-    return (
-        <>
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Advance Seat Booking</CardTitle>
-                        {activeClub && <Button onClick={() => openCreateModal(activeClub)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>}
-                    </div>
-                    <CardDescription>Schedule upcoming games to allow players to book their seats in advance.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <GamesTable games={scheduledGames} onDelete={handleDeleteGame} />
+                    ) : (
+                        <GamesTable games={scheduledGames} onDelete={handleDeleteGame} />
+                    )}
                 </CardContent>
             </Card>
             {clubForNewGame && (
@@ -483,8 +472,18 @@ const SeatBookingManagement: FC<{
                     onSchedule={handleCreateGame}
                 />
             )}
+            {gameForAnnouncement && (
+                <SendGameAnnouncementDialog
+                    isOpen={isAnnouncementModalOpen}
+                    onOpenChange={setAnnouncementModalOpen}
+                    game={gameForAnnouncement}
+                    club={allClubs.find(c => c.id === gameForAnnouncement.clubId)!}
+                    players={players.filter(p => p.clubId === gameForAnnouncement.clubId)}
+                    toast={toast}
+                />
+            )}
         </>
-    );
+    )
 };
 
 const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => void }> = ({ games, onDelete }) => (
@@ -1573,6 +1572,148 @@ const CreatePlayerDialog: FC<{
     );
 };
 
+const SendGameAnnouncementDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    game: ScheduledGame;
+    club: Club;
+    players: MasterPlayer[];
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, game, club, players, toast }) => {
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [message, setMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const playersWithWhatsapp = useMemo(() => {
+        return players.filter(p => p.whatsappNumber && p.isActive);
+    }, [players]);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Pre-select all active players with whatsapp numbers
+            setSelectedPlayerIds(playersWithWhatsapp.map(p => p.id));
+            
+            // Generate initial message
+            setIsGenerating(true);
+            generatePokerReminder({
+                gameDate: format(new Date(game.gameDate), 'PPP'),
+                gameTime: game.gameStartTime,
+                clubName: club.name,
+                customMessage: 'A new game has been scheduled! Book your seat now.',
+            }).then(result => {
+                if (result.reminderTemplate) {
+                    setMessage(result.reminderTemplate);
+                } else {
+                    // Fallback message
+                    setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
+                }
+            }).catch(() => {
+                setMessage(`Hi [Player Name], a new game has been scheduled for ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Looking forward to seeing you there!\n\n- ${club.name}`);
+            }).finally(() => {
+                setIsGenerating(false);
+            });
+        }
+    }, [isOpen, playersWithWhatsapp, game, club]);
+
+    const handleSelectPlayer = (id: string, isSelected: boolean) => {
+        setSelectedPlayerIds(prev => isSelected ? [...prev, id] : prev.filter(pId => pId !== id));
+    };
+
+    const handleSelectAll = (isChecked: boolean) => {
+        setSelectedPlayerIds(isChecked ? playersWithWhatsapp.map(p => p.id) : []);
+    };
+
+    const handleSend = async () => {
+        if (selectedPlayerIds.length === 0 || !message) {
+            toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select recipients and enter a message.' });
+            return;
+        }
+        setIsSending(true);
+        try {
+            const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
+            const sendPromises = selectedPlayers.map(player => {
+                const personalizedMessage = message.replace(/\[Player Name\]/g, player.name);
+                return sendWhatsappMessage({
+                    to: player.whatsappNumber,
+                    message: personalizedMessage,
+                    ...(club.whatsappConfig || {}),
+                });
+            });
+            const results = await Promise.all(sendPromises);
+            const successfulSends = results.filter(r => r.success).length;
+
+            toast({ title: 'Announcements Sent!', description: `Successfully sent messages to ${successfulSends} player(s).` });
+            onOpenChange(false);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to send messages.';
+            toast({ variant: 'destructive', title: 'Error Sending Messages', description: errorMessage });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Announce New Game</DialogTitle>
+                    <DialogDescription>
+                        Notify players in {club.name} about the newly scheduled game on {format(new Date(game.gameDate), 'PPP')}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Recipients</Label>
+                        <div className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox
+                                id="announce-select-all"
+                                onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                checked={playersWithWhatsapp.length > 0 && selectedPlayerIds.length === playersWithWhatsapp.length}
+                                disabled={playersWithWhatsapp.length === 0}
+                            />
+                            <Label htmlFor="announce-select-all" className="font-medium">Select All ({selectedPlayerIds.length})</Label>
+                        </div>
+                        <ScrollArea className="h-48 border rounded-md p-2">
+                            {playersWithWhatsapp.length > 0 ? (
+                                playersWithWhatsapp.map(player => (
+                                    <div key={player.id} className="flex items-center space-x-2 p-1">
+                                        <Checkbox
+                                            id={`announce-${player.id}`}
+                                            onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
+                                            checked={selectedPlayerIds.includes(player.id)}
+                                        />
+                                        <Label htmlFor={`announce-${player.id}`}>{player.name}</Label>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers in this club.</p>
+                            )}
+                        </ScrollArea>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="message">Message</Label>
+                        <Textarea
+                            id="message"
+                            placeholder={isGenerating ? "Generating message..." : "Enter your announcement here."}
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            className="min-h-[150px]"
+                            disabled={isGenerating}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0 || !message}>
+                        {isSending ? <Loader2 className="animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s)</>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -1678,6 +1819,7 @@ export default function SettingsPage() {
             allClubs={clubs}
             activeClub={activeClub} 
             toast={toast} 
+            players={players}
           />
        )}
        {isAdmin && (
