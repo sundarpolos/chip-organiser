@@ -9,18 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send, CalendarIcon as CalendarIconLucide } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory } from '@/lib/types';
+import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory, ScheduledGame } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub, getClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
 import { getGameHistory } from '@/services/game-service';
+import { createScheduledGame, deleteScheduledGame, getScheduledGamesForClub } from '@/services/booking-service';
 import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
@@ -32,6 +33,8 @@ import { Command, CommandInput, CommandEmpty, CommandGroup, CommandItem, Command
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -332,6 +335,183 @@ const CountryCodePicker: FC<{
         </Popover>
     )
 }
+
+const SeatBookingManagement: FC<{
+    activeClub: Club;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ activeClub, toast }) => {
+    const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+
+    useEffect(() => {
+        getScheduledGamesForClub(activeClub.id)
+            .then(setScheduledGames)
+            .finally(() => setIsLoading(false));
+    }, [activeClub.id]);
+
+    const handleCreateGame = async (gameDate: string, totalSeats: number) => {
+        try {
+            const newGame = await createScheduledGame({
+                clubId: activeClub.id,
+                gameDate,
+                totalSeats,
+            });
+            setScheduledGames(prev => [...prev, newGame].sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
+            toast({ title: 'Game Scheduled', description: `A game has been scheduled for ${format(new Date(gameDate), 'PPP')}.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to schedule the game.' });
+        }
+    };
+
+    const handleDeleteGame = async (gameId: string) => {
+        try {
+            await deleteScheduledGame(gameId);
+            setScheduledGames(prev => prev.filter(g => g.id !== gameId));
+            toast({ title: 'Game Deleted', description: 'The scheduled game has been removed.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete the scheduled game.' });
+        }
+    };
+
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Advance Seat Booking</CardTitle>
+                        <Button onClick={() => setCreateModalOpen(true)}><Plus className="mr-2 h-4 w-4" /> Schedule Game</Button>
+                    </div>
+                    <CardDescription>Schedule upcoming games to allow players to book their seats in advance.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <Loader2 className="animate-spin" />
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Game Date</TableHead>
+                                    <TableHead>Total Seats</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {scheduledGames.map(game => (
+                                    <TableRow key={game.id}>
+                                        <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
+                                        <TableCell>{game.totalSeats}</TableCell>
+                                        <TableCell className="text-right">
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                        <AlertDialogDescription>This will delete the scheduled game for {format(new Date(game.gameDate), 'PPP')} and remove all player bookings.</AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteGame(game.id)}>Delete</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {scheduledGames.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center">No games scheduled yet.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+            <ScheduleGameDialog
+                isOpen={isCreateModalOpen}
+                onOpenChange={setCreateModalOpen}
+                onSchedule={handleCreateGame}
+            />
+        </>
+    );
+};
+
+const ScheduleGameDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSchedule: (gameDate: string, totalSeats: number) => void;
+}> = ({ isOpen, onOpenChange, onSchedule }) => {
+    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [seats, setSeats] = useState(10);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const handleSave = () => {
+        if (date && seats > 0) {
+            setIsSaving(true);
+            // Pass date in YYYY-MM-DD format to be timezone-safe
+            onSchedule(format(date, 'yyyy-MM-dd'), seats);
+            setIsSaving(false);
+            onOpenChange(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Schedule New Game</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Game Date</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !date && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIconLucide className="mr-2 h-4 w-4" />
+                                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={date}
+                                    onSelect={setDate}
+                                    disabled={(date) => date < new Date()}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="seats">Total Seats</Label>
+                        <Input
+                            id="seats"
+                            type="number"
+                            value={seats}
+                            onChange={(e) => setSeats(Number(e.target.value))}
+                            min="1"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSaving || !date}>
+                        {isSaving ? <Loader2 className="animate-spin" /> : 'Schedule'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+};
 
 
 const ClubManagement: FC<{
@@ -1300,6 +1480,7 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP, [currentUser]);
+  const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
 
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
@@ -1385,7 +1566,10 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       {(currentUser.isAdmin || isSuperAdmin) && (
+       {isAdmin && activeClub && (
+          <SeatBookingManagement activeClub={activeClub} toast={toast} />
+       )}
+       {isAdmin && (
          <PlayerManagement 
             players={filteredPlayers} 
             setPlayers={setPlayers} 
@@ -1398,5 +1582,7 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
 
     
