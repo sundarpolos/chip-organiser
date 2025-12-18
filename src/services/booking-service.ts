@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/firebase";
 import { ScheduledGame, SeatBooking } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, addDoc, query, where, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, addDoc, query, where, deleteDoc, getDoc } from "firebase/firestore";
 
 const SCHEDULED_GAMES_COLLECTION = "scheduledGames";
 const SEAT_BOOKINGS_COLLECTION = "seatBookings";
@@ -17,6 +17,15 @@ export async function createScheduledGame(game: Omit<ScheduledGame, 'id' | 'crea
     };
     const docRef = await addDoc(collection(db, SCHEDULED_GAMES_COLLECTION), newGame);
     return { id: docRef.id, ...newGame };
+}
+
+export async function getScheduledGame(gameId: string): Promise<ScheduledGame | null> {
+    const docRef = doc(db, SCHEDULED_GAMES_COLLECTION, gameId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() } as ScheduledGame;
+    }
+    return null;
 }
 
 export async function getScheduledGamesForClub(clubId: string): Promise<ScheduledGame[]> {

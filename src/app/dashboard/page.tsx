@@ -3402,8 +3402,6 @@ const BookingView: FC<{
     const [isLoading, setIsLoading] = useState(true);
     const [bookingState, setBookingState] = useState<Record<string, SeatBooking | null>>({});
 
-    const [manageGame, setManageGame] = useState<ScheduledGame | null>(null);
-
     const refreshData = useCallback(async () => {
         if (!activeClub) return;
         try {
@@ -3437,48 +3435,32 @@ const BookingView: FC<{
     }
 
     return (
-        <>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games & Bookings</CardTitle>
-                    <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {scheduledGames.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-8">No games have been scheduled yet.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {scheduledGames.map(game => (
-                                <GameBookingCard
-                                    key={game.id}
-                                    game={game}
-                                    bookings={bookings[game.id] || []}
-                                    playerBooking={bookingState[game.id]}
-                                    currentUser={currentUser}
-                                    activeClub={activeClub}
-                                    toast={toast}
-                                    onBookingChange={refreshData}
-                                    onManageBookings={() => setManageGame(game)}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {manageGame && (
-                <ManageBookingsDialog
-                    isOpen={!!manageGame}
-                    onOpenChange={() => setManageGame(null)}
-                    game={manageGame}
-                    clubId={activeClub!.id}
-                    bookings={bookings[manageGame.id] || []}
-                    onBookingChange={refreshData}
-                    toast={toast}
-                    currentUser={currentUser}
-                />
-            )}
-        </>
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games & Bookings</CardTitle>
+                <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {scheduledGames.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No games have been scheduled yet.</p>
+                ) : (
+                    <div className="space-y-4">
+                        {scheduledGames.map(game => (
+                            <GameBookingCard
+                                key={game.id}
+                                game={game}
+                                bookings={bookings[game.id] || []}
+                                playerBooking={bookingState[game.id]}
+                                currentUser={currentUser}
+                                activeClub={activeClub}
+                                toast={toast}
+                                onBookingChange={refreshData}
+                            />
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };
 
@@ -3490,8 +3472,7 @@ const GameBookingCard: FC<{
     activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
     onBookingChange: () => void;
-    onManageBookings: (game: ScheduledGame) => void;
-}> = ({ game, bookings, playerBooking, currentUser, activeClub, toast, onBookingChange, onManageBookings }) => {
+}> = ({ game, bookings, playerBooking, currentUser, activeClub, toast, onBookingChange }) => {
     
     const [otp, setOtp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -3610,8 +3591,10 @@ const GameBookingCard: FC<{
                         </CardDescription>
                     </div>
                     {currentUser.isAdmin && (
-                        <Button variant="secondary" size="sm" onClick={() => onManageBookings(game)}>
-                            <Users className="mr-2 h-4 w-4" /> Manage Bookings
+                        <Button variant="secondary" size="sm" asChild>
+                            <Link href={`/bookings/${game.id}`}>
+                                <Users className="mr-2 h-4 w-4" /> Manage Bookings
+                            </Link>
                         </Button>
                     )}
                 </div>
@@ -3622,188 +3605,3 @@ const GameBookingCard: FC<{
         </Card>
     );
 };
-
-const ManageBookingsDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    game: ScheduledGame;
-    clubId: string;
-    bookings: SeatBooking[];
-    toast: ReturnType<typeof useToast>['toast'];
-    onBookingChange: () => void;
-    currentUser: MasterPlayer | null;
-}> = ({ isOpen, onOpenChange, game, clubId, bookings, toast, onBookingChange, currentUser }) => {
-    const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
-    const [allClubs, setAllClubs] = useState<Club[]>([]);
-    const [selectedClubId, setSelectedClubId] = useState<string>(clubId);
-    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const isSuperAdmin = currentUser?.whatsappNumber === '919843350000';
-
-    useEffect(() => {
-        if(isOpen) {
-            Promise.all([
-                getMasterPlayers(),
-                isSuperAdmin ? getClubs() : Promise.resolve([])
-            ]).then(([players, clubs]) => {
-                setAllPlayers(players);
-                if (isSuperAdmin) {
-                    setAllClubs(clubs);
-                }
-            });
-            setSelectedPlayerIds([]);
-            setSelectedClubId(clubId); // Reset to game's club on open
-        }
-    }, [isOpen, clubId, isSuperAdmin]);
-
-    const handleAdminAddBooking = async () => {
-        if (selectedPlayerIds.length === 0) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please select one or more players.' });
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            const playersToAdd = allPlayers.filter(p => selectedPlayerIds.includes(p.id));
-            const promises = playersToAdd.map(player => 
-                createSeatBooking({
-                    scheduledGameId: game.id,
-                    clubId: player.clubId, // Use the player's actual clubId
-                    playerId: player.id,
-                    playerName: player.name,
-                    playerWhatsappNumber: player.whatsappNumber,
-                    status: 'confirmed',
-                    confirmationType: 'admin',
-                })
-            );
-
-            await Promise.all(promises);
-            toast({ title: 'Players Added', description: `${playersToAdd.length} player(s) have been added to the game.` });
-            onBookingChange();
-            setSelectedPlayerIds([]);
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to add players.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleAdminRemoveBooking = async (bookingId: string) => {
-        try {
-            await cancelSeatBooking(bookingId);
-            toast({ title: 'Booking Removed' });
-            onBookingChange();
-        } catch {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to remove booking.' });
-        }
-    };
-
-    const handleSelectPlayer = (id: string, isSelected: boolean) => {
-        if (isSelected) {
-            setSelectedPlayerIds(prev => [...prev, id]);
-        } else {
-            setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
-        }
-    };
-    
-    const availablePlayers = useMemo(() => {
-        return allPlayers
-            .filter(p => 
-                p.clubId === selectedClubId &&
-                p.isActive &&
-                !bookings.some(b => b.playerId === p.id && b.status === 'confirmed')
-            )
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [allPlayers, selectedClubId, bookings]);
-
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Manage Bookings for {format(new Date(game.gameDate), 'PPP')}</DialogTitle>
-                    <DialogDescription>{bookings.filter(b=>b.status==='confirmed').length} / {game.totalSeats} seats booked.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {bookings.map(b => (
-                                <TableRow key={b.id}>
-                                    <TableCell>{b.playerName}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={b.status === 'confirmed' ? 'default' : 'secondary'}>{b.status}</Badge>
-                                        {b.confirmationType === 'admin' && <span className="text-xs text-muted-foreground ml-2">(Admin)</span>}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="destructive" size="sm" onClick={() => handleAdminRemoveBooking(b.id)}>Remove</Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                             {bookings.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={3} className="text-center text-muted-foreground">No bookings yet.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-
-                    <Separator className="my-6" />
-
-                    <div className="space-y-4">
-                        <h3 className="font-semibold">Add Player(s) Manually</h3>
-                        {isSuperAdmin && (
-                             <div className="space-y-2">
-                                <Label htmlFor="club-select">Select Club</Label>
-                                <Select value={selectedClubId} onValueChange={setSelectedClubId}>
-                                    <SelectTrigger id="club-select">
-                                        <SelectValue placeholder="Select a club..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {allClubs.map(c => (
-                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                        <ScrollArea className="h-48 border rounded-md p-2">
-                           {availablePlayers.length > 0 ? (
-                             availablePlayers.map(player => (
-                                <div key={player.id} className="flex items-center space-x-3 p-2 rounded-md hover:bg-muted">
-                                  <Checkbox
-                                    id={`manage-add-${player.id}`}
-                                    checked={selectedPlayerIds.includes(player.id)}
-                                    onCheckedChange={checked => handleSelectPlayer(player.id, !!checked)}
-                                  />
-                                  <Label htmlFor={`manage-add-${player.id}`} className="flex-1 cursor-pointer">
-                                    {player.name}
-                                  </Label>
-                                </div>
-                              ))
-                           ) : (
-                             <p className="text-center text-muted-foreground p-4">All active players for this club are already booked or there are no players.</p>
-                           )}
-                        </ScrollArea>
-                        <div className="flex justify-end pt-2">
-                            <Button onClick={handleAdminAddBooking} disabled={isSaving || selectedPlayerIds.length === 0}>
-                                {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
-                                Add Selected ({selectedPlayerIds.length})
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
