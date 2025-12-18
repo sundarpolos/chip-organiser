@@ -364,11 +364,12 @@ const SeatBookingManagement: FC<{
         loadGames();
     }, [isSuperAdmin, allClubs, activeClub]);
 
-    const handleCreateGame = async (clubId: string, gameDate: string, totalSeats: number) => {
+    const handleCreateGame = async (clubId: string, gameDate: string, gameStartTime: string, totalSeats: number) => {
         try {
             const newGame = await createScheduledGame({
                 clubId: clubId,
                 gameDate,
+                gameStartTime,
                 totalSeats,
             });
             setScheduledGames(prev => [...prev, newGame].sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
@@ -491,6 +492,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
         <TableHeader>
             <TableRow>
                 <TableHead>Game Date</TableHead>
+                <TableHead>Start Time</TableHead>
                 <TableHead>Total Seats</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -499,6 +501,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
             {games.map(game => (
                 <TableRow key={game.id}>
                     <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
+                    <TableCell>{game.gameStartTime}</TableCell>
                     <TableCell>{game.totalSeats}</TableCell>
                     <TableCell className="text-right">
                         <AlertDialog>
@@ -521,7 +524,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
             ))}
             {games.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={3} className="text-center">No games scheduled yet.</TableCell>
+                    <TableCell colSpan={4} className="text-center">No games scheduled yet.</TableCell>
                 </TableRow>
             )}
         </TableBody>
@@ -533,17 +536,17 @@ const ScheduleGameDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     club: Club;
-    onSchedule: (clubId: string, gameDate: string, totalSeats: number) => void;
+    onSchedule: (clubId: string, gameDate: string, gameStartTime: string, totalSeats: number) => void;
 }> = ({ isOpen, onOpenChange, club, onSchedule }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
+    const [startTime, setStartTime] = useState('19:00');
     const [seats, setSeats] = useState(10);
     const [isSaving, setIsSaving] = useState(false);
     
     const handleSave = () => {
-        if (date && seats > 0) {
+        if (date && seats > 0 && startTime) {
             setIsSaving(true);
-            // Pass date in YYYY-MM-DD format to be timezone-safe
-            onSchedule(club.id, format(date, 'yyyy-MM-dd'), seats);
+            onSchedule(club.id, format(date, 'yyyy-MM-dd'), startTime, seats);
             setIsSaving(false);
             onOpenChange(false);
         }
@@ -582,6 +585,15 @@ const ScheduleGameDialog: FC<{
                             </PopoverContent>
                         </Popover>
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="start-time">Start Time</Label>
+                        <Input
+                            id="start-time"
+                            type="time"
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                        />
+                    </div>
                      <div className="space-y-2">
                         <Label htmlFor="seats">Total Seats</Label>
                         <Input
@@ -595,7 +607,7 @@ const ScheduleGameDialog: FC<{
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSave} disabled={isSaving || !date}>
+                    <Button onClick={handleSave} disabled={isSaving || !date || !startTime}>
                         {isSaving ? <Loader2 className="animate-spin" /> : 'Schedule'}
                     </Button>
                 </DialogFooter>

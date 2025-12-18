@@ -1227,7 +1227,7 @@ function DashboardContent() {
     const newGameDate = new Date(importedGame.timestamp);
     
     const serializablePlayers = importedGame.players.map(p => {
-        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+        const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? (bi.amount || 0) : 0), 0);
         return {
             id: p.id,
             name: p.name,
@@ -3585,7 +3585,7 @@ const GameBookingCard: FC<{
             <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                     <div>
-                        <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')}</CardTitle>
+                        <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')} at {game.gameStartTime}</CardTitle>
                         <CardDescription>
                             {seatsRemaining > 0 ? `${seatsRemaining} of ${game.totalSeats} seats remaining` : 'All seats are booked'}
                         </CardDescription>

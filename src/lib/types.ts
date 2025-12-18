@@ -80,6 +80,7 @@ export interface ScheduledGame {
   id: string;
   clubId: string;
   gameDate: string; // YYYY-MM-DD
+  gameStartTime: string; // HH:mm
   totalSeats: number;
   createdAt: string;
 }
