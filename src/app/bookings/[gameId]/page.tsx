@@ -92,7 +92,7 @@ const ManageBookingsPage: FC = () => {
             setActiveClub(clubData);
 
             setGame(gameData);
-            setBookings(bookingsData);
+            setBookings(bookingsData.sort((a, b) => a.playerName.localeCompare(b.playerName)));
             setAllPlayers(playersData);
             setAllClubs(clubsData);
             setSelectedClubId(gameData.clubId); // Default to game's club
