@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import type { Club, MasterPlayer, ScheduledGame, SeatBooking } from '@/lib/types';
-import { Loader2, Plus, Trash2, Users } from 'lucide-react';
+import { Loader2, Plus, Trash2, Users, Send } from 'lucide-react';
 import { getClubs, getClub } from '@/services/club-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getScheduledGame, getSeatBookingsForGame, createSeatBooking, cancelSeatBooking } from '@/services/booking-service';
+import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const ManageBookingsPage: FC = () => {
@@ -33,12 +35,17 @@ const ManageBookingsPage: FC = () => {
     const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
     const [allClubs, setAllClubs] = useState<Club[]>([]);
     const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
+    const [activeClub, setActiveClub] = useState<Club | null>(null);
     
     const [selectedClubId, setSelectedClubId] = useState<string>('');
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
+    const [whatsappMessage, setWhatsappMessage] = useState('');
+
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSendingMessage, setIsSendingMessage] = useState(false);
 
     const isSuperAdmin = currentUser?.whatsappNumber === '919843350000';
 
@@ -77,6 +84,9 @@ const ManageBookingsPage: FC = () => {
                 router.push('/dashboard');
                 return;
             }
+
+            const clubData = await getClub(gameData.clubId);
+            setActiveClub(clubData);
 
             setGame(gameData);
             setBookings(bookingsData);
@@ -138,8 +148,57 @@ const ManageBookingsPage: FC = () => {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to remove booking.' });
         }
     };
+    
+    const handleSendWhatsappMessage = async () => {
+        if (selectedBookingIds.length === 0 || !whatsappMessage.trim() || !activeClub) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: 'Please select players and write a message.' });
+            return;
+        }
+        setIsSendingMessage(true);
+        try {
+            const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
+            const sendPromises = playersToSend.map(player =>
+                sendWhatsappMessage({
+                    to: player.playerWhatsappNumber,
+                    message: whatsappMessage,
+                    ...(activeClub.whatsappConfig || {}),
+                })
+            );
 
-    const handleSelectPlayer = (id: string, isSelected: boolean) => {
+            const results = await Promise.all(sendPromises);
+            const successCount = results.filter(r => r.success).length;
+
+            toast({
+                title: 'Messages Sent',
+                description: `Successfully sent messages to ${successCount} out of ${playersToSend.length} selected players.`,
+            });
+            setWhatsappMessage('');
+            setSelectedBookingIds([]);
+
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to send messages.' });
+        } finally {
+            setIsSendingMessage(false);
+        }
+    };
+
+    const handleSelectBooking = (id: string, isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedBookingIds(prev => [...prev, id]);
+        } else {
+            setSelectedBookingIds(prev => prev.filter(bId => bId !== id));
+        }
+    };
+
+    const handleSelectAllBookings = (isChecked: boolean) => {
+        if (isChecked) {
+            setSelectedBookingIds(bookings.map(b => b.id));
+        } else {
+            setSelectedBookingIds([]);
+        }
+    };
+
+    const handleSelectPlayerForManualAdd = (id: string, isSelected: boolean) => {
         if (isSelected) {
             setSelectedPlayerIds(prev => [...prev, id]);
         } else {
@@ -179,6 +238,13 @@ const ManageBookingsPage: FC = () => {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12">
+                                    <Checkbox
+                                        checked={selectedBookingIds.length === bookings.length && bookings.length > 0}
+                                        onCheckedChange={handleSelectAllBookings}
+                                        aria-label="Select all bookings"
+                                    />
+                                </TableHead>
                                 <TableHead>Player</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -187,6 +253,13 @@ const ManageBookingsPage: FC = () => {
                         <TableBody>
                             {bookings.map(b => (
                                 <TableRow key={b.id}>
+                                    <TableCell>
+                                        <Checkbox
+                                            checked={selectedBookingIds.includes(b.id)}
+                                            onCheckedChange={checked => handleSelectBooking(b.id, !!checked)}
+                                            aria-label={`Select booking for ${b.playerName}`}
+                                        />
+                                    </TableCell>
                                     <TableCell>{b.playerName}</TableCell>
                                     <TableCell>
                                         <Badge variant={b.status === 'confirmed' ? 'default' : 'secondary'}>{b.status}</Badge>
@@ -213,11 +286,35 @@ const ManageBookingsPage: FC = () => {
                             ))}
                              {bookings.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={3} className="text-center text-muted-foreground h-24">No bookings yet.</TableCell>
+                                    <TableCell colSpan={4} className="text-center text-muted-foreground h-24">No bookings yet.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                     </Table>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Send WhatsApp Message</CardTitle>
+                    <CardDescription>Send a message to the selected players from the list above.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <Textarea
+                        placeholder="Type your message here..."
+                        value={whatsappMessage}
+                        onChange={e => setWhatsappMessage(e.target.value)}
+                        disabled={selectedBookingIds.length === 0}
+                    />
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={handleSendWhatsappMessage}
+                            disabled={isSendingMessage || selectedBookingIds.length === 0 || !whatsappMessage.trim()}
+                        >
+                            {isSendingMessage ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
+                            Send to {selectedBookingIds.length} Player(s)
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -250,7 +347,7 @@ const ManageBookingsPage: FC = () => {
                               <Checkbox
                                 id={`manage-add-${player.id}`}
                                 checked={selectedPlayerIds.includes(player.id)}
-                                onCheckedChange={checked => handleSelectPlayer(player.id, !!checked)}
+                                onCheckedChange={checked => handleSelectPlayerForManualAdd(player.id, !!checked)}
                               />
                               <Label htmlFor={`manage-add-${player.id}`} className="flex-1 cursor-pointer">
                                 {player.name}
@@ -274,3 +371,5 @@ const ManageBookingsPage: FC = () => {
 };
 
 export default ManageBookingsPage;
+
+    
