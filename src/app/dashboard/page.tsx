@@ -3707,11 +3707,13 @@ const ManageBookingsDialog: FC<{
     };
     
     const availablePlayers = useMemo(() => {
-        return allPlayers.filter(p => 
-            p.clubId === selectedClubId &&
-            p.isActive &&
-            !bookings.some(b => b.playerId === p.id && b.status === 'confirmed')
-        );
+        return allPlayers
+            .filter(p => 
+                p.clubId === selectedClubId &&
+                p.isActive &&
+                !bookings.some(b => b.playerId === p.id && b.status === 'confirmed')
+            )
+            .sort((a, b) => a.name.localeCompare(b.name));
     }, [allPlayers, selectedClubId, bookings]);
 
 
@@ -3804,3 +3806,4 @@ const ManageBookingsDialog: FC<{
         </Dialog>
     );
 };
+
