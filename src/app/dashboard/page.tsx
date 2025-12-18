@@ -1,3 +1,4 @@
+
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -1315,7 +1316,7 @@ function DashboardContent() {
         </div>
         
         <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
-            {(isAdmin || isBanker) && <>
+            {isAdmin && <>
                 <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
             </>}
              <TooltipProvider>
@@ -1428,7 +1429,7 @@ function DashboardContent() {
                 activeClub={activeClub}
                 toast={toast}
             />
-        ) : ((isAdmin || isBanker) && !activeGame && isDataReady && (
+        ) : ((isAdmin) && !activeGame && isDataReady && (
             <BookingView 
                 currentUser={currentUser}
                 activeClub={activeClub}
@@ -2600,6 +2601,7 @@ const SendMessageDialog: FC<{
     if (isOpen) {
       // Pre-select all active players with whatsapp numbers
       setSelectedPlayerIds(playersWithWhatsapp.map(p => p.id));
+      setMessage('');
     }
   }, [isOpen, playersWithWhatsapp]);
 
@@ -2624,42 +2626,56 @@ const SendMessageDialog: FC<{
       });
       return;
     }
+    
     setIsSending(true);
-    try {
-      const selectedPlayers = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
-      const sendPromises = selectedPlayers.map(player => 
-        sendWhatsappMessage({ 
-          to: player.whatsappNumber, 
-          message,
-          ...whatsappConfig
-        })
-      );
-      const results = await Promise.all(sendPromises);
-      const successfulSends = results.filter(r => r.success).length;
-      const failedSends = results.length - successfulSends;
+    const playersToSend = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
+    const totalToSend = playersToSend.length;
+    
+    onOpenChange(false);
+    const { id: toastId, update } = toast({
+      title: `Sending ${totalToSend} message(s)...`,
+      description: <Progress value={0} className="w-full" />,
+    });
 
-      if (failedSends > 0) {
-        toast({
-          variant: 'destructive',
-          title: 'Some Messages Failed',
-          description: `Successfully sent ${successfulSends} messages, but ${failedSends} failed. Check console for details.`,
-        });
-      } else {
-        toast({ title: 'Messages Sent!', description: `Successfully sent messages to ${successfulSends} player(s).` });
-      }
-      
-      onOpenChange(false);
-      setMessage('');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send messages.';
-      toast({
-        variant: 'destructive',
-        title: 'Error Sending Messages',
-        description: errorMessage,
-      });
-    } finally {
-      setIsSending(false);
+    let successfulSends = 0;
+    let failedSends = 0;
+
+    for (let i = 0; i < totalToSend; i++) {
+        const player = playersToSend[i];
+        
+        try {
+            const result = await sendWhatsappMessage({ 
+              to: player.whatsappNumber, 
+              message,
+              ...whatsappConfig
+            });
+
+            if (result.success) {
+                successfulSends++;
+            } else {
+                failedSends++;
+                console.error(`Failed to send to ${player.name}:`, result.error);
+            }
+        } catch (error) {
+            failedSends++;
+            console.error(`Exception while sending to ${player.name}:`, error);
+        }
+        
+        const progress = ((i + 1) / totalToSend) * 100;
+        update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
+        
+        if (i < totalToSend - 1) {
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
     }
+    
+    setIsSending(false);
+
+    update({
+        id: toastId,
+        title: 'Sending Complete!',
+        description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
+    });
   };
 
   return (
@@ -2668,7 +2684,7 @@ const SendMessageDialog: FC<{
         <DialogHeader>
           <DialogTitle>Send Group WhatsApp Message</DialogTitle>
           <DialogDescription>
-            Select players to message. Only players with saved WhatsApp numbers are shown.
+            Select players to message. Only players with saved WhatsApp numbers are shown. A 10s delay is applied between messages.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -3058,7 +3074,6 @@ ${formattedTransfers}
         
         const totalToSend = playersToSend.length;
         
-        // Close modal immediately and show a toast
         onOpenChange(false);
         const { id: toastId, update } = toast({
             title: `Sending ${totalToSend} settlement message(s)...`,
@@ -3178,17 +3193,15 @@ ${formattedTransfers}
 };
 
 const BuyInSummaryDialog: FC<{
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    activeGame: GameHistory | null,
-    whatsappConfig: WhatsappConfig,
-    toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void,
-    masterPlayers: MasterPlayer[],
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    activeGame: GameHistory | null;
+    whatsappConfig: WhatsappConfig;
+    toast: ReturnType<typeof useToast>['toast'];
+    masterPlayers: MasterPlayer[];
 }> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
-    const [sendingStatus, setSendingStatus] = useState<string | null>(null);
-    const [progress, setProgress] = useState(0);
 
     const playersInGame = useMemo(() => {
         if (!activeGame) return [];
@@ -3204,9 +3217,6 @@ const BuyInSummaryDialog: FC<{
     useEffect(() => {
         if (isOpen) {
             setSelectedPlayerIds(playersInGame.filter(p => p.whatsappNumber).map(p => p.id));
-            setIsSending(false);
-            setSendingStatus(null);
-            setProgress(0);
         }
     }, [isOpen, playersInGame]);
 
@@ -3221,17 +3231,23 @@ const BuyInSummaryDialog: FC<{
             toast({ variant: 'destructive', title: 'No players selected' });
             return;
         }
+
         setIsSending(true);
         const playersToSend = playersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
-
         const totalToSend = playersToSend.length;
+        
+        onOpenChange(false);
+        const { id: toastId, update } = toast({
+            title: `Sending ${totalToSend} summary message(s)...`,
+            description: <Progress value={0} className="w-full" />,
+        });
+
         let successfulSends = 0;
         let failedSends = 0;
         
         for (let i = 0; i < totalToSend; i++) {
             const player = playersToSend[i];
-            setSendingStatus(`Sending to ${player.name} (${i + 1} of ${totalToSend})...`);
-
+            
             const totalBuyIns = (player.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
             
             let playerMessage = `*Buy-in Summary for ${activeGame?.venue}*\n\n`;
@@ -3252,29 +3268,28 @@ const BuyInSummaryDialog: FC<{
                     successfulSends++;
                 } else {
                     failedSends++;
-                    console.error(`Failed to send to ${player.name}:`, result.error);
+                    console.error(`Failed to send summary to ${player.name}:`, result.error);
                 }
             } catch(e) {
                 failedSends++;
-                console.error(`Exception while sending to ${player.name}:`, e);
+                console.error(`Exception sending summary to ${player.name}:`, e);
             }
             
-            setProgress(((i + 1) / totalToSend) * 100);
+            const progress = ((i + 1) / totalToSend) * 100;
+            update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
+
+            if (i < totalToSend - 1) {
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
         }
         
         setIsSending(false);
-        setSendingStatus(null);
         
-        if (successfulSends > 0) {
-            toast({ title: 'Success', description: `Sent summaries to ${successfulSends} player(s).`});
-        }
-        if (failedSends > 0) {
-            toast({ variant: 'destructive', title: 'Error', description: `Failed to send summaries to ${failedSends} player(s).`});
-        }
-
-        if (failedSends === 0) {
-            onOpenChange(false);
-        }
+        update({
+            id: toastId,
+            title: 'Sending Complete!',
+            description: `Sent summaries to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
+        });
     };
 
     return (
@@ -3282,7 +3297,7 @@ const BuyInSummaryDialog: FC<{
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Send Buy-in Summary</DialogTitle>
-                    <DialogDescription>Select players to send their current total buy-in amount via WhatsApp.</DialogDescription>
+                    <DialogDescription>Select players to send their current total buy-in amount via WhatsApp. A 10s delay is applied between messages.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -3303,28 +3318,18 @@ const BuyInSummaryDialog: FC<{
                             ))}
                         </ScrollArea>
                     </div>
-                     {isSending && (
-                        <div className="space-y-2">
-                            <Progress value={progress} />
-                            {sendingStatus && (
-                                <div className="flex items-center gap-2 text-sm text-primary">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <p>{sendingStatus}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline" disabled={isSending}>Cancel</Button></DialogClose>
                     <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
-                        {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedPlayerIds.length}`}
+                        {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedPlayerIds.length} Player(s)`}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 };
+
 
 
 const BuyInRequestModalDialog: FC<{
@@ -3558,7 +3563,7 @@ const GameBookingCard: FC<{
     };
 
     const handleConfirmOtp = async () => {
-        if (!playerBooking || !playerBooking.otp || !activeClub) return;
+        if (!playerBooking || !playerBooking.otp || !activeClub || !currentUser.whatsappNumber) return;
         setIsSubmitting(true);
         if (playerBooking.otp === otp) {
             try {
@@ -3688,7 +3693,9 @@ const GameBookingCard: FC<{
                 </div>
             </CardHeader>
             <CardContent className="space-y-4">
-                {renderBookingStatus()}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    {renderBookingStatus()}
+                </div>
                  <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                         <AccordionTrigger>View Player Lists</AccordionTrigger>
@@ -3707,6 +3714,7 @@ const GameBookingCard: FC<{
 
 
     
+
 
 
 

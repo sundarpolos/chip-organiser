@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { generatePokerReminder } from '@/ai/flows/generate-poker-reminder';
+import { Progress } from '@/components/ui/progress';
 
 
 const ManageBookingsPage: FC = () => {
@@ -185,34 +186,54 @@ Please be on time!`;
             return;
         }
         setIsSendingMessage(true);
-        try {
-            const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
-            
-            const sendPromises = playersToSend.map(player => {
-                const finalMessage = whatsappMessage.replace('[Player Name]', player.playerName);
-                
-                return sendWhatsappMessage({
+        setWhatsappMessage('');
+        setSelectedBookingIds([]);
+
+        const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
+        const totalToSend = playersToSend.length;
+        
+        const { id: toastId, update } = toast({
+            title: `Sending ${totalToSend} message(s)...`,
+            description: <Progress value={0} className="w-full" />,
+        });
+
+        let successfulSends = 0;
+        let failedSends = 0;
+
+        for (let i = 0; i < totalToSend; i++) {
+            const player = playersToSend[i];
+            const finalMessage = whatsappMessage.replace('[Player Name]', player.playerName);
+            try {
+                const result = await sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
                     message: finalMessage,
                     ...(activeClub.whatsappConfig || {}),
                 });
-            });
+                if (result.success) {
+                    successfulSends++;
+                } else {
+                    failedSends++;
+                    console.error(`Failed to send to ${player.playerName}: ${result.error}`);
+                }
+            } catch (error) {
+                failedSends++;
+                console.error(`Exception while sending to ${player.playerName}:`, error);
+            }
+            const progress = ((i + 1) / totalToSend) * 100;
+            update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
 
-            const results = await Promise.all(sendPromises);
-            const successCount = results.filter(r => r.success).length;
-
-            toast({
-                title: 'Messages Sent',
-                description: `Successfully sent messages to ${successCount} out of ${playersToSend.length} selected players.`,
-            });
-            setWhatsappMessage('');
-            setSelectedBookingIds([]);
-
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to send messages.' });
-        } finally {
-            setIsSendingMessage(false);
+            if (i < totalToSend - 1) {
+                await new Promise(resolve => setTimeout(resolve, 10000));
+            }
         }
+        
+        setIsSendingMessage(false);
+        
+        update({
+            id: toastId,
+            title: 'Sending Complete!',
+            description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
+        });
     };
 
     const handleSelectBooking = (id: string, isSelected: boolean) => {
@@ -384,7 +405,7 @@ Please be on time!`;
             <Card>
                 <CardHeader>
                     <CardTitle>Send Individual WhatsApp Message</CardTitle>
-                    <CardDescription>Send a custom message to the selected players from the list above.</CardDescription>
+                    <CardDescription>Send a custom message to the selected players from the list above. A 10s delay is applied between messages.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
