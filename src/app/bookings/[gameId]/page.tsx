@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import type { Club, MasterPlayer, ScheduledGame, SeatBooking } from '@/lib/types';
-import { Loader2, Plus, Trash2, Users, Send } from 'lucide-react';
+import { Loader2, Plus, Trash2, Users, Send, Copy, Check } from 'lucide-react';
 import { getClubs, getClub } from '@/services/club-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getScheduledGame, getSeatBookingsForGame, createSeatBooking, cancelSeatBooking } from '@/services/booking-service';
@@ -46,6 +46,7 @@ const ManageBookingsPage: FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSendingMessage, setIsSendingMessage] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     const isSuperAdmin = currentUser?.whatsappNumber === '919843350000';
 
@@ -93,7 +94,7 @@ const ManageBookingsPage: FC = () => {
             setAllPlayers(playersData);
             setAllClubs(clubsData);
             setSelectedClubId(gameData.clubId); // Default to game's club
-            setWhatsappMessage(`Reminder: The game is scheduled for ${format(new Date(gameData.gameDate), 'PPP')}. Please arrive on time.`);
+            setWhatsappMessage(`Reminder: The game is scheduled for ${format(new Date(gameData.gameDate), 'PPP')} at ${gameData.gameStartTime}. Please arrive on time.`);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load booking data.' });
         } finally {
@@ -107,6 +108,33 @@ const ManageBookingsPage: FC = () => {
         }
     }, [currentUser, gameId]);
 
+    const groupUpdateMessage = useMemo(() => {
+        if (!game) return '';
+        const confirmedPlayers = bookings
+            .filter(b => b.status === 'confirmed')
+            .map((b, index) => `${index + 1}. ${b.playerName}`)
+            .join('\n');
+
+        return `🎉 Confirmed Players for ${format(new Date(game.gameDate), 'PPP')} 🎉
+
+Game Time: ${game.gameStartTime} ⏰
+
+-----------------------------
+${confirmedPlayers || 'No confirmations yet.'}
+-----------------------------
+
+Total: ${bookings.filter(b => b.status === 'confirmed').length} players
+
+Please be on time!`;
+    }, [game, bookings]);
+
+    const handleCopyToClipboard = () => {
+        navigator.clipboard.writeText(groupUpdateMessage).then(() => {
+            setIsCopied(true);
+            toast({ title: 'Copied!', description: 'Group update message copied to clipboard.' });
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
 
     const handleAdminAddBooking = async () => {
         if (selectedPlayerIds.length === 0) {
@@ -232,7 +260,7 @@ const ManageBookingsPage: FC = () => {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manage Bookings for {format(new Date(game.gameDate), 'PPP')}</CardTitle>
+                    <CardTitle>Manage Bookings for {format(new Date(game.gameDate), 'PPP')} at {game.gameStartTime}</CardTitle>
                     <CardDescription>{confirmedBookingsCount} / {game.totalSeats} seats booked.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -294,11 +322,33 @@ const ManageBookingsPage: FC = () => {
                     </Table>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>WhatsApp Group Update</CardTitle>
+                    <CardDescription>Copy the formatted text below and paste it into your group chat.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Textarea
+                        readOnly
+                        value={groupUpdateMessage}
+                        className="h-64 font-mono text-sm"
+                    />
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={handleCopyToClipboard}
+                        >
+                            {isCopied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                            {isCopied ? 'Copied!' : 'Copy to Clipboard'}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
             
             <Card>
                 <CardHeader>
-                    <CardTitle>Send WhatsApp Message</CardTitle>
-                    <CardDescription>Send a message to the selected players from the list above.</CardDescription>
+                    <CardTitle>Send Individual WhatsApp Message</CardTitle>
+                    <CardDescription>Send a custom message to the selected players from the list above.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
@@ -372,5 +422,3 @@ const ManageBookingsPage: FC = () => {
 };
 
 export default ManageBookingsPage;
-
-    
