@@ -93,6 +93,7 @@ const ManageBookingsPage: FC = () => {
             setAllPlayers(playersData);
             setAllClubs(clubsData);
             setSelectedClubId(gameData.clubId); // Default to game's club
+            setWhatsappMessage(`Reminder: The game is scheduled for ${format(new Date(gameData.gameDate), 'PPP')}. Please arrive on time.`);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load booking data.' });
         } finally {
