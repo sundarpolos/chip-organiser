@@ -187,8 +187,13 @@ Please be on time!`;
             const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
             
             const sendPromises = playersToSend.map(player => {
-                const automatedGreeting = `Hi ${player.playerName}, this is a reminder for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Please try to arrive a few minutes early.`;
-                const finalMessage = `${automatedGreeting}\n\n${whatsappMessage}`;
+                const automatedGreeting = `Hi ${player.playerName},\n\nThis is a friendly reminder for the game on *${format(new Date(game.gameDate), 'PPP')}* at *${game.gameStartTime}*. Please try to arrive a few minutes early.`;
+                
+                const customPart = whatsappMessage ? `\n\n${whatsappMessage}` : '';
+                
+                const signature = `\n\n- ${activeClub.name}`;
+
+                const finalMessage = `${automatedGreeting}${customPart}${signature}`;
 
                 return sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
@@ -355,7 +360,7 @@ Please be on time!`;
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
-                        placeholder={`The automated greeting is "Hi [Player Name], this is a reminder for the game on..."\n\nAdd your custom message here.\n\n- ${activeClub?.name || 'Admin'}`}
+                        placeholder={`Add your custom message here. A greeting and signature will be added automatically.`}
                         value={whatsappMessage}
                         onChange={e => setWhatsappMessage(e.target.value)}
                         disabled={selectedBookingIds.length === 0}
@@ -425,3 +430,5 @@ Please be on time!`;
 };
 
 export default ManageBookingsPage;
+
+    
