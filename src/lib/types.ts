@@ -1,4 +1,5 @@
 
+
 export interface BuyIn {
   id: string;
   amount: number;
@@ -50,7 +51,7 @@ export interface GameProgressLog {
 }
 
 export interface GameHistory {
-    id: string;
+    id:string;
     venue: string;
     timestamp: string;
     players: Player[];

@@ -9,7 +9,8 @@ import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress } from "@/lib/types"
+import { sendBookingOtp } from "@/ai/flows/send-booking-otp";
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -102,6 +103,8 @@ import {
   ArrowDown,
   ArrowUp,
   TestTube,
+  CalendarCheck,
+  CalendarPlus,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -121,6 +124,7 @@ import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClub } from "@/services/club-service"
+import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking } from "@/services/booking-service"
 
 
 const WhatsappIcon = () => (
@@ -1391,21 +1395,17 @@ function DashboardContent() {
                 toast={toast}
             />
         ) : !isAdmin && hasCheckedForGame ? (
-            <PlayerView
+            <BookingView 
                 currentUser={currentUser}
-                joinableGame={joinableGame}
-                onJoinGame={handleJoinGame}
-                setLoadGameModalOpen={setLoadGameModalOpen}
+                activeClub={activeClub}
+                toast={toast}
             />
         ) : ((isAdmin || isBanker) && !activeGame && isDataReady && (
-            <div className="text-center py-20">
-                <h2 className="text-2xl font-semibold mb-2">Welcome to {activeClub?.name}!</h2>
-                <p className="text-muted-foreground mb-6">There's no active game. You can start a new one or load a previous game.</p>
-                <div className="flex justify-center gap-4">
-                     <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
-                     <Button onClick={() => setLoadGameModalOpen(true)} variant="outline"><History className="mr-2 h-4 w-4" />Load Game</Button>
-                </div>
-            </div>
+            <BookingView 
+                currentUser={currentUser}
+                activeClub={activeClub}
+                toast={toast}
+            />
         ))}
 
       <VenueDialog 
@@ -3388,3 +3388,357 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+// Seat Booking Components
+
+const BookingView: FC<{
+    currentUser: MasterPlayer;
+    activeClub: Club | null;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ currentUser, activeClub, toast }) => {
+    const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
+    const [bookings, setBookings] = useState<Record<string, SeatBooking[]>>({});
+    const [isLoading, setIsLoading] = useState(true);
+    const [bookingState, setBookingState] = useState<Record<string, SeatBooking | null>>({});
+
+    const [manageGame, setManageGame] = useState<ScheduledGame | null>(null);
+
+    const refreshData = useCallback(async () => {
+        if (!activeClub) return;
+        try {
+            const games = await getScheduledGamesForClub(activeClub.id);
+            setScheduledGames(games);
+
+            const allBookings: Record<string, SeatBooking[]> = {};
+            const playerBookings: Record<string, SeatBooking | null> = {};
+
+            for (const game of games) {
+                const gameBookings = await getSeatBookingsForGame(game.id);
+                allBookings[game.id] = gameBookings;
+                const playerBooking = await getPlayerBookingForGame(currentUser.id, game.id);
+                playerBookings[game.id] = playerBooking;
+            }
+            setBookings(allBookings);
+            setBookingState(playerBookings);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load booking information.'});
+        } finally {
+            setIsLoading(false);
+        }
+    }, [activeClub, currentUser.id, toast]);
+
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin" /></div>;
+    }
+
+    return (
+        <>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games & Bookings</CardTitle>
+                    <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {scheduledGames.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">No games have been scheduled yet.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {scheduledGames.map(game => (
+                                <GameBookingCard
+                                    key={game.id}
+                                    game={game}
+                                    bookings={bookings[game.id] || []}
+                                    playerBooking={bookingState[game.id]}
+                                    currentUser={currentUser}
+                                    activeClub={activeClub}
+                                    toast={toast}
+                                    onBookingChange={refreshData}
+                                    onManageBookings={() => setManageGame(game)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {manageGame && (
+                <ManageBookingsDialog
+                    isOpen={!!manageGame}
+                    onOpenChange={() => setManageGame(null)}
+                    game={manageGame}
+                    clubId={activeClub!.id}
+                    bookings={bookings[manageGame.id] || []}
+                    onBookingChange={refreshData}
+                    toast={toast}
+                />
+            )}
+        </>
+    );
+};
+
+const GameBookingCard: FC<{
+    game: ScheduledGame;
+    bookings: SeatBooking[];
+    playerBooking: SeatBooking | null;
+    currentUser: MasterPlayer;
+    activeClub: Club | null;
+    toast: ReturnType<typeof useToast>['toast'];
+    onBookingChange: () => void;
+    onManageBookings: (game: ScheduledGame) => void;
+}> = ({ game, bookings, playerBooking, currentUser, activeClub, toast, onBookingChange, onManageBookings }) => {
+    
+    const [otp, setOtp] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
+    const seatsRemaining = game.totalSeats - confirmedBookings.length;
+    const isFull = seatsRemaining <= 0;
+
+    const handleBookSeat = async () => {
+        if (!currentUser.whatsappNumber || !activeClub) {
+            toast({ variant: 'destructive', title: 'Cannot Book', description: 'Your WhatsApp number is not set.' });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const result = await sendBookingOtp({
+                playerName: currentUser.name,
+                whatsappNumber: currentUser.whatsappNumber,
+                gameDate: format(new Date(game.gameDate), 'PPP'),
+                clubId: activeClub.id,
+            });
+
+            if (result.success && result.otp) {
+                const bookingData: Omit<SeatBooking, 'id' | 'bookedAt'> = {
+                    scheduledGameId: game.id,
+                    clubId: activeClub.id,
+                    playerId: currentUser.id,
+                    playerName: currentUser.name,
+                    playerWhatsappNumber: currentUser.whatsappNumber,
+                    status: 'pending_otp',
+                    confirmationType: 'otp',
+                    otp: result.otp,
+                    otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+                };
+                await createSeatBooking(bookingData);
+                onBookingChange();
+                toast({ title: 'OTP Sent', description: 'Check your WhatsApp for the confirmation code.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Could not start booking process.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleConfirmOtp = async () => {
+        if (!playerBooking || !playerBooking.otp) return;
+        setIsSubmitting(true);
+        if (playerBooking.otp === otp) {
+            await updateSeatBooking(playerBooking.id, { status: 'confirmed' });
+            toast({ title: 'Seat Confirmed!', description: 'Your seat is booked.' });
+            onBookingChange();
+        } else {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The code is incorrect.' });
+        }
+        setIsSubmitting(false);
+    };
+
+    const handleCancelBooking = async () => {
+        if (!playerBooking) return;
+        setIsSubmitting(true);
+        try {
+            await cancelSeatBooking(playerBooking.id);
+            toast({ title: 'Booking Cancelled', description: 'Your seat has been released.' });
+            onBookingChange();
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel booking.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const renderBookingStatus = () => {
+        if (playerBooking?.status === 'confirmed') {
+            return (
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="flex items-center gap-2 text-green-600 font-semibold">
+                        <CheckCircle2 className="h-5 w-5"/> Your Seat is Confirmed
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting}>
+                        Cancel Booking
+                    </Button>
+                </div>
+            );
+        }
+
+        if (playerBooking?.status === 'pending_otp') {
+            return (
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="Enter WhatsApp OTP" className="max-w-xs" />
+                    <Button onClick={handleConfirmOtp} disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirm Seat'}
+                    </Button>
+                </div>
+            );
+        }
+        
+        return (
+            <Button onClick={handleBookSeat} disabled={isFull || isSubmitting}>
+                {isSubmitting ? <Loader2 className="animate-spin" /> : (isFull ? 'Game Full' : 'Book My Seat')}
+            </Button>
+        );
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                    <div>
+                        <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')}</CardTitle>
+                        <CardDescription>
+                            {seatsRemaining > 0 ? `${seatsRemaining} of ${game.totalSeats} seats remaining` : 'All seats are booked'}
+                        </CardDescription>
+                    </div>
+                    {currentUser.isAdmin && (
+                        <Button variant="secondary" size="sm" onClick={() => onManageBookings(game)}>
+                            <Users className="mr-2 h-4 w-4" /> Manage Bookings
+                        </Button>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent>
+                {renderBookingStatus()}
+            </CardContent>
+        </Card>
+    );
+};
+
+const ManageBookingsDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    game: ScheduledGame;
+    clubId: string;
+    bookings: SeatBooking[];
+    toast: ReturnType<typeof useToast>['toast'];
+    onBookingChange: () => void;
+}> = ({ isOpen, onOpenChange, game, clubId, bookings, toast, onBookingChange }) => {
+    const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
+    const [playerToAdd, setPlayerToAdd] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if(isOpen) {
+            getMasterPlayers().then(allPlayers => {
+                setMasterPlayers(allPlayers.filter(p => p.clubId === clubId && p.isActive));
+            });
+        }
+    }, [isOpen, clubId]);
+
+    const handleAdminAddBooking = async () => {
+        const player = masterPlayers.find(p => p.id === playerToAdd);
+        if (!player) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please select a player.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await createSeatBooking({
+                scheduledGameId: game.id,
+                clubId: clubId,
+                playerId: player.id,
+                playerName: player.name,
+                playerWhatsappNumber: player.whatsappNumber,
+                status: 'confirmed',
+                confirmationType: 'admin',
+            });
+            toast({ title: 'Player Added', description: `${player.name} has been added to the game.` });
+            onBookingChange();
+            setPlayerToAdd('');
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to add player.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleAdminRemoveBooking = async (bookingId: string) => {
+        try {
+            await cancelSeatBooking(bookingId);
+            toast({ title: 'Booking Removed' });
+            onBookingChange();
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to remove booking.' });
+        }
+    };
+    
+    const availablePlayers = masterPlayers.filter(p => !bookings.some(b => b.playerId === p.id && b.status === 'confirmed'));
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Manage Bookings for {format(new Date(game.gameDate), 'PPP')}</DialogTitle>
+                    <DialogDescription>{bookings.filter(b=>b.status==='confirmed').length} / {game.totalSeats} seats booked.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {bookings.map(b => (
+                                <TableRow key={b.id}>
+                                    <TableCell>{b.playerName}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={b.status === 'confirmed' ? 'default' : 'secondary'}>{b.status}</Badge>
+                                        {b.confirmationType === 'admin' && <span className="text-xs text-muted-foreground ml-2">(Admin)</span>}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="destructive" size="sm" onClick={() => handleAdminRemoveBooking(b.id)}>Remove</Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+
+                    <Separator className="my-6" />
+
+                    <div className="space-y-2">
+                        <Label>Add Player Manually</Label>
+                        <div className="flex gap-2">
+                            <Select value={playerToAdd} onValueChange={setPlayerToAdd}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a player to add..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availablePlayers.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button onClick={handleAdminAddBooking} disabled={isSaving || !playerToAdd}>
+                                {isSaving ? <Loader2 className="animate-spin" /> : 'Add'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
