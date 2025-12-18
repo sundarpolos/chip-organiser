@@ -3476,11 +3476,14 @@ const GameBookingCard: FC<{
     
     const [otp, setOtp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
+    
+    const confirmedBookings = useMemo(() => bookings.filter(b => b.status === 'confirmed'), [bookings]);
+    const waitingList = useMemo(() => bookings.filter(b => b.status === 'waiting_list'), [bookings]);
+    
     const seatsRemaining = game.totalSeats - confirmedBookings.length;
     const isFull = seatsRemaining <= 0;
 
-    const handleBookSeat = async () => {
+    const handleBookSeat = async (joinWaitingList = false) => {
         if (!currentUser.whatsappNumber || !activeClub) {
             toast({ variant: 'destructive', title: 'Cannot Book', description: 'Your WhatsApp number is not set.' });
             return;
@@ -3488,6 +3491,23 @@ const GameBookingCard: FC<{
 
         setIsSubmitting(true);
         try {
+            // No OTP for waiting list
+            if (joinWaitingList) {
+                const bookingData: Omit<SeatBooking, 'id' | 'bookedAt'> = {
+                    scheduledGameId: game.id,
+                    clubId: activeClub.id,
+                    playerId: currentUser.id,
+                    playerName: currentUser.name,
+                    playerWhatsappNumber: currentUser.whatsappNumber,
+                    status: 'waiting_list',
+                    confirmationType: 'admin', // Waiting list is auto-confirmed if a spot opens
+                };
+                await createSeatBooking(bookingData);
+                onBookingChange();
+                toast({ title: 'Added to Waiting List', description: "We'll notify you if a spot opens up." });
+                return;
+            }
+
             const result = await sendBookingOtp({
                 playerName: currentUser.name,
                 whatsappNumber: currentUser.whatsappNumber,
@@ -3539,7 +3559,22 @@ const GameBookingCard: FC<{
         setIsSubmitting(true);
         try {
             await cancelSeatBooking(playerBooking.id);
-            toast({ title: 'Booking Cancelled', description: 'Your seat has been released.' });
+            toast({ title: 'Booking Cancelled', description: 'Your spot has been released.' });
+
+            // Auto-promote from waiting list if a seat opened up
+            if (playerBooking.status === 'confirmed' && waitingList.length > 0) {
+                const firstInWaiting = waitingList.sort((a,b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime())[0];
+                await updateSeatBooking(firstInWaiting.id, { status: 'confirmed' });
+                
+                // Notify promoted player
+                if (firstInWaiting.playerWhatsappNumber && activeClub) {
+                    sendWhatsappMessage({
+                        to: firstInWaiting.playerWhatsappNumber,
+                        message: `Great news, ${firstInWaiting.playerName}! A spot has opened up for the game on ${format(new Date(game.gameDate), 'PPP')}. Your seat is now confirmed!`,
+                        ...(activeClub.whatsappConfig || {})
+                    });
+                }
+            }
             onBookingChange();
         } catch {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel booking.' });
@@ -3562,6 +3597,19 @@ const GameBookingCard: FC<{
             );
         }
 
+        if (playerBooking?.status === 'waiting_list') {
+             return (
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="flex items-center gap-2 text-amber-600 font-semibold">
+                        <Hourglass className="h-5 w-5"/> You're on the Waiting List (#{waitingList.findIndex(p => p.playerId === currentUser.id) + 1})
+                    </div>
+                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting}>
+                        Leave Waiting List
+                    </Button>
+                </div>
+            );
+        }
+
         if (playerBooking?.status === 'pending_otp') {
             return (
                 <div className="flex flex-col sm:flex-row items-center gap-2">
@@ -3574,11 +3622,22 @@ const GameBookingCard: FC<{
         }
         
         return (
-            <Button onClick={handleBookSeat} disabled={isFull || isSubmitting}>
-                {isSubmitting ? <Loader2 className="animate-spin" /> : (isFull ? 'Game Full' : 'Book My Seat')}
+            <Button onClick={() => handleBookSeat(isFull)} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="animate-spin" /> : (isFull ? 'Join Waiting List' : 'Book My Seat')}
             </Button>
         );
     };
+
+    const playerList = (players: SeatBooking[], title: string) => (
+        <div>
+            <h4 className="font-semibold mb-2">{title} ({players.length})</h4>
+            {players.length > 0 ? (
+                <ul className="list-decimal list-inside text-sm text-muted-foreground">
+                    {players.map(b => <li key={b.id}>{b.playerName}</li>)}
+                </ul>
+            ) : <p className="text-sm text-muted-foreground">No players yet.</p>}
+        </div>
+    );
 
     return (
         <Card>
@@ -3587,7 +3646,7 @@ const GameBookingCard: FC<{
                     <div>
                         <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')} at {game.gameStartTime}</CardTitle>
                         <CardDescription>
-                            {seatsRemaining > 0 ? `${seatsRemaining} of ${game.totalSeats} seats remaining` : 'All seats are booked'}
+                            {isFull ? `${waitingList.length} player(s) on waiting list` : `${seatsRemaining} of ${game.totalSeats} seats remaining`}
                         </CardDescription>
                     </div>
                     {currentUser.isAdmin && (
@@ -3599,8 +3658,19 @@ const GameBookingCard: FC<{
                     )}
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
                 {renderBookingStatus()}
+                 <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="item-1">
+                        <AccordionTrigger>View Player Lists</AccordionTrigger>
+                        <AccordionContent>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                {playerList(confirmedBookings, 'Confirmed Players')}
+                                {playerList(waitingList, 'Waiting List')}
+                           </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             </CardContent>
         </Card>
     );

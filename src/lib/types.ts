@@ -92,7 +92,7 @@ export interface SeatBooking {
   playerId: string;
   playerName: string;
   playerWhatsappNumber: string;
-  status: 'pending_otp' | 'confirmed' | 'cancelled';
+  status: 'pending_otp' | 'confirmed' | 'cancelled' | 'waiting_list';
   confirmationType: 'otp' | 'admin';
   bookedAt: string;
   otp?: string;
