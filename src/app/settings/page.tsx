@@ -1147,12 +1147,14 @@ const EditPlayerDialog: FC<{
         if (player) {
             setEditablePlayer(JSON.parse(JSON.stringify(player)));
             const fullNumber = player.whatsappNumber || '';
-            const indiaCode = '91';
-            if (fullNumber.startsWith(indiaCode) && fullNumber.length > indiaCode.length) {
-                setCountryCode(indiaCode);
-                setMobileNumber(fullNumber.substring(indiaCode.length));
+            const sortedCountries = [...countries].sort((a, b) => b.code.length - a.code.length);
+            const foundCountry = sortedCountries.find(c => fullNumber.startsWith(c.code));
+    
+            if (foundCountry) {
+                setCountryCode(foundCountry.code);
+                setMobileNumber(fullNumber.substring(foundCountry.code.length));
             } else {
-                setCountryCode(indiaCode);
+                setCountryCode('91'); // Default to India if no match
                 setMobileNumber(fullNumber);
             }
         }
@@ -1172,6 +1174,7 @@ const EditPlayerDialog: FC<{
         }
         const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
         const playerToSave = { ...editablePlayer, whatsappNumber: fullWhatsappNumber };
+        
         setIsSaving(true);
         await onSave(playerToSave);
         setIsSaving(false);
