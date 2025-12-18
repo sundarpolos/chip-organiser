@@ -538,7 +538,7 @@ const ScheduleGameDialog: FC<{
     onSchedule: (clubId: string, gameDate: string, gameStartTime: string, totalSeats: number) => void;
 }> = ({ isOpen, onOpenChange, club, onSchedule }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const [startTime, setStartTime] = useState('19:00');
+    const [startTime, setStartTime] = useState('13:30');
     const [seats, setSeats] = useState(10);
     const [isSaving, setIsSaving] = useState(false);
     
@@ -1171,7 +1171,7 @@ const EditPlayerDialog: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Player name and club are required.' });
             return;
         }
-        const fullWhatsappNumber = `${countryCode}${mobileNumber}`;
+        const fullWhatsappNumber = mobileNumber ? `${countryCode}${mobileNumber}` : '';
         const playerToSave = { ...editablePlayer, whatsappNumber: fullWhatsappNumber };
         
         setIsSaving(true);
