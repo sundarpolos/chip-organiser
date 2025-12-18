@@ -188,7 +188,7 @@ Please be on time!`;
             
             const sendPromises = playersToSend.map(player => {
                 const automatedGreeting = `Hi ${player.playerName}, this is a reminder for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Please try to arrive a few minutes early.`;
-                const finalMessage = `${automatedGreeting}\n\n${whatsappMessage}\n\n- ${activeClub.name}`;
+                const finalMessage = `${automatedGreeting}\n\n${whatsappMessage}`;
 
                 return sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
@@ -355,7 +355,7 @@ Please be on time!`;
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
-                        placeholder="Hi [Player Name], this is a reminder for the game on [Date] at [Time]. Please try to arrive a few minutes early."
+                        placeholder={`The automated greeting is "Hi [Player Name], this is a reminder for the game on..."\n\nAdd your custom message here.\n\n- ${activeClub?.name || 'Admin'}`}
                         value={whatsappMessage}
                         onChange={e => setWhatsappMessage(e.target.value)}
                         disabled={selectedBookingIds.length === 0}
