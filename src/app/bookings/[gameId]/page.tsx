@@ -94,7 +94,6 @@ const ManageBookingsPage: FC = () => {
             setAllPlayers(playersData);
             setAllClubs(clubsData);
             setSelectedClubId(gameData.clubId); // Default to game's club
-            setWhatsappMessage(`Reminder: The game is scheduled for ${format(new Date(gameData.gameDate), 'PPP')} at ${gameData.gameStartTime}. Please arrive on time.`);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load booking data.' });
         } finally {
@@ -179,20 +178,24 @@ Please be on time!`;
     };
     
     const handleSendWhatsappMessage = async () => {
-        if (selectedBookingIds.length === 0 || !whatsappMessage.trim() || !activeClub) {
-            toast({ variant: 'destructive', title: 'Missing Info', description: 'Please select players and write a message.' });
+        if (selectedBookingIds.length === 0 || !activeClub || !game) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: 'Please select players to message.' });
             return;
         }
         setIsSendingMessage(true);
         try {
             const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
-            const sendPromises = playersToSend.map(player =>
-                sendWhatsappMessage({
+            
+            const sendPromises = playersToSend.map(player => {
+                const automatedGreeting = `Hi ${player.playerName}, this is a reminder for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Please try to arrive a few minutes early.`;
+                const finalMessage = `${automatedGreeting}\n\n${whatsappMessage}\n\n- ${activeClub.name}`;
+
+                return sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
-                    message: whatsappMessage,
+                    message: finalMessage,
                     ...(activeClub.whatsappConfig || {}),
-                })
-            );
+                });
+            });
 
             const results = await Promise.all(sendPromises);
             const successCount = results.filter(r => r.success).length;
@@ -352,7 +355,7 @@ Please be on time!`;
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
-                        placeholder="Type your message here..."
+                        placeholder="Hi [Player Name], this is a reminder for the game on [Date] at [Time]. Please try to arrive a few minutes early."
                         value={whatsappMessage}
                         onChange={e => setWhatsappMessage(e.target.value)}
                         disabled={selectedBookingIds.length === 0}
@@ -360,7 +363,7 @@ Please be on time!`;
                     <div className="flex justify-end">
                         <Button
                             onClick={handleSendWhatsappMessage}
-                            disabled={isSendingMessage || selectedBookingIds.length === 0 || !whatsappMessage.trim()}
+                            disabled={isSendingMessage || selectedBookingIds.length === 0}
                         >
                             {isSendingMessage ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
                             Send to {selectedBookingIds.length} Player(s)
