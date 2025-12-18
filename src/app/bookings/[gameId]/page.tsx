@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, type FC } from 'react';
+import { useState, useEffect, useMemo, useCallback, type FC } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { generatePokerReminder } from '@/ai/flows/generate-poker-reminder';
 
 
 const ManageBookingsPage: FC = () => {
@@ -41,6 +42,7 @@ const ManageBookingsPage: FC = () => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
     const [whatsappMessage, setWhatsappMessage] = useState('');
+    const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
 
 
     const [isLoading, setIsLoading] = useState(true);
@@ -178,8 +180,8 @@ Please be on time!`;
     };
     
     const handleSendWhatsappMessage = async () => {
-        if (selectedBookingIds.length === 0 || !activeClub || !game) {
-            toast({ variant: 'destructive', title: 'Missing Info', description: 'Please select players to message.' });
+        if (selectedBookingIds.length === 0 || !activeClub || !game || !whatsappMessage) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: 'Please select players and ensure a message is generated.' });
             return;
         }
         setIsSendingMessage(true);
@@ -187,14 +189,8 @@ Please be on time!`;
             const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
             
             const sendPromises = playersToSend.map(player => {
-                const automatedGreeting = `Hi ${player.playerName},\n\nThis is a friendly reminder for the game on *${format(new Date(game.gameDate), 'PPP')}* at *${game.gameStartTime}*. Please try to arrive a few minutes early.`;
+                const finalMessage = whatsappMessage.replace('[Player Name]', player.playerName);
                 
-                const customPart = whatsappMessage ? `\n\n${whatsappMessage}` : '';
-                
-                const signature = `\n\n- ${activeClub.name}`;
-
-                const finalMessage = `${automatedGreeting}${customPart}${signature}`;
-
                 return sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
                     message: finalMessage,
@@ -234,6 +230,38 @@ Please be on time!`;
             setSelectedBookingIds([]);
         }
     };
+    
+    const generateMessageTemplate = useCallback(async (customText?: string) => {
+        if (!game || !activeClub) return;
+        setIsGeneratingTemplate(true);
+        try {
+            const result = await generatePokerReminder({
+                gameDate: format(new Date(game.gameDate), 'PPP'),
+                gameTime: game.gameStartTime,
+                clubName: activeClub.name,
+                customMessage: customText,
+            });
+            if (result.reminderTemplate) {
+                setWhatsappMessage(result.reminderTemplate);
+            }
+        } catch (error) {
+            console.error("Template generation failed:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate message template.' });
+            // Fallback to a simpler message
+            setWhatsappMessage(`Hi [Player Name],\n\nThis is a reminder for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime}. Please be on time.\n\n- ${activeClub.name}`);
+        } finally {
+            setIsGeneratingTemplate(false);
+        }
+    }, [game, activeClub, toast]);
+
+    useEffect(() => {
+        if (selectedBookingIds.length > 0 && !whatsappMessage && !isGeneratingTemplate) {
+            generateMessageTemplate();
+        } else if (selectedBookingIds.length === 0) {
+            setWhatsappMessage('');
+        }
+    }, [selectedBookingIds, whatsappMessage, isGeneratingTemplate, generateMessageTemplate]);
+
 
     const handleSelectPlayerForManualAdd = (id: string, isSelected: boolean) => {
         if (isSelected) {
@@ -360,10 +388,11 @@ Please be on time!`;
                 </CardHeader>
                 <CardContent className="space-y-4">
                      <Textarea
-                        placeholder={`Add your custom message here. A greeting and signature will be added automatically.`}
+                        placeholder={isGeneratingTemplate ? "Generating creative reminder..." : "Select players to generate a message template."}
                         value={whatsappMessage}
                         onChange={e => setWhatsappMessage(e.target.value)}
-                        disabled={selectedBookingIds.length === 0}
+                        disabled={selectedBookingIds.length === 0 || isGeneratingTemplate}
+                        className="min-h-[150px]"
                     />
                     <div className="flex justify-end">
                         <Button
@@ -430,5 +459,3 @@ Please be on time!`;
 };
 
 export default ManageBookingsPage;
-
-    
