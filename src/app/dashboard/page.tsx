@@ -1520,11 +1520,9 @@ function DashboardContent() {
         onSave={(value) => {
             setOtpVerificationEnabled(value);
             setOtpModalOpen(false);
-            setLoadGameModalOpen(true);
         }}
         onCancel={() => {
             setOtpModalOpen(false);
-            setLoadGameModalOpen(true);
         }}
       />
     </div>
@@ -3501,6 +3499,14 @@ const GameBookingCard: FC<{
                     confirmationType: 'admin', // Waiting list is auto-confirmed if a spot opens
                 };
                 await createSeatBooking(bookingData);
+                
+                // Send WhatsApp notification for waiting list
+                sendWhatsappMessage({
+                    to: currentUser.whatsappNumber,
+                    message: `Hi ${currentUser.name}, you have been added to the waiting list for the game on ${format(new Date(game.gameDate), 'PPP')}. We will notify you if a seat becomes available.`,
+                    ...(activeClub.whatsappConfig || {})
+                });
+
                 onBookingChange();
                 toast({ title: 'Added to Waiting List', description: "We'll notify you if a spot opens up." });
                 return;
@@ -3673,3 +3679,6 @@ const GameBookingCard: FC<{
         </Card>
     );
 };
+
+
+    
