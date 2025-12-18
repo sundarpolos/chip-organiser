@@ -124,7 +124,7 @@ import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from "@/servic
 import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/venue-service"
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { getClub } from "@/services/club-service"
+import { getClub, getClubs } from "@/services/club-service"
 import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking } from "@/services/booking-service"
 
 
@@ -3475,6 +3475,7 @@ const BookingView: FC<{
                     bookings={bookings[manageGame.id] || []}
                     onBookingChange={refreshData}
                     toast={toast}
+                    currentUser={currentUser}
                 />
             )}
         </>
@@ -3630,19 +3631,30 @@ const ManageBookingsDialog: FC<{
     bookings: SeatBooking[];
     toast: ReturnType<typeof useToast>['toast'];
     onBookingChange: () => void;
-}> = ({ isOpen, onOpenChange, game, clubId, bookings, toast, onBookingChange }) => {
-    const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
+    currentUser: MasterPlayer | null;
+}> = ({ isOpen, onOpenChange, game, clubId, bookings, toast, onBookingChange, currentUser }) => {
+    const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
+    const [allClubs, setAllClubs] = useState<Club[]>([]);
+    const [selectedClubId, setSelectedClubId] = useState<string>(clubId);
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const isSuperAdmin = currentUser?.whatsappNumber === '919843350000';
 
     useEffect(() => {
         if(isOpen) {
-            getMasterPlayers().then(allPlayers => {
-                setMasterPlayers(allPlayers.filter(p => p.clubId === clubId && p.isActive));
+            Promise.all([
+                getMasterPlayers(),
+                isSuperAdmin ? getClubs() : Promise.resolve([])
+            ]).then(([players, clubs]) => {
+                setAllPlayers(players);
+                if (isSuperAdmin) {
+                    setAllClubs(clubs);
+                }
             });
             setSelectedPlayerIds([]);
+            setSelectedClubId(clubId); // Reset to game's club on open
         }
-    }, [isOpen, clubId]);
+    }, [isOpen, clubId, isSuperAdmin]);
 
     const handleAdminAddBooking = async () => {
         if (selectedPlayerIds.length === 0) {
@@ -3652,11 +3664,11 @@ const ManageBookingsDialog: FC<{
 
         setIsSaving(true);
         try {
-            const playersToAdd = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
+            const playersToAdd = allPlayers.filter(p => selectedPlayerIds.includes(p.id));
             const promises = playersToAdd.map(player => 
                 createSeatBooking({
                     scheduledGameId: game.id,
-                    clubId: clubId,
+                    clubId: player.clubId, // Use the player's actual clubId
                     playerId: player.id,
                     playerName: player.name,
                     playerWhatsappNumber: player.whatsappNumber,
@@ -3694,7 +3706,14 @@ const ManageBookingsDialog: FC<{
         }
     };
     
-    const availablePlayers = masterPlayers.filter(p => !bookings.some(b => b.playerId === p.id && b.status === 'confirmed'));
+    const availablePlayers = useMemo(() => {
+        return allPlayers.filter(p => 
+            p.clubId === selectedClubId &&
+            p.isActive &&
+            !bookings.some(b => b.playerId === p.id && b.status === 'confirmed')
+        );
+    }, [allPlayers, selectedClubId, bookings]);
+
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -3735,8 +3754,23 @@ const ManageBookingsDialog: FC<{
 
                     <Separator className="my-6" />
 
-                    <div className="space-y-2">
-                        <Label>Add Player(s) Manually</Label>
+                    <div className="space-y-4">
+                        <h3 className="font-semibold">Add Player(s) Manually</h3>
+                        {isSuperAdmin && (
+                             <div className="space-y-2">
+                                <Label htmlFor="club-select">Select Club</Label>
+                                <Select value={selectedClubId} onValueChange={setSelectedClubId}>
+                                    <SelectTrigger id="club-select">
+                                        <SelectValue placeholder="Select a club..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allClubs.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <ScrollArea className="h-48 border rounded-md p-2">
                            {availablePlayers.length > 0 ? (
                              availablePlayers.map(player => (
@@ -3752,7 +3786,7 @@ const ManageBookingsDialog: FC<{
                                 </div>
                               ))
                            ) : (
-                             <p className="text-center text-muted-foreground p-4">All active players are already booked.</p>
+                             <p className="text-center text-muted-foreground p-4">All active players for this club are already booked or there are no players.</p>
                            )}
                         </ScrollArea>
                         <div className="flex justify-end pt-2">
