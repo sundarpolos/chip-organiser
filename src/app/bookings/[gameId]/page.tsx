@@ -141,7 +141,9 @@ Please be on time!`;
                 to: activeClub.whatsappConfig.whatsappGroupId,
                 message: groupUpdateMessage,
                 isGroup: true,
-                ...(activeClub.whatsappConfig || {}),
+                apiUrl: activeClub.whatsappConfig.apiUrl,
+                apiToken: activeClub.whatsappConfig.apiToken,
+                senderMobile: activeClub.whatsappConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Update Sent!', description: 'The message was sent to the club group.' });
@@ -214,10 +216,10 @@ Please be on time!`;
         }
         setIsSendingMessage(true);
         setWhatsappMessage('');
-        setSelectedBookingIds([]);
-
+        
         const playersToSend = bookings.filter(b => selectedBookingIds.includes(b.id));
         const totalToSend = playersToSend.length;
+        setSelectedBookingIds([]);
         
         const { id: toastId, update } = toast({
             title: `Sending ${totalToSend} message(s)...`,
