@@ -39,6 +39,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
+import Link from 'next/link';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -503,7 +504,13 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
                     <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
                     <TableCell>{game.gameStartTime}</TableCell>
                     <TableCell>{game.totalSeats}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`/bookings/${game.id}`}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Manage
+                            </Link>
+                        </Button>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
