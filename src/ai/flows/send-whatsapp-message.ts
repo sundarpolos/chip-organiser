@@ -53,8 +53,8 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
-    if (isGroup && !finalSenderMobile) {
-        const errorMsg = 'Sender mobile number is not configured for group messaging.';
+    if (!finalSenderMobile) {
+        const errorMsg = 'Sender mobile number is not configured.';
         console.error(errorMsg);
         return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
@@ -68,9 +68,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       if (isGroup) {
         body.append('group', to);
-        if (finalSenderMobile) {
-          body.append('sender', finalSenderMobile);
-        }
+        // The API requires a 'receiver' even for group messages to identify the instance.
+        // It should be the same as the sender's number.
+        body.append('receiver', finalSenderMobile);
       } else {
         body.append('receiver', to);
       }
