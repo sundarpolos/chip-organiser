@@ -15,8 +15,9 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const SendWhatsappMessageInputSchema = z.object({
-  to: z.string().describe('The recipient WhatsApp number.'),
+  to: z.string().describe('The recipient WhatsApp number or group ID.'),
   message: z.string().describe('The message content to send.'),
+  isGroup: z.boolean().optional().describe('Set to true if sending to a group ID.'),
   apiUrl: z.string().optional().describe('The WhatsApp API URL.'),
   apiToken: z.string().optional().describe('The WhatsApp API Token.'),
   senderMobile: z.string().optional().describe('The sender WhatsApp number.'),
@@ -40,7 +41,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     inputSchema: SendWhatsappMessageInputSchema,
     outputSchema: SendWhatsappMessageOutputSchema,
   },
-  async ({ to, message, apiUrl, apiToken, senderMobile }) => {
+  async ({ to, message, isGroup = false, apiUrl, apiToken, senderMobile }) => {
     // Prefer credentials passed in, but fall back to environment variables
     const finalApiUrl = apiUrl || process.env.WHATSAPP_API_URL;
     const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
@@ -53,10 +54,15 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
     try {
       const body = new URLSearchParams({
-        receiver: to,
         msgtext: message,
         token: finalApiToken,
       });
+
+      if (isGroup) {
+        body.append('group', to);
+      } else {
+        body.append('receiver', to);
+      }
 
       console.log(`Attempting to send WhatsApp message via POST to: ${finalApiUrl}`);
       

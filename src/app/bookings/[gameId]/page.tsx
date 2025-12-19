@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import type { Club, MasterPlayer, ScheduledGame, SeatBooking } from '@/lib/types';
-import { Loader2, Plus, Trash2, Users, Send, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, Trash2, Users, Send, Copy, Check, MessageSquare } from 'lucide-react';
 import { getClubs, getClub } from '@/services/club-service';
 import { getMasterPlayers } from '@/services/player-service';
 import { getScheduledGame, getSeatBookingsForGame, createSeatBooking, cancelSeatBooking } from '@/services/booking-service';
@@ -129,6 +129,33 @@ Total: ${bookings.filter(b => b.status === 'confirmed').length} players
 
 Please be on time!`;
     }, [game, bookings]);
+
+    const handleSendToGroup = async () => {
+        if (!activeClub?.whatsappConfig?.whatsappGroupId || !groupUpdateMessage) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: 'Club Group ID not set or message is empty.' });
+            return;
+        }
+        setIsSendingMessage(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: activeClub.whatsappConfig.whatsappGroupId,
+                message: groupUpdateMessage,
+                isGroup: true,
+                ...(activeClub.whatsappConfig || {}),
+            });
+            if (result.success) {
+                toast({ title: 'Group Update Sent!', description: 'The message was sent to the club group.' });
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Could not send message.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        } finally {
+            setIsSendingMessage(false);
+        }
+    };
+
 
     const handleCopyToClipboard = () => {
         navigator.clipboard.writeText(groupUpdateMessage).then(() => {
@@ -383,7 +410,7 @@ Please be on time!`;
             <Card>
                 <CardHeader>
                     <CardTitle>WhatsApp Group Update</CardTitle>
-                    <CardDescription>Copy the formatted text below and paste it into your group chat.</CardDescription>
+                    <CardDescription>Copy the formatted text below and paste it into your group chat, or send it directly to your configured group.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Textarea
@@ -391,7 +418,14 @@ Please be on time!`;
                         value={groupUpdateMessage}
                         className="h-64 font-mono text-sm"
                     />
-                    <div className="flex justify-end">
+                    <div className="flex justify-between items-center">
+                        <Button
+                            onClick={handleSendToGroup}
+                            disabled={isSendingMessage || !activeClub?.whatsappConfig?.whatsappGroupId}
+                        >
+                            {isSendingMessage ? <Loader2 className="animate-spin mr-2"/> : <MessageSquare className="mr-2 h-4 w-4" />}
+                            Send to Group
+                        </Button>
                         <Button
                             onClick={handleCopyToClipboard}
                         >

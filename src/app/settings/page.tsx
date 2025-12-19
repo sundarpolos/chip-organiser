@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send, CalendarIcon as CalendarIconLucide } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send, CalendarIcon as CalendarIconLucide, MessageSquare } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -1625,7 +1625,7 @@ const SendGameAnnouncementDialog: FC<{
         setSelectedPlayerIds(isChecked ? playersWithWhatsapp.map(p => p.id) : []);
     };
 
-    const handleSend = async () => {
+    const handleSendToIndividuals = async () => {
         if (selectedPlayerIds.length === 0 || !message) {
             toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select recipients and enter a message.' });
             return;
@@ -1678,6 +1678,38 @@ const SendGameAnnouncementDialog: FC<{
             description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
         });
     };
+    
+    const handleSendToGroup = async () => {
+        const groupId = club.whatsappConfig?.whatsappGroupId;
+        if (!groupId || !message) {
+            toast({ variant: 'destructive', title: 'Missing Information', description: 'Club Group ID is not set or message is empty.' });
+            return;
+        }
+
+        setIsSending(true);
+        onOpenChange(false);
+
+        try {
+            // Remove personalization for group message
+            const groupMessage = message.replace(/Hi \[Player Name\],/g, 'Hi everyone,');
+            const result = await sendWhatsappMessage({
+                to: groupId,
+                message: groupMessage,
+                isGroup: true,
+                ...(club.whatsappConfig || {}),
+            });
+            if (result.success) {
+                toast({ title: 'Group Message Sent!', description: 'The announcement has been sent to the club group.'});
+            } else {
+                throw new Error(result.error);
+            }
+        } catch(e) {
+             const errorMessage = e instanceof Error ? e.message : 'Could not send group message.';
+            toast({ variant: 'destructive', title: 'Error', description: errorMessage});
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -1729,11 +1761,16 @@ const SendGameAnnouncementDialog: FC<{
                         />
                     </div>
                 </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0 || !message}>
-                        {isSending ? <Loader2 className="animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s)</>}
+                <DialogFooter className="sm:justify-between">
+                    <Button onClick={handleSendToGroup} variant="secondary" disabled={isSending || !club.whatsappConfig?.whatsappGroupId}>
+                        {isSending ? <Loader2 className="animate-spin" /> : <><MessageSquare className="mr-2 h-4 w-4" /> Send to Group</>}
                     </Button>
+                    <div className="flex gap-2">
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button onClick={handleSendToIndividuals} disabled={isSending || selectedPlayerIds.length === 0 || !message}>
+                            {isSending ? <Loader2 className="animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s)</>}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
