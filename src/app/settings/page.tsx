@@ -40,6 +40,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
+import { assignGroupIdToSmartClub } from '@/services/migration-service';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -1852,6 +1853,11 @@ export default function SettingsPage() {
       async function loadData() {
           if (!currentUser) return;
           try {
+              if (isSuperAdmin) {
+                  // Run the one-time assignment
+                  const result = await assignGroupIdToSmartClub();
+                  console.log(result.message);
+              }
               const [allClubs, allPlayers, allVenues, allGames] = await Promise.all([
                 getClubs(), 
                 getMasterPlayers(),
@@ -1870,7 +1876,7 @@ export default function SettingsPage() {
           }
       }
       loadData();
-  }, [currentUser, toast]);
+  }, [currentUser, isSuperAdmin, toast]);
   
   const filteredPlayers = useMemo(() => {
       if (isSuperAdmin) return players;
@@ -1936,3 +1942,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

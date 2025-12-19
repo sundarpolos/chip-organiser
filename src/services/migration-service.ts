@@ -1,10 +1,12 @@
 
+
 'use server';
 
 import { db } from "@/lib/firebase";
-import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, query, where } from "firebase/firestore";
 import { getMasterPlayers } from "./player-service";
-import { createClub, findClubByName } from "./club-service";
+import { createClub, findClubByName, updateClub } from "./club-service";
+import type { Club } from "@/lib/types";
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -65,3 +67,24 @@ export async function migrateLegacyData(): Promise<{ message: string }> {
         message: `Successfully migrated ${playersMigrated} players, ${venuesMigrated} venues, and ${gamesMigrated} games to ${club.name}.`
     };
 }
+
+
+export async function assignGroupIdToSmartClub(): Promise<{ message: string }> {
+    const club = await findClubByName("Smart CLUB");
+    if (!club) {
+        return { message: "Smart CLUB not found." };
+    }
+
+    const updatedClub: Club = {
+        ...club,
+        whatsappConfig: {
+            ...club.whatsappConfig,
+            whatsappGroupId: "120363167976530467@g.us",
+        },
+    };
+
+    await updateClub(updatedClub);
+
+    return { message: `Successfully assigned WhatsApp Group ID to ${club.name}.` };
+}
+
