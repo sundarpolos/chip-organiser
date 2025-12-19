@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { db } from "@/lib/firebase";
@@ -37,7 +38,7 @@ export async function updateClub(club: Club): Promise<Club> {
     const clubData = {
         name: club.name,
         ownerId: club.ownerId,
-        whatsappConfig: club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' },
+        whatsappConfig: club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '', whatsappGroupId: '' },
         deckChangeIntervalHours: club.deckChangeIntervalHours || 0,
     };
     await setDoc(docRef, clubData, { merge: true });
@@ -67,7 +68,7 @@ export async function deleteClub(clubId: string): Promise<void> {
 
 
 export async function findClubByName(name: string): Promise<Club | null> {
-    const q = query(collection(db, CLUBS_COLlection), where("name", "==", name));
+    const q = query(collection(db, CLUBS_COLLECTION), where("name", "==", name));
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0];

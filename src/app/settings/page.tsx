@@ -758,13 +758,13 @@ const CreateEditClubDialog: FC<{
     const [adminId, setAdminId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
-    const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '' });
+    const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({ apiUrl: '', apiToken: '', senderMobile: '', whatsappGroupId: '' });
     const [deckChangeIntervalHours, setDeckChangeIntervalHours] = useState(2);
 
     useEffect(() => {
         if (clubToEdit) {
             setClubName(clubToEdit.name);
-            setWhatsappConfig(clubToEdit.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
+            setWhatsappConfig(clubToEdit.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '', whatsappGroupId: '' });
             setDeckChangeIntervalHours(clubToEdit.deckChangeIntervalHours || 2);
             const clubAdmin = players.find(p => p.clubId === clubToEdit.id && p.isAdmin);
             if (clubAdmin) {
@@ -773,7 +773,7 @@ const CreateEditClubDialog: FC<{
         } else {
             setClubName('');
             setAdminId('');
-            setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '' });
+            setWhatsappConfig({ apiUrl: '', apiToken: '', senderMobile: '', whatsappGroupId: '' });
             setDeckChangeIntervalHours(2);
         }
     }, [clubToEdit, players, isOpen]);
@@ -909,6 +909,10 @@ const CreateEditClubDialog: FC<{
                                 <div className="space-y-2">
                                     <Label htmlFor="wa-sender-mobile">Sender Mobile</Label>
                                     <Input id="wa-sender-mobile" value={whatsappConfig.senderMobile} onChange={e => setWhatsappConfig(c => ({...c, senderMobile: e.target.value}))} placeholder="e.g., 14155552671" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="wa-group-id">WhatsApp Group ID</Label>
+                                    <Input id="wa-group-id" value={whatsappConfig.whatsappGroupId || ''} onChange={e => setWhatsappConfig(c => ({...c, whatsappGroupId: e.target.value}))} placeholder="e.g., 12036302... (optional)" />
                                 </div>
                                 <div className="flex justify-end">
                                     <Button variant="secondary" onClick={handleTestWhatsapp} disabled={isTesting}>

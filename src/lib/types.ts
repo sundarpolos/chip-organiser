@@ -66,6 +66,7 @@ export interface WhatsappConfig {
   apiUrl: string;
   apiToken: string;
   senderMobile: string;
+  whatsappGroupId?: string;
 }
 
 export interface Club {
