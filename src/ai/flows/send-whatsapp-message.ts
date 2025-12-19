@@ -45,12 +45,20 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     // Prefer credentials passed in, but fall back to environment variables
     const finalApiUrl = apiUrl || process.env.WHATSAPP_API_URL;
     const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
+    const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
     if (!finalApiUrl || !finalApiToken) {
       const errorMsg = 'WhatsApp API URL and Token are not configured. Please provide them in the WA Settings or in the .env file.';
       console.error(errorMsg);
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
+
+    if (isGroup && !finalSenderMobile) {
+        const errorMsg = 'Sender mobile number is not configured for group messaging.';
+        console.error(errorMsg);
+        return { success: false, error: `Server configuration error: ${errorMsg}` };
+    }
+
 
     try {
       const body = new URLSearchParams({
@@ -60,6 +68,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       if (isGroup) {
         body.append('group', to);
+        if (finalSenderMobile) {
+          body.append('sender', finalSenderMobile);
+        }
       } else {
         body.append('receiver', to);
       }
