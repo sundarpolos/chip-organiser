@@ -53,13 +53,6 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       return { success: false, error: `Server configuration error: ${errorMsg}` };
     }
 
-    if (!finalSenderMobile) {
-        const errorMsg = 'Sender mobile number is not configured.';
-        console.error(errorMsg);
-        return { success: false, error: `Server configuration error: ${errorMsg}` };
-    }
-
-
     try {
       const body = new URLSearchParams({
         msgtext: message,
@@ -67,10 +60,10 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       });
 
       if (isGroup) {
+        // For group messages, 'to' is the group ID.
+        // The API seems to use the 'group' param for the ID and also expects it as 'receiver'
         body.append('group', to);
-        // The API requires a 'receiver' even for group messages to identify the instance.
-        // It should be the same as the sender's number.
-        body.append('receiver', finalSenderMobile);
+        body.append('receiver', to); 
       } else {
         body.append('receiver', to);
       }
