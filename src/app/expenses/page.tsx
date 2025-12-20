@@ -346,7 +346,7 @@ const SendExpenseSummaryDialog: FC<{
         }
         msg += `\n*Total Expenses:* ₹${summary.totalExpenses.toFixed(2)}\n\n`;
         msg += `----------------------------------\n`;
-        msg += `*Net Profit/Loss:* ₹${summary.netProfit.toFixed(2)}\n`;
+        msg += `*Cash in Hand:* ₹${summary.netProfit.toFixed(2)}\n`;
         
         return msg;
     }, [game, summary]);
