@@ -1198,7 +1198,7 @@ function DashboardContent() {
 
   const handleStartGameFromSchedule = async (scheduledGame: ScheduledGame) => {
     if (!activeClub) return;
-
+  
     // Fetch confirmed players
     const bookings = await getSeatBookingsForGame(scheduledGame.id);
     const confirmedPlayers = bookings.filter(b => b.status === 'confirmed');
@@ -1214,9 +1214,12 @@ function DashboardContent() {
     
     const now = new Date();
 
+    const venues = await getMasterVenues();
+    const venueName = venues.find(v => v.id === scheduledGame.gameDate)?.name ?? "Scheduled Game";
+  
     const newGame: GameHistory = {
         id: `game-${Date.now()}`,
-        venue: (await getMasterVenues()).find(v => v.id === scheduledGame.gameDate) ?.name ?? "Scheduled Game", // A bit of a guess, maybe venue should be on scheduled game
+        venue: venueName,
         timestamp: now.toISOString(),
         players: newPlayers,
         startTime: now.toISOString(),
@@ -1225,10 +1228,10 @@ function DashboardContent() {
         playerEntryFee: scheduledGame.playerEntryFee,
         expenses: scheduledGame.expenses,
     }
-
+  
     try {
-        await saveGameHistory(newGame);
-        setActiveGame(newGame);
+        const savedGame = await saveGameHistory(newGame);
+        await loadGameIntoState(savedGame);
         toast({ title: "Game Started!", description: `The game for ${format(new Date(scheduledGame.gameDate), 'PPP')} has started.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error Starting Game', description: 'Could not start the game session.'});
