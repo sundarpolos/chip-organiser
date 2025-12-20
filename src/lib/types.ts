@@ -66,6 +66,7 @@ export interface GameHistory {
     clubId: string;
     progressLog?: GameProgressLog[];
     playerEntryFee?: number;
+    paidPlayerIds?: string[];
     expenses?: GameExpense[];
 }
 

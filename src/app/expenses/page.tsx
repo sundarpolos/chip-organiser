@@ -29,6 +29,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const DailyExpensesPage: FC = () => {
   const { toast } = useToast();
@@ -38,9 +40,12 @@ const DailyExpensesPage: FC = () => {
   const [activeClub, setActiveClub] = useState<Club | null>(null);
   const [games, setGames] = useState<GameHistory[]>([]);
   const [selectedGame, setSelectedGame] = useState<GameHistory | null>(null);
+  const [paidPlayerIds, setPaidPlayerIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
+
+  const PLAYER_ENTRY_FEE = 2500;
 
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
@@ -55,12 +60,14 @@ const DailyExpensesPage: FC = () => {
       }
       getClub(clubId).then(setActiveClub);
       getGameHistory().then(allGames => {
-        const clubGames = allGames.filter(g => g.clubId === clubId);
+        const clubGames = allGames.filter(g => g.clubId === clubId).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         setGames(clubGames);
         if (clubGames.length > 0) {
             const today = new Date();
             const todayGame = clubGames.find(g => format(new Date(g.timestamp), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'));
-            setSelectedGame(todayGame || clubGames[0]);
+            const gameToSelect = todayGame || clubGames[0];
+            setSelectedGame(gameToSelect);
+            setPaidPlayerIds(gameToSelect.paidPlayerIds ?? (gameToSelect.players?.map(p => p.id) || []));
         }
         setIsLoading(false);
       });
@@ -69,6 +76,16 @@ const DailyExpensesPage: FC = () => {
     }
   }, [router, toast]);
   
+  const handleSelectGame = (gameId: string) => {
+    const game = games.find(g => g.id === gameId) || null;
+    setSelectedGame(game);
+    if (game) {
+        setPaidPlayerIds(game.paidPlayerIds ?? (game.players?.map(p => p.id) || []));
+    } else {
+        setPaidPlayerIds([]);
+    }
+  };
+
   const handleExpenseChange = (index: number, field: 'name' | 'amount', value: string | number) => {
     if (!selectedGame) return;
     const newExpenses = [...(selectedGame.expenses || [])];
@@ -93,20 +110,31 @@ const DailyExpensesPage: FC = () => {
     const newExpenses = (selectedGame.expenses || []).filter((_, i) => i !== index);
     setSelectedGame({ ...selectedGame, expenses: newExpenses });
   };
+  
+  const handlePlayerPayToggle = (playerId: string, isPaid: boolean) => {
+    setPaidPlayerIds(prev => isPaid ? [...prev, playerId] : prev.filter(id => id !== playerId));
+  };
+
+  const handleSelectAllPlayers = (isChecked: boolean) => {
+    if (!selectedGame) return;
+    setPaidPlayerIds(isChecked ? selectedGame.players.map(p => p.id) : []);
+  };
+
 
   const accountingSummary = useMemo(() => {
     if (!selectedGame) return { totalEntryFees: 0, totalExpenses: 0, netProfit: 0 };
-    const totalEntryFees = (selectedGame.players?.length || 0) * (selectedGame.playerEntryFee || 0);
+    const totalEntryFees = paidPlayerIds.length * PLAYER_ENTRY_FEE;
     const totalExpenses = (selectedGame.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
     const netProfit = totalEntryFees - totalExpenses;
     return { totalEntryFees, totalExpenses, netProfit };
-  }, [selectedGame]);
+  }, [selectedGame, paidPlayerIds, PLAYER_ENTRY_FEE]);
 
   const handleSave = async () => {
     if (!selectedGame) return;
     setIsSaving(true);
     try {
-      await saveGameHistory(selectedGame);
+      const gameToSave = { ...selectedGame, playerEntryFee: PLAYER_ENTRY_FEE, paidPlayerIds };
+      await saveGameHistory(gameToSave);
       toast({ title: 'Expenses Saved', description: 'The financial data for this game has been updated.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to save expenses.' });
@@ -136,7 +164,7 @@ const DailyExpensesPage: FC = () => {
                 <Label>Select Game</Label>
                 <Select
                     value={selectedGame?.id}
-                    onValueChange={(gameId) => setSelectedGame(games.find(g => g.id === gameId) || null)}
+                    onValueChange={handleSelectGame}
                 >
                     <SelectTrigger>
                         <SelectValue placeholder="Select a game to manage..." />
@@ -156,26 +184,47 @@ const DailyExpensesPage: FC = () => {
                     <Separator />
                     <div className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Income</h3>
-                            <div className="space-y-2">
-                                <Label htmlFor="entry-fee">Player Entry Fee (per player)</Label>
-                                <Input
-                                    id="entry-fee"
-                                    type="number"
-                                    value={selectedGame.playerEntryFee || 0}
-                                    onChange={(e) => setSelectedGame({ ...selectedGame, playerEntryFee: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div className="p-4 bg-muted rounded-md text-sm">
-                                <div className="flex justify-between">
-                                    <span>Number of Players:</span>
-                                    <span>{selectedGame.players?.length || 0}</span>
-                                </div>
-                                <div className="flex justify-between font-semibold mt-2">
-                                    <span>Total Entry Fees Collected:</span>
-                                    <span>₹{accountingSummary.totalEntryFees.toFixed(2)}</span>
-                                </div>
-                            </div>
+                            <h3 className="text-lg font-medium">Income (Entry Fee: ₹{PLAYER_ENTRY_FEE})</h3>
+                            <Card>
+                                <CardHeader className='p-4'>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="select-all-players"
+                                            checked={selectedGame.players.length > 0 && paidPlayerIds.length === selectedGame.players.length}
+                                            onCheckedChange={handleSelectAllPlayers}
+                                        />
+                                        <Label htmlFor="select-all-players" className="text-base font-semibold">
+                                            Select All Players
+                                        </Label>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className='p-4 pt-0'>
+                                    <ScrollArea className="h-48 border rounded-md p-2">
+                                    {selectedGame.players?.length > 0 ? selectedGame.players.map(player => (
+                                        <div key={player.id} className="flex items-center space-x-3 p-1">
+                                            <Checkbox
+                                                id={`player-${player.id}`}
+                                                checked={paidPlayerIds.includes(player.id)}
+                                                onCheckedChange={checked => handlePlayerPayToggle(player.id, !!checked)}
+                                            />
+                                            <Label htmlFor={`player-${player.id}`} className="flex-1 cursor-pointer">{player.name}</Label>
+                                        </div>
+                                    )) : <p className="text-center text-sm text-muted-foreground p-4">No players in this game.</p>}
+                                    </ScrollArea>
+                                </CardContent>
+                                <CardFooter className='p-4'>
+                                    <div className="p-4 bg-muted rounded-md text-sm w-full">
+                                        <div className="flex justify-between">
+                                            <span>Number of Paid Players:</span>
+                                            <span>{paidPlayerIds.length}</span>
+                                        </div>
+                                        <div className="flex justify-between font-semibold mt-2">
+                                            <span>Total Entry Fees Collected:</span>
+                                            <span>₹{accountingSummary.totalEntryFees.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                </CardFooter>
+                            </Card>
                         </div>
                         <div className="space-y-4">
                             <h3 className="text-lg font-medium">Expenses</h3>
@@ -275,15 +324,19 @@ const SendExpenseSummaryDialog: FC<{
 
     const message = useMemo(() => {
         let msg = `*Financial Summary for ${game.venue} on ${format(new Date(game.timestamp), 'PPP')}*\n\n`;
-        msg += `Total Players: ${game.players?.length || 0}\n`;
-        msg += `Entry Fee: ₹${game.playerEntryFee || 0}\n`;
+        msg += `Paid Players: ${game.paidPlayerIds?.length || game.players?.length || 0}\n`;
+        msg += `Entry Fee per Player: ₹${game.playerEntryFee || 0}\n`;
         msg += `----------------------------------\n`;
         msg += `*Total Income:* ₹${summary.totalEntryFees.toFixed(2)}\n\n`;
         msg += `*Expenses:*\n`;
-        (game.expenses || []).forEach(exp => {
-            msg += `- ${exp.name}: ₹${exp.amount.toFixed(2)}\n`;
-        });
-        msg += `*Total Expenses:* ₹${summary.totalExpenses.toFixed(2)}\n\n`;
+        if ((game.expenses || []).length > 0) {
+            (game.expenses || []).forEach(exp => {
+                msg += `- ${exp.name}: ₹${exp.amount.toFixed(2)}\n`;
+            });
+        } else {
+            msg += `- No expenses recorded.\n`;
+        }
+        msg += `\n*Total Expenses:* ₹${summary.totalExpenses.toFixed(2)}\n\n`;
         msg += `----------------------------------\n`;
         msg += `*Net Profit/Loss:* ₹${summary.netProfit.toFixed(2)}\n`;
         
@@ -346,5 +399,3 @@ const SendExpenseSummaryDialog: FC<{
 
 
 export default DailyExpensesPage;
-
-    
