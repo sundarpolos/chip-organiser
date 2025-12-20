@@ -2550,7 +2550,7 @@ const ReportsDialog: FC<{
                                         </TableBody>
                                         <TableFoot>
                                             <TableRow className="font-bold text-lg">
-                                                <TableCell>Net Profit / Loss</TableCell>
+                                                <TableCell>Cash in Hand</TableCell>
                                                 <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
                                                     ₹{accountingSummary.netProfit.toFixed(2)}
                                                 </TableCell>
@@ -3484,7 +3484,6 @@ const DeckChangeAlertDialog: FC<{
     );
 };
 
-// Seat Booking Components
 const BookingView: FC<{
     currentUser: MasterPlayer;
     activeClub: Club | null;
