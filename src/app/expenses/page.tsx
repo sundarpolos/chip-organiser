@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, type FC } from 'react';
+import { useState, useEffect, useMemo, type FC, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getGameHistory, saveGameHistory } from '@/services/game-service';
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -31,10 +31,14 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import jsPDF from "jspdf"
+import "jspdf-autotable"
+import html2canvas from 'html2canvas';
 
 const DailyExpensesPage: FC = () => {
   const { toast } = useToast();
   const router = useRouter();
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [activeClub, setActiveClub] = useState<Club | null>(null);
@@ -43,6 +47,7 @@ const DailyExpensesPage: FC = () => {
   const [paidPlayerIds, setPaidPlayerIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
 
   const PLAYER_ENTRY_FEE = 2500;
@@ -143,6 +148,43 @@ const DailyExpensesPage: FC = () => {
     }
   };
 
+    const handleExportPdf = async () => {
+        if (!reportRef.current) {
+            toast({ variant: "destructive", title: "Export Error", description: "Report content not found." });
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(reportRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: null,
+            });
+            
+            const imgData = canvas.toDataURL('image/jpeg', 0.8);
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            
+            const filename = `daily-expenses-${selectedGame ? format(new Date(selectedGame.timestamp), 'yyyy-MM-dd') : 'report'}.pdf`;
+            
+            pdf.save(filename);
+            toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
+
+        } catch (error) {
+            console.error("Failed to export PDF:", error);
+            toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -181,124 +223,132 @@ const DailyExpensesPage: FC = () => {
             
             {selectedGame && (
                 <>
-                    <Card className="bg-muted/50">
-                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                            <Label className="text-sm font-medium text-muted-foreground">Cash in Hand</Label>
-                            <p className={cn("text-4xl font-bold tracking-tighter", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
-                                ₹{accountingSummary.netProfit.toFixed(2)}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Separator />
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Income (Entry Fee: ₹{PLAYER_ENTRY_FEE})</h3>
-                            <Card>
-                                <CardHeader className='p-4'>
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="select-all-players"
-                                            checked={selectedGame.players.length > 0 && paidPlayerIds.length === selectedGame.players.length}
-                                            onCheckedChange={handleSelectAllPlayers}
-                                        />
-                                        <Label htmlFor="select-all-players" className="text-base font-semibold">
-                                            Select All Players
-                                        </Label>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className='p-4 pt-0'>
-                                    <ScrollArea className="h-48 border rounded-md p-2">
-                                    {selectedGame.players?.length > 0 ? selectedGame.players.map(player => (
-                                        <div key={player.id} className="flex items-center space-x-3 p-1">
+                    <div ref={reportRef} className="space-y-4 bg-background p-0 md:p-4 rounded-lg">
+                        <Card className="bg-muted/50">
+                            <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                <Label className="text-sm font-medium text-muted-foreground">Cash in Hand</Label>
+                                <p className={cn("text-4xl font-bold tracking-tighter", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                                    ₹{accountingSummary.netProfit.toFixed(2)}
+                                </p>
+                            </CardContent>
+                        </Card>
+                        <Separator />
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Income (Entry Fee: ₹{PLAYER_ENTRY_FEE})</h3>
+                                <Card>
+                                    <CardHeader className='p-4'>
+                                        <div className="flex items-center space-x-2">
                                             <Checkbox
-                                                id={`player-${player.id}`}
-                                                checked={paidPlayerIds.includes(player.id)}
-                                                onCheckedChange={checked => handlePlayerPayToggle(player.id, !!checked)}
+                                                id="select-all-players"
+                                                checked={selectedGame.players.length > 0 && paidPlayerIds.length === selectedGame.players.length}
+                                                onCheckedChange={handleSelectAllPlayers}
                                             />
-                                            <Label htmlFor={`player-${player.id}`} className="flex-1 cursor-pointer">{player.name}</Label>
+                                            <Label htmlFor="select-all-players" className="text-base font-semibold">
+                                                Select All Players
+                                            </Label>
                                         </div>
-                                    )) : <p className="text-center text-sm text-muted-foreground p-4">No players in this game.</p>}
-                                    </ScrollArea>
-                                </CardContent>
-                                <CardFooter className='p-4'>
-                                    <div className="p-4 bg-muted rounded-md text-sm w-full">
-                                        <div className="flex justify-between">
-                                            <span>Number of Paid Players:</span>
-                                            <span>{paidPlayerIds.length}</span>
+                                    </CardHeader>
+                                    <CardContent className='p-4 pt-0'>
+                                        <ScrollArea className="h-48 border rounded-md p-2">
+                                        {selectedGame.players?.length > 0 ? selectedGame.players.map(player => (
+                                            <div key={player.id} className="flex items-center space-x-3 p-1">
+                                                <Checkbox
+                                                    id={`player-${player.id}`}
+                                                    checked={paidPlayerIds.includes(player.id)}
+                                                    onCheckedChange={checked => handlePlayerPayToggle(player.id, !!checked)}
+                                                />
+                                                <Label htmlFor={`player-${player.id}`} className="flex-1 cursor-pointer">{player.name}</Label>
+                                            </div>
+                                        )) : <p className="text-center text-sm text-muted-foreground p-4">No players in this game.</p>}
+                                        </ScrollArea>
+                                    </CardContent>
+                                    <CardFooter className='p-4'>
+                                        <div className="p-4 bg-muted rounded-md text-sm w-full">
+                                            <div className="flex justify-between">
+                                                <span>Number of Paid Players:</span>
+                                                <span>{paidPlayerIds.length}</span>
+                                            </div>
+                                            <div className="flex justify-between font-semibold mt-2">
+                                                <span>Total Entry Fees Collected:</span>
+                                                <span>₹{accountingSummary.totalEntryFees.toFixed(2)}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex justify-between font-semibold mt-2">
-                                            <span>Total Entry Fees Collected:</span>
-                                            <span>₹{accountingSummary.totalEntryFees.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                </CardFooter>
-                            </Card>
-                        </div>
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Expenses</h3>
-                            <div className="space-y-2">
-                            {(selectedGame.expenses || []).map((exp, index) => (
-                                <div key={index} className="flex gap-2 items-center">
-                                    <Input
-                                        placeholder="Expense Name (e.g., Rent)"
-                                        value={exp.name}
-                                        onChange={(e) => handleExpenseChange(index, 'name', e.target.value)}
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="Amount"
-                                        value={exp.amount === 0 ? '' : exp.amount}
-                                        onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)}
-                                        className="w-32"
-                                    />
-                                    <Button variant="ghost" size="icon" onClick={() => removeExpense(index)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
+                                    </CardFooter>
+                                </Card>
                             </div>
-                            <Button variant="outline" size="sm" onClick={addExpense}>
-                                <Plus className="mr-2 h-4 w-4" /> Add Expense
-                            </Button>
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-medium">Expenses</h3>
+                                <div className="space-y-2">
+                                {(selectedGame.expenses || []).map((exp, index) => (
+                                    <div key={index} className="flex gap-2 items-center">
+                                        <Input
+                                            placeholder="Expense Name (e.g., Rent)"
+                                            value={exp.name}
+                                            onChange={(e) => handleExpenseChange(index, 'name', e.target.value)}
+                                        />
+                                        <Input
+                                            type="number"
+                                            placeholder="Amount"
+                                            value={exp.amount === 0 ? '' : exp.amount}
+                                            onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)}
+                                            className="w-32"
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={() => removeExpense(index)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                </div>
+                                <Button variant="outline" size="sm" onClick={addExpense}>
+                                    <Plus className="mr-2 h-4 w-4" /> Add Expense
+                                </Button>
+                            </div>
                         </div>
+                         <Separator />
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Financial Summary</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                 <Table>
+                                    <TableBody>
+                                        <TableRow>
+                                            <TableCell>Total Entry Fees Collected</TableCell>
+                                            <TableCell className="text-right font-mono text-green-600">+ ₹{accountingSummary.totalEntryFees.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell>Total Expenses</TableCell>
+                                            <TableCell className="text-right font-mono text-red-600">- ₹{accountingSummary.totalExpenses.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="font-bold text-lg">
+                                            <TableCell>Cash in Hand</TableCell>
+                                            <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                                                ₹{accountingSummary.netProfit.toFixed(2)}
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </CardContent>
+                        </Card>
                     </div>
-                     <Separator />
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Financial Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <Table>
-                                <TableBody>
-                                    <TableRow>
-                                        <TableCell>Total Entry Fees Collected</TableCell>
-                                        <TableCell className="text-right font-mono text-green-600">+ ₹{accountingSummary.totalEntryFees.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableCell>Total Expenses</TableCell>
-                                        <TableCell className="text-right font-mono text-red-600">- ₹{accountingSummary.totalExpenses.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                </TableBody>
-                                <TableFooter>
-                                    <TableRow className="font-bold text-lg">
-                                        <TableCell>Cash in Hand</TableCell>
-                                        <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
-                                            ₹{accountingSummary.netProfit.toFixed(2)}
-                                        </TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            </Table>
-                        </CardContent>
-                    </Card>
                 </>
             )}
           </div>
         </CardContent>
          <CardFooter className="flex justify-between">
-            <Button variant="secondary" onClick={() => setSendMessageModalOpen(true)} disabled={!selectedGame}>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Send to Group
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setSendMessageModalOpen(true)} disabled={!selectedGame}>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Send to Group
+                </Button>
+                 <Button onClick={handleExportPdf} disabled={!selectedGame || isExporting}>
+                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <FileDown className="mr-2 h-4 w-4" />}
+                    Export PDF
+                </Button>
+            </div>
             <Button onClick={handleSave} disabled={isSaving || !selectedGame}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save Expenses
@@ -402,7 +452,7 @@ const SendExpenseSummaryDialog: FC<{
                     <Label>Message Preview</Label>
                     <Textarea value={message} readOnly className="h-64 mt-2 font-mono text-xs"/>
                 </div>
-                <DialogFooter className="justify-between">
+                <DialogFooter className="sm:justify-between">
                     <Button variant="outline" size="icon" onClick={handleCopyToClipboard}>
                         {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         <span className="sr-only">Copy to Clipboard</span>
