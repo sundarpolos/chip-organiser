@@ -106,6 +106,7 @@ import {
   TestTube,
   CalendarCheck,
   CalendarPlus,
+  Banknote,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -1380,6 +1381,12 @@ function DashboardContent() {
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
+             <Button asChild variant="outline">
+                <Link href="/expenses">
+                    <Banknote className="mr-2 h-4 w-4" />
+                    Daily Expenses
+                </Link>
+            </Button>
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
                 <History className="mr-2 h-4 w-4" />
                 Load Game
@@ -3822,3 +3829,21 @@ const GameBookingCard: FC<{
         </Card>
     );
 };
+
+// Main component with Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading Dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+    
