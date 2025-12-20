@@ -442,27 +442,24 @@ const PlayerView: FC<{
     joinableGame: GameHistory | null;
     onJoinGame: (gameId: string) => void;
     setLoadGameModalOpen: (isOpen: boolean) => void;
-}> = ({
-    currentUser, joinableGame, onJoinGame, setLoadGameModalOpen
-}) => {
-    
+}> = ({ currentUser, joinableGame, onJoinGame, setLoadGameModalOpen }) => {
     return (
         <div className="flex items-center justify-center h-[60vh]">
             <Card className="w-full max-w-md text-center">
                 <CardHeader>
                     <CardTitle>Welcome, {currentUser?.name}</CardTitle>
                     {joinableGame ? (
-                         <CardDescription>A game is currently active!</CardDescription>
+                        <CardDescription>A game is currently active!</CardDescription>
                     ) : (
                         <CardDescription>There are no games running right now.</CardDescription>
                     )}
                 </CardHeader>
-                 <CardContent>
+                <CardContent>
                     {joinableGame ? (
-                       <div className="space-y-2">
-                           <p className="font-semibold">{joinableGame.venue}</p>
-                           <p className="text-sm text-muted-foreground">{format(new Date(joinableGame.timestamp), "PPP")}</p>
-                       </div>
+                        <div className="space-y-2">
+                            <p className="font-semibold">{joinableGame.venue}</p>
+                            <p className="text-sm text-muted-foreground">{format(new Date(joinableGame.timestamp), "PPP")}</p>
+                        </div>
                     ) : (
                         <p className="text-muted-foreground">You can view past games or wait for an admin to start a new one.</p>
                     )}
@@ -481,7 +478,7 @@ const PlayerView: FC<{
                 </CardFooter>
             </Card>
         </div>
-    )
+    );
 };
 
 
@@ -3487,24 +3484,7 @@ const DeckChangeAlertDialog: FC<{
     );
 };
 
-// Main component with Suspense boundary
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading Dashboard...</p>
-        </div>
-      </div>
-    }>
-      <DashboardContent />
-    </Suspense>
-  );
-}
-
 // Seat Booking Components
-
 const BookingView: FC<{
     currentUser: MasterPlayer;
     activeClub: Club | null;
@@ -3845,5 +3825,3 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
-
-    
