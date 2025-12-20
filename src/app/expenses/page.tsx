@@ -281,7 +281,7 @@ const DailyExpensesPage: FC = () => {
                                 </TableBody>
                                 <TableFooter>
                                     <TableRow className="font-bold text-lg">
-                                        <TableCell>Net Profit / Loss</TableCell>
+                                        <TableCell>Cash in Hand</TableCell>
                                         <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
                                             ₹{accountingSummary.netProfit.toFixed(2)}
                                         </TableCell>
