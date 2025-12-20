@@ -110,7 +110,7 @@ import {
 import jsPDF from "jspdf"
 import "jspdf-autotable"
 import html2canvas from 'html2canvas';
-import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds, formatDuration } from "date-fns"
+import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds, formatDuration, parse } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -3592,6 +3592,12 @@ const GameBookingCard: FC<{
     const seatsRemaining = game.totalSeats - confirmedBookings.length;
     const isFull = seatsRemaining <= 0;
 
+    const gameDateTime = useMemo(() => {
+        return parse(`${game.gameDate} ${game.gameStartTime}`, 'yyyy-MM-dd HH:mm', new Date());
+    }, [game.gameDate, game.gameStartTime]);
+
+    const isGameTimePassed = useMemo(() => new Date() > gameDateTime, [gameDateTime]);
+
     const handleBookSeat = async (joinWaitingList = false) => {
         if (!currentUser.whatsappNumber || !activeClub) {
             toast({ variant: 'destructive', title: 'Cannot Book', description: 'Your WhatsApp number is not set.' });
@@ -3714,13 +3720,17 @@ const GameBookingCard: FC<{
     };
 
     const renderBookingStatus = () => {
+        if (isGameTimePassed && playerBooking?.status !== 'confirmed') {
+            return <p className="text-sm font-semibold text-muted-foreground">Booking has closed.</p>;
+        }
+        
         if (playerBooking?.status === 'confirmed') {
             return (
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="flex items-center gap-2 text-green-600 font-semibold">
                         <CheckCircle2 className="h-5 w-5"/> Your Seat is Confirmed
                     </div>
-                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting}>
+                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting || isGameTimePassed}>
                         Cancel Booking
                     </Button>
                 </div>
@@ -3733,7 +3743,7 @@ const GameBookingCard: FC<{
                     <div className="flex items-center gap-2 text-amber-600 font-semibold">
                         <Hourglass className="h-5 w-5"/> You're on the Waiting List (#{waitingList.findIndex(p => p.playerId === currentUser.id) + 1})
                     </div>
-                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting}>
+                    <Button variant="destructive" size="sm" onClick={handleCancelBooking} disabled={isSubmitting || isGameTimePassed}>
                         Leave Waiting List
                     </Button>
                 </div>
@@ -3752,7 +3762,7 @@ const GameBookingCard: FC<{
         }
         
         return (
-            <Button onClick={() => handleBookSeat(isFull)} disabled={isSubmitting}>
+            <Button onClick={() => handleBookSeat(isFull)} disabled={isSubmitting || isGameTimePassed}>
                 {isSubmitting ? <Loader2 className="animate-spin" /> : (isFull ? 'Join Waiting List' : 'Book My Seat')}
             </Button>
         );
@@ -3776,12 +3786,12 @@ const GameBookingCard: FC<{
                     <div>
                         <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')} at {game.gameStartTime}</CardTitle>
                         <CardDescription>
-                            {isFull ? `${waitingList.length} player(s) on waiting list` : `${seatsRemaining} of ${game.totalSeats} seats remaining`}
+                            {isGameTimePassed ? "This game has already started." : isFull ? `${waitingList.length} player(s) on waiting list` : `${seatsRemaining} of ${game.totalSeats} seats remaining`}
                         </CardDescription>
                     </div>
                     {currentUser.isAdmin && (
                         <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => onStartGame(game)}>
+                            <Button variant="outline" size="sm" onClick={() => onStartGame(game)} disabled={isGameTimePassed}>
                                 Start Game
                             </Button>
                             <Button variant="secondary" size="sm" asChild>
