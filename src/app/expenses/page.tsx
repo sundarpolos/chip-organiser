@@ -149,31 +149,78 @@ const DailyExpensesPage: FC = () => {
   };
 
     const handleExportPdf = async () => {
-        if (!reportRef.current) {
-            toast({ variant: "destructive", title: "Export Error", description: "Report content not found." });
+        if (!selectedGame) {
+            toast({ variant: "destructive", title: "Export Error", description: "No game selected." });
             return;
         }
         
         setIsExporting(true);
         try {
-            const canvas = await html2canvas(reportRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: null,
-            });
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
             
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
+            // Title
+            doc.setFontSize(20);
+            doc.text("Daily Expenses & Accounting", pageWidth / 2, 15, { align: "center" });
+            doc.setFontSize(12);
+            doc.text(`${selectedGame.venue} - ${format(new Date(selectedGame.timestamp), 'PPP')}`, pageWidth / 2, 22, { align: "center" });
+
+            // Summary Table
+            (doc as any).autoTable({
+                startY: 30,
+                head: [['Description', 'Amount']],
+                body: [
+                    ['Total Entry Fees Collected', `+ ₹${accountingSummary.totalEntryFees.toFixed(2)}`],
+                    ['Total Expenses', `- ₹${accountingSummary.totalExpenses.toFixed(2)}`],
+                    ['Cash in Hand', `₹${accountingSummary.netProfit.toFixed(2)}`],
+                ],
+                theme: 'grid',
+                headStyles: { fillColor: [41, 128, 185] },
+                foot: [
+                    [{ content: 'Cash in Hand', colSpan: 1, styles: { fontStyle: 'bold' } }, { content: `₹${accountingSummary.netProfit.toFixed(2)}`, styles: { fontStyle: 'bold', halign: 'right' }}]
+                ],
+                didParseCell: function(data: any) {
+                    if (data.row.section === 'body' && data.column.index === 1) {
+                        const text = data.cell.text[0];
+                        if(text.startsWith('+')) data.cell.styles.textColor = [0, 128, 0]; // Green
+                        if(text.startsWith('-')) data.cell.styles.textColor = [255, 0, 0]; // Red
+                    }
+                    if (data.row.section === 'foot') {
+                         data.cell.styles.fillColor = [230, 230, 230];
+                         data.cell.styles.textColor = [0,0,0];
+                    }
+                }
             });
 
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            const summaryTableEnd = (doc as any).lastAutoTable.finalY;
+
+            // Expenses Table
+            if (selectedGame.expenses && selectedGame.expenses.length > 0) {
+                 (doc as any).autoTable({
+                    startY: summaryTableEnd + 10,
+                    head: [['Expense Name', 'Amount']],
+                    body: selectedGame.expenses.map(exp => [exp.name, `₹${exp.amount.toFixed(2)}`]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [22, 160, 133] },
+                 });
+            }
+
+            // Players Table
+            if (selectedGame.players && selectedGame.players.length > 0) {
+                 (doc as any).autoTable({
+                    startY: (doc as any).lastAutoTable.finalY + 10,
+                    head: [['Player Name', 'Entry Fee Paid']],
+                    body: selectedGame.players.map(player => [
+                        player.name,
+                        paidPlayerIds.includes(player.id) ? 'Yes' : 'No'
+                    ]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [142, 68, 173] },
+                });
+            }
             
-            const filename = `daily-expenses-${selectedGame ? format(new Date(selectedGame.timestamp), 'yyyy-MM-dd') : 'report'}.pdf`;
-            
-            pdf.save(filename);
+            const filename = `daily-expenses-${format(new Date(selectedGame.timestamp), 'yyyy-MM-dd')}.pdf`;
+            doc.save(filename);
             toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
 
         } catch (error) {
