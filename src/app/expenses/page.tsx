@@ -181,6 +181,14 @@ const DailyExpensesPage: FC = () => {
             
             {selectedGame && (
                 <>
+                    <Card className="bg-muted/50">
+                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <Label className="text-sm font-medium text-muted-foreground">Cash in Hand (P/L)</Label>
+                            <p className={cn("text-4xl font-bold tracking-tighter", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                                ₹{accountingSummary.netProfit.toFixed(2)}
+                            </p>
+                        </CardContent>
+                    </Card>
                     <Separator />
                     <div className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-4">
