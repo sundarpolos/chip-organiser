@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -183,7 +183,7 @@ const DailyExpensesPage: FC = () => {
                 <>
                     <Card className="bg-muted/50">
                         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                            <Label className="text-sm font-medium text-muted-foreground">Cash in Hand (P/L)</Label>
+                            <Label className="text-sm font-medium text-muted-foreground">Cash in Hand</Label>
                             <p className={cn("text-4xl font-bold tracking-tighter", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
                                 ₹{accountingSummary.netProfit.toFixed(2)}
                             </p>
@@ -329,6 +329,7 @@ const SendExpenseSummaryDialog: FC<{
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, game, club, summary, toast }) => {
     const [isSending, setIsSending] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     const message = useMemo(() => {
         let msg = `*Financial Summary for ${game.venue} on ${format(new Date(game.timestamp), 'PPP')}*\n\n`;
@@ -379,6 +380,14 @@ const SendExpenseSummaryDialog: FC<{
             setIsSending(false);
         }
     };
+
+    const handleCopyToClipboard = () => {
+        navigator.clipboard.writeText(message).then(() => {
+            setIsCopied(true);
+            toast({ title: 'Copied!', description: 'Summary copied to clipboard.' });
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
     
     return (
          <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -393,12 +402,18 @@ const SendExpenseSummaryDialog: FC<{
                     <Label>Message Preview</Label>
                     <Textarea value={message} readOnly className="h-64 mt-2 font-mono text-xs"/>
                 </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSend} disabled={isSending}>
-                        {isSending ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                        Send to Group
+                <DialogFooter className="justify-between">
+                    <Button variant="outline" size="icon" onClick={handleCopyToClipboard}>
+                        {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        <span className="sr-only">Copy to Clipboard</span>
                     </Button>
+                    <div className="flex gap-2">
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button onClick={handleSend} disabled={isSending}>
+                            {isSending ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                            Send to Group
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
