@@ -1164,7 +1164,7 @@ function DashboardContent() {
     setVenueModalOpen(true);
   }
   
-  const handleStartGameFromVenue = async (venue: string, date: Date, scheduledGameId?: string) => {
+  const handleStartGameFromVenue = async (venue: string, date: Date) => {
     if (!activeClub) return;
 
     if (!masterVenues.some(v => v.name === venue)) {
@@ -1180,18 +1180,6 @@ function DashboardContent() {
       seconds: now.getSeconds() 
     }).toISOString();
 
-    let gameDataFromSchedule: Partial<GameHistory> = {};
-    if (scheduledGameId) {
-        const scheduledGame = await getScheduledGame(scheduledGameId);
-        if (scheduledGame) {
-            gameDataFromSchedule = {
-                playerEntryFee: scheduledGame.playerEntryFee,
-                expenses: scheduledGame.expenses,
-            };
-        }
-    }
-
-
     const newGame: GameHistory = {
         id: `game-${Date.now()}`,
         venue: venue,
@@ -1200,7 +1188,6 @@ function DashboardContent() {
         startTime: now.toISOString(),
         clubId: activeClub.id,
         progressLog: [],
-        ...gameDataFromSchedule
     }
     await saveGameHistory(newGame);
     setActiveGame(newGame);
@@ -1208,6 +1195,45 @@ function DashboardContent() {
     setVenueModalOpen(false);
     setAddPlayerModalOpen(true);
   }
+
+  const handleStartGameFromSchedule = async (scheduledGame: ScheduledGame) => {
+    if (!activeClub) return;
+
+    // Fetch confirmed players
+    const bookings = await getSeatBookingsForGame(scheduledGame.id);
+    const confirmedPlayers = bookings.filter(b => b.status === 'confirmed');
+    
+    const newPlayers: Player[] = confirmedPlayers.map(booking => ({
+        id: `player-${Date.now()}-${booking.playerId}`,
+        name: booking.playerName,
+        whatsappNumber: booking.playerWhatsappNumber,
+        buyIns: [],
+        finalChips: 0,
+        clubId: scheduledGame.clubId,
+    }));
+    
+    const now = new Date();
+
+    const newGame: GameHistory = {
+        id: `game-${Date.now()}`,
+        venue: (await getMasterVenues()).find(v => v.id === scheduledGame.gameDate) ?.name ?? "Scheduled Game", // A bit of a guess, maybe venue should be on scheduled game
+        timestamp: now.toISOString(),
+        players: newPlayers,
+        startTime: now.toISOString(),
+        clubId: activeClub.id,
+        progressLog: [],
+        playerEntryFee: scheduledGame.playerEntryFee,
+        expenses: scheduledGame.expenses,
+    }
+
+    try {
+        await saveGameHistory(newGame);
+        setActiveGame(newGame);
+        toast({ title: "Game Started!", description: `The game for ${format(new Date(scheduledGame.gameDate), 'PPP')} has started.` });
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error Starting Game', description: 'Could not start the game session.'});
+    }
+  };
 
   const handleVenueChange = async (newVenue: string) => {
     if (!activeGame || newVenue === activeGame.venue || !activeClub) return;
@@ -1448,12 +1474,14 @@ function DashboardContent() {
                 currentUser={currentUser}
                 activeClub={activeClub}
                 toast={toast}
+                onStartGame={handleStartGameFromSchedule}
             />
         ) : ((isAdmin) && !activeGame && isDataReady && (
             <BookingView 
                 currentUser={currentUser}
                 activeClub={activeClub}
                 toast={toast}
+                onStartGame={handleStartGameFromSchedule}
             />
         ))}
 
@@ -2021,7 +2049,7 @@ const VenueDialog: FC<{
   onOpenChange: (open: boolean) => void;
   masterVenues: MasterVenue[];
   setMasterVenues: React.Dispatch<React.SetStateAction<MasterVenue[]>>;
-  onStartGame: (venue: string, date: Date, scheduledGameId?: string) => void;
+  onStartGame: (venue: string, date: Date) => void;
   toast: ReturnType<typeof useToast>['toast'];
   initialDate: Date;
 }> = ({ isOpen, onOpenChange, masterVenues, setMasterVenues, onStartGame, toast, initialDate }) => {
@@ -3471,7 +3499,8 @@ const BookingView: FC<{
     currentUser: MasterPlayer;
     activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ currentUser, activeClub, toast }) => {
+    onStartGame: (game: ScheduledGame) => void;
+}> = ({ currentUser, activeClub, toast, onStartGame }) => {
     const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
     const [bookings, setBookings] = useState<Record<string, SeatBooking[]>>({});
     const [isLoading, setIsLoading] = useState(true);
@@ -3530,6 +3559,7 @@ const BookingView: FC<{
                                 activeClub={activeClub}
                                 toast={toast}
                                 onBookingChange={refreshData}
+                                onStartGame={onStartGame}
                             />
                         ))}
                     </div>
@@ -3547,7 +3577,8 @@ const GameBookingCard: FC<{
     activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
     onBookingChange: () => void;
-}> = ({ game, bookings, playerBooking, currentUser, activeClub, toast, onBookingChange }) => {
+    onStartGame: (game: ScheduledGame) => void;
+}> = ({ game, bookings, playerBooking, currentUser, activeClub, toast, onBookingChange, onStartGame }) => {
     
     const [otp, setOtp] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -3746,11 +3777,16 @@ const GameBookingCard: FC<{
                         </CardDescription>
                     </div>
                     {currentUser.isAdmin && (
-                        <Button variant="secondary" size="sm" asChild>
-                            <Link href={`/bookings/${game.id}`}>
-                                <Users className="mr-2 h-4 w-4" /> Manage Bookings
-                            </Link>
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => onStartGame(game)}>
+                                Start Game
+                            </Button>
+                            <Button variant="secondary" size="sm" asChild>
+                                <Link href={`/bookings/${game.id}`}>
+                                    <Users className="mr-2 h-4 w-4" /> Manage Bookings
+                                </Link>
+                            </Button>
+                        </div>
                     )}
                 </div>
             </CardHeader>
