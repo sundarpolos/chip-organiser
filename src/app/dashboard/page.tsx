@@ -11,7 +11,7 @@ import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
 import { sendBookingOtp } from "@/ai/flows/send-booking-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking, GameExpense } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -125,7 +125,7 @@ import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClub, getClubs } from "@/services/club-service"
-import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking } from "@/services/booking-service"
+import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking, getScheduledGame } from "@/services/booking-service"
 
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
@@ -1164,7 +1164,7 @@ function DashboardContent() {
     setVenueModalOpen(true);
   }
   
-  const handleStartGameFromVenue = async (venue: string, date: Date) => {
+  const handleStartGameFromVenue = async (venue: string, date: Date, scheduledGameId?: string) => {
     if (!activeClub) return;
 
     if (!masterVenues.some(v => v.name === venue)) {
@@ -1180,6 +1180,18 @@ function DashboardContent() {
       seconds: now.getSeconds() 
     }).toISOString();
 
+    let gameDataFromSchedule: Partial<GameHistory> = {};
+    if (scheduledGameId) {
+        const scheduledGame = await getScheduledGame(scheduledGameId);
+        if (scheduledGame) {
+            gameDataFromSchedule = {
+                playerEntryFee: scheduledGame.playerEntryFee,
+                expenses: scheduledGame.expenses,
+            };
+        }
+    }
+
+
     const newGame: GameHistory = {
         id: `game-${Date.now()}`,
         venue: venue,
@@ -1188,6 +1200,7 @@ function DashboardContent() {
         startTime: now.toISOString(),
         clubId: activeClub.id,
         progressLog: [],
+        ...gameDataFromSchedule
     }
     await saveGameHistory(newGame);
     setActiveGame(newGame);
@@ -2008,7 +2021,7 @@ const VenueDialog: FC<{
   onOpenChange: (open: boolean) => void;
   masterVenues: MasterVenue[];
   setMasterVenues: React.Dispatch<React.SetStateAction<MasterVenue[]>>;
-  onStartGame: (venue: string, date: Date) => void;
+  onStartGame: (venue: string, date: Date, scheduledGameId?: string) => void;
   toast: ReturnType<typeof useToast>['toast'];
   initialDate: Date;
 }> = ({ isOpen, onOpenChange, masterVenues, setMasterVenues, onStartGame, toast, initialDate }) => {
@@ -2396,6 +2409,15 @@ const ReportsDialog: FC<{
           .map(p => ({ name: p.name, value: p.finalChips }));
     }, [activeGame]);
 
+    const accountingSummary = useMemo(() => {
+        if (!activeGame) return null;
+        const totalEntryFees = (activeGame.players.length || 0) * (activeGame.playerEntryFee || 0);
+        const totalExpenses = (activeGame.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
+        const netProfit = totalEntryFees - totalExpenses;
+        return { totalEntryFees, totalExpenses, netProfit };
+    }, [activeGame]);
+
+
     const handleExportPdf = async () => {
         const reportElement = reportContentRef.current;
         if (!activeGame || !reportElement) {
@@ -2470,6 +2492,39 @@ const ReportsDialog: FC<{
                 </DialogHeader>
                 <ScrollArea className="flex-1 -mx-2 md:-mx-6">
                     <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
+                        {accountingSummary && (activeGame.playerEntryFee || 0) > 0 && (
+                            <Card>
+                                <CardHeader><CardTitle>Accounting Summary</CardTitle></CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableBody>
+                                            <TableRow>
+                                                <TableCell>Total Entry Fees Collected</TableCell>
+                                                <TableCell className="text-right font-mono text-green-600">+ ₹{accountingSummary.totalEntryFees.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                            {(activeGame.expenses || []).map((exp, i) => (
+                                                <TableRow key={i}>
+                                                    <TableCell className="pl-8">{exp.name}</TableCell>
+                                                    <TableCell className="text-right font-mono text-red-600">- ₹{exp.amount.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                             <TableRow>
+                                                <TableCell>Total Expenses</TableCell>
+                                                <TableCell className="text-right font-mono text-red-600">- ₹{accountingSummary.totalExpenses.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                        <TableFoot>
+                                            <TableRow className="font-bold text-lg">
+                                                <TableCell>Net Profit / Loss</TableCell>
+                                                <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                                                    ₹{accountingSummary.netProfit.toFixed(2)}
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableFoot>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        )}
                         
                          {/* Player Summary & Accumulative Report */}
                         <Card>
@@ -3718,12 +3773,3 @@ const GameBookingCard: FC<{
         </Card>
     );
 };
-
-
-    
-
-
-
-
-
-

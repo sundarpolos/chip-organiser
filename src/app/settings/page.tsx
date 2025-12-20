@@ -9,14 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send, CalendarIcon as CalendarIconLucide, MessageSquare } from 'lucide-react';
+import { Loader2, Save, Clock, Building, Plus, Pencil, Trash2, LogIn, Users, CheckCircle2, AlertCircle, HelpCircle, Shield, Crown as CrownIcon, Banknote, User as UserIcon, XCircle, Send, CalendarIcon as CalendarIconLucide, MessageSquare, X } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory, ScheduledGame } from '@/lib/types';
+import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory, ScheduledGame, GameExpense } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub, getClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
@@ -373,16 +373,11 @@ const SeatBookingManagement: FC<{
         loadGames();
     }, [isSuperAdmin, allClubs, activeClub]);
 
-    const handleCreateGame = async (clubId: string, gameDate: string, gameStartTime: string, totalSeats: number) => {
+    const handleCreateGame = async (newGameData: Omit<ScheduledGame, 'id' | 'createdAt'>) => {
         try {
-            const newGame = await createScheduledGame({
-                clubId: clubId,
-                gameDate,
-                gameStartTime,
-                totalSeats,
-            });
+            const newGame = await createScheduledGame(newGameData);
             setScheduledGames(prev => [...prev, newGame].sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
-            toast({ title: 'Game Scheduled', description: `A game has been scheduled for ${format(new Date(gameDate), 'PPP')}.` });
+            toast({ title: 'Game Scheduled', description: `A game has been scheduled for ${format(new Date(newGame.gameDate), 'PPP')}.` });
             
             // Open announcement modal
             setGameForAnnouncement(newGame);
@@ -496,6 +491,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
                 <TableHead>Game Date</TableHead>
                 <TableHead>Start Time</TableHead>
                 <TableHead>Total Seats</TableHead>
+                <TableHead>Entry Fee</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow>
         </TableHeader>
@@ -505,6 +501,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
                     <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
                     <TableCell>{game.gameStartTime}</TableCell>
                     <TableCell>{game.totalSeats}</TableCell>
+                    <TableCell>₹{game.playerEntryFee}</TableCell>
                     <TableCell className="text-right space-x-2">
                         <Button asChild variant="outline" size="sm">
                             <Link href={`/bookings/${game.id}`}>
@@ -532,7 +529,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
             ))}
             {games.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center">No games scheduled yet.</TableCell>
+                    <TableCell colSpan={5} className="text-center">No games scheduled yet.</TableCell>
                 </TableRow>
             )}
         </TableBody>
@@ -544,17 +541,49 @@ const ScheduleGameDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     club: Club;
-    onSchedule: (clubId: string, gameDate: string, gameStartTime: string, totalSeats: number) => void;
+    onSchedule: (gameData: Omit<ScheduledGame, 'id'|'createdAt'>) => void;
 }> = ({ isOpen, onOpenChange, club, onSchedule }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [startTime, setStartTime] = useState('13:30');
     const [seats, setSeats] = useState(10);
+    const [entryFee, setEntryFee] = useState(2500);
+    const [expenses, setExpenses] = useState<GameExpense[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     
+    useEffect(() => {
+        if(isOpen) {
+            setDate(new Date());
+            setStartTime('13:30');
+            setSeats(10);
+            setEntryFee(2500);
+            setExpenses([{name: 'Rent', amount: 0}]);
+        }
+    }, [isOpen]);
+
+    const handleExpenseChange = (index: number, field: 'name'|'amount', value: string | number) => {
+        const newExpenses = [...expenses];
+        if (field === 'amount') {
+            newExpenses[index][field] = Number(value);
+        } else {
+            newExpenses[index][field] = value as string;
+        }
+        setExpenses(newExpenses);
+    };
+
+    const addExpense = () => setExpenses([...expenses, {name: '', amount: 0}]);
+    const removeExpense = (index: number) => setExpenses(expenses.filter((_, i) => i !== index));
+
     const handleSave = () => {
         if (date && seats > 0 && startTime) {
             setIsSaving(true);
-            onSchedule(club.id, format(date, 'yyyy-MM-dd'), startTime, seats);
+            onSchedule({
+                clubId: club.id, 
+                gameDate: format(date, 'yyyy-MM-dd'), 
+                gameStartTime: startTime, 
+                totalSeats: seats,
+                playerEntryFee: entryFee,
+                expenses: expenses.filter(e => e.name && e.amount > 0),
+            });
             setIsSaving(false);
             onOpenChange(false);
         }
@@ -562,11 +591,12 @@ const ScheduleGameDialog: FC<{
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Game for {club.name}</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
+                <ScrollArea className="max-h-[70vh] py-4 pr-4">
+                <div className="space-y-4">
                     <div className="space-y-2">
                         <Label>Game Date</Label>
                         <Popover>
@@ -612,7 +642,45 @@ const ScheduleGameDialog: FC<{
                             min="1"
                         />
                     </div>
+                    <Separator />
+                    <h3 className="text-lg font-medium">Accounting</h3>
+                    <div className="space-y-2">
+                        <Label htmlFor="entry-fee">Player Entry Fee (₹)</Label>
+                        <Input
+                            id="entry-fee"
+                            type="number"
+                            value={entryFee}
+                            onChange={(e) => setEntryFee(Number(e.target.value))}
+                            min="0"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Game Expenses</Label>
+                        {expenses.map((exp, index) => (
+                            <div key={index} className="flex gap-2 items-center">
+                                <Input 
+                                    placeholder="Expense Name (e.g., Rent)" 
+                                    value={exp.name}
+                                    onChange={(e) => handleExpenseChange(index, 'name', e.target.value)}
+                                />
+                                <Input 
+                                    type="number" 
+                                    placeholder="Amount" 
+                                    value={exp.amount === 0 ? '' : exp.amount}
+                                    onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)}
+                                    className="w-32"
+                                />
+                                <Button variant="ghost" size="icon" onClick={() => removeExpense(index)} disabled={expenses.length === 1}>
+                                    <Trash2 className="h-4 w-4"/>
+                                </Button>
+                            </div>
+                        ))}
+                        <Button variant="outline" size="sm" onClick={addExpense}>
+                            <Plus className="mr-2 h-4 w-4"/> Add Expense
+                        </Button>
+                    </div>
                 </div>
+                </ScrollArea>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSave} disabled={isSaving || !date || !startTime}>
@@ -1853,11 +1921,6 @@ export default function SettingsPage() {
       async function loadData() {
           if (!currentUser) return;
           try {
-              if (isSuperAdmin) {
-                  // Run the one-time assignment
-                  const result = await assignGroupIdToSmartClub();
-                  console.log(result.message);
-              }
               const [allClubs, allPlayers, allVenues, allGames] = await Promise.all([
                 getClubs(), 
                 getMasterPlayers(),
@@ -1876,7 +1939,7 @@ export default function SettingsPage() {
           }
       }
       loadData();
-  }, [currentUser, isSuperAdmin, toast]);
+  }, [currentUser, toast]);
   
   const filteredPlayers = useMemo(() => {
       if (isSuperAdmin) return players;
@@ -1942,4 +2005,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

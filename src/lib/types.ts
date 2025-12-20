@@ -50,6 +50,11 @@ export interface GameProgressLog {
     playerStats: PlayerProgress[];
 }
 
+export interface GameExpense {
+    name: string;
+    amount: number;
+}
+
 export interface GameHistory {
     id:string;
     venue: string;
@@ -60,6 +65,8 @@ export interface GameHistory {
     duration?: number; // in milliseconds
     clubId: string;
     progressLog?: GameProgressLog[];
+    playerEntryFee?: number;
+    expenses?: GameExpense[];
 }
 
 export interface WhatsappConfig {
@@ -83,6 +90,8 @@ export interface ScheduledGame {
   gameDate: string; // YYYY-MM-DD
   gameStartTime: string; // HH:mm
   totalSeats: number;
+  playerEntryFee: number;
+  expenses: GameExpense[];
   createdAt: string;
 }
 

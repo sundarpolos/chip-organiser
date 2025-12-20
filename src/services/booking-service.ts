@@ -89,5 +89,5 @@ export async function getPlayerBookingForGame(playerId: string, scheduledGameId:
 }
 
 export async function cancelSeatBooking(bookingId: string): Promise<void> {
-    await deleteDoc(doc(db, SEAT_BOOKINGS_COLLECTION, bookingId));
+    await deleteDoc(doc(db, SEAT_BOOKINGS_COLlection, bookingId));
 }
