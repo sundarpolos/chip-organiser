@@ -3569,6 +3569,8 @@ const GameBookingCard: FC<{
         return parse(`${game.gameDate} ${game.gameStartTime}`, 'yyyy-MM-dd HH:mm', new Date());
     }, [game.gameDate, game.gameStartTime]);
 
+    const formattedGameDateTime = format(gameDateTime, 'EEEE - dd/MM/yyyy - hh:mm a');
+
     const isGameTimePassed = useMemo(() => new Date() > gameDateTime, [gameDateTime]);
 
     const handleBookSeat = async (joinWaitingList = false) => {
@@ -3595,7 +3597,7 @@ const GameBookingCard: FC<{
                 // Send WhatsApp notification for waiting list
                 await sendWhatsappMessage({
                     to: currentUser.whatsappNumber,
-                    message: `Hi ${currentUser.name}, you have been added to the waiting list for the game on ${format(new Date(game.gameDate), 'PPP')}. We will notify you if a seat becomes available.`,
+                    message: `Hi ${currentUser.name}, you have been added to the waiting list for the game on ${formattedGameDateTime}. We will notify you if a seat becomes available.`,
                     ...(activeClub.whatsappConfig || {})
                 });
 
@@ -3607,7 +3609,7 @@ const GameBookingCard: FC<{
             const result = await sendBookingOtp({
                 playerName: currentUser.name,
                 whatsappNumber: currentUser.whatsappNumber,
-                gameDate: format(new Date(game.gameDate), 'PPP'),
+                gameDate: formattedGameDateTime,
                 clubId: activeClub.id,
             });
 
@@ -3646,7 +3648,7 @@ const GameBookingCard: FC<{
                 toast({ title: 'Seat Confirmed!', description: 'Your seat is booked.' });
 
                 // Send confirmation message
-                const message = `Hi ${currentUser.name}, your seat for the game on ${format(new Date(game.gameDate), 'PPP')} at ${game.gameStartTime} is confirmed. See you at the table!\n\n- ${activeClub.name}`;
+                const message = `Hi ${currentUser.name}, your seat for the game on ${formattedGameDateTime} is confirmed. See you at the table!\n\n- ${activeClub.name}`;
                 await sendWhatsappMessage({
                     to: currentUser.whatsappNumber,
                     message: message,
@@ -3679,7 +3681,7 @@ const GameBookingCard: FC<{
                 if (firstInWaiting.playerWhatsappNumber && activeClub) {
                     await sendWhatsappMessage({
                         to: firstInWaiting.playerWhatsappNumber,
-                        message: `Great news, ${firstInWaiting.playerName}! A spot has opened up for the game on ${format(new Date(game.gameDate), 'PPP')}. Your seat is now confirmed!`,
+                        message: `Great news, ${firstInWaiting.playerName}! A spot has opened up for the game on ${formattedGameDateTime}. Your seat is now confirmed!`,
                         ...(activeClub.whatsappConfig || {})
                     });
                 }
@@ -3757,7 +3759,7 @@ const GameBookingCard: FC<{
             <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                     <div>
-                        <CardTitle>{format(new Date(game.gameDate), 'EEEE, MMMM d, yyyy')} at {game.gameStartTime}</CardTitle>
+                        <CardTitle>{formattedGameDateTime}</CardTitle>
                         <CardDescription>
                             {isGameTimePassed ? "This game has already started." : isFull ? `${waitingList.length} player(s) on waiting list` : `${seatsRemaining} of ${game.totalSeats} seats remaining`}
                         </CardDescription>
@@ -3816,4 +3818,5 @@ export default function DashboardPage() {
     
 
     
+
 
