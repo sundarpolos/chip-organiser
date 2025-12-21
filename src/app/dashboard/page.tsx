@@ -101,8 +101,8 @@ import {
   FileText,
   StopCircle,
   Minus,
-  ArrowDown,
   ArrowUp,
+  ArrowDown,
   TestTube,
   CalendarCheck,
   CalendarPlus,
@@ -1372,10 +1372,9 @@ function DashboardContent() {
                     <LayoutDashboard className="h-4 w-4" />
                 </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" size="icon">
                 <Link href="/expenses">
-                    <Banknote className="mr-2 h-4 w-4" />
-                    Daily Expenses
+                    <Banknote className="h-4 w-4" />
                 </Link>
             </Button>
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
@@ -2557,42 +2556,43 @@ const ReportsDialog: FC<{
                             </Card>
                         )}
                         
-                         {/* Player Summary & Accumulative Report */}
-                        <Card>
-                            <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto">
-                                    <Table className="text-xs sm:text-sm">
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
-                                                <TableHead className="px-2 sm:px-4 text-right">Buy-in</TableHead>
-                                                <TableHead className="px-2 sm:px-4 text-right">Return</TableHead>
-                                                <TableHead className="px-2 sm:px-4 text-right">P/L</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {sortedStandings.map((p) => (
-                                                <TableRow key={p.id}>
-                                                    <TableCell className="font-medium px-2 sm:px-4 text-left whitespace-nowrap">{p.name}</TableCell>
-                                                    <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
-                                                    <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
-                                                    <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                        <TableFoot>
-                                            <TableRow className="font-bold border-t-2 border-foreground">
-                                                <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
-                                                <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
-                                                <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
-                                                <TableCell className={`px-2 sm:px-4 text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
-                                            </TableRow>
-                                        </TableFoot>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <div className="overflow-x-auto">
+                          <Card>
+                              <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
+                              <CardContent>
+                                  <div className="overflow-x-auto">
+                                      <Table className="text-xs sm:text-sm">
+                                          <TableHeader>
+                                              <TableRow>
+                                                  <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
+                                                  <TableHead className="px-2 sm:px-4 text-right">Buy-in</TableHead>
+                                                  <TableHead className="px-2 sm:px-4 text-right">Return</TableHead>
+                                                  <TableHead className="px-2 sm:px-4 text-right">P/L</TableHead>
+                                              </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                              {sortedStandings.map((p) => (
+                                                  <TableRow key={p.id}>
+                                                      <TableCell className="font-medium px-2 sm:px-4 text-left whitespace-nowrap">{p.name}</TableCell>
+                                                      <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
+                                                      <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
+                                                      <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                  </TableRow>
+                                              ))}
+                                          </TableBody>
+                                          <TableFoot>
+                                              <TableRow className="font-bold border-t-2 border-foreground">
+                                                  <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
+                                                  <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
+                                                  <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
+                                                  <TableCell className={`px-2 sm:px-4 text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                              </TableRow>
+                                          </TableFoot>
+                                      </Table>
+                                  </div>
+                              </CardContent>
+                          </Card>
+                        </div>
                         
                         <Card>
                             <CardHeader>
@@ -2656,14 +2656,16 @@ const ReportsDialog: FC<{
                                 </CardContent>
                             </Card>
                         </div>
-                        <Card>
-                            <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="w-full overflow-x-auto">
-                                    <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <div className="overflow-x-auto">
+                            <Card>
+                                <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
+                                <CardContent>
+                                    <div className="w-full overflow-x-auto">
+                                        <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                          {/* Player Timeline Analysis */}
                         {activeGame.progressLog && activeGame.progressLog.length > 0 && (
                             <PlayerTimelineAnalysis
