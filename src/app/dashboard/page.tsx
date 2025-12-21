@@ -2499,7 +2499,7 @@ const ReportsDialog: FC<{
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col">
+            <DialogContent className="max-w-6xl w-full h-full sm:h-[95vh] flex flex-col">
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-1">
@@ -2566,35 +2566,37 @@ const ReportsDialog: FC<{
                          {/* Player Summary & Accumulative Report */}
                         <Card>
                             <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
-                            <CardContent className="overflow-x-auto">
-                                <Table className="text-xs sm:text-sm">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
-                                            <TableHead className="px-2 sm:px-4 text-right">Buy-in</TableHead>
-                                            <TableHead className="px-2 sm:px-4 text-right">Return</TableHead>
-                                            <TableHead className="px-2 sm:px-4 text-right">P/L</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {sortedStandings.map((p) => (
-                                            <TableRow key={p.id}>
-                                                <TableCell className="font-medium px-2 sm:px-4 text-left whitespace-nowrap">{p.name}</TableCell>
-                                                <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
-                                                <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
-                                                <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <Table className="text-xs sm:text-sm">
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
+                                                <TableHead className="px-2 sm:px-4 text-right">Buy-in</TableHead>
+                                                <TableHead className="px-2 sm:px-4 text-right">Return</TableHead>
+                                                <TableHead className="px-2 sm:px-4 text-right">P/L</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFoot>
-                                        <TableRow className="font-bold border-t-2 border-foreground">
-                                            <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
-                                            <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
-                                            <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
-                                            <TableCell className={`px-2 sm:px-4 text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
-                                        </TableRow>
-                                    </TableFoot>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {sortedStandings.map((p) => (
+                                                <TableRow key={p.id}>
+                                                    <TableCell className="font-medium px-2 sm:px-4 text-left whitespace-nowrap">{p.name}</TableCell>
+                                                    <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
+                                                    <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
+                                                    <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                        <TableFoot>
+                                            <TableRow className="font-bold border-t-2 border-foreground">
+                                                <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
+                                                <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
+                                                <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
+                                                <TableCell className={`px-2 sm:px-4 text-right ${grandTotalProfitLoss === 0 ? '' : 'text-destructive'}`}>₹{grandTotalProfitLoss.toFixed(0)}</TableCell>
+                                            </TableRow>
+                                        </TableFoot>
+                                    </Table>
+                                </div>
                             </CardContent>
                         </Card>
                         
@@ -3828,6 +3830,8 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+    
+
     
 
     
