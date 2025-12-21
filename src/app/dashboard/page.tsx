@@ -2499,34 +2499,36 @@ const ReportsDialog: FC<{
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md md:max-w-4xl w-full flex flex-col h-full max-h-[95vh]">
-                <DialogHeader className="mb-4 flex flex-col sm:flex-row items-start justify-between gap-4">
-                    <div className="space-y-1">
-                        <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
-                        <DialogDescription className="text-base sm:text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
-                         {activeGame.startTime && (
-                            <p className="text-sm text-muted-foreground">
-                                Started: {format(new Date(activeGame.startTime), 'p')}
-                                {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
-                            </p>
-                        )}
-                    </div>
-                     <div className="flex items-center gap-2 flex-wrap">
-                        <Button onClick={handleExportPdf} disabled={isExporting} size="sm">
-                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
-                             Export PDF
-                        </Button>
-                        <Button onClick={onSettleUp} size="sm">
-                            <WhatsappIcon />
-                            <span className="ml-2">Settlement</span>
-                        </Button>
-                        <DialogClose asChild>
-                           <Button variant="outline" size="icon"><X /></Button>
-                        </DialogClose>
+            <DialogContent className="max-w-sm md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[95vh] flex flex-col">
+                <DialogHeader className="flex-shrink-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="space-y-1">
+                            <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
+                            <DialogDescription className="text-base sm:text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                            {activeGame.startTime && (
+                                <p className="text-sm text-muted-foreground">
+                                    Started: {format(new Date(activeGame.startTime), 'p')}
+                                    {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Button onClick={handleExportPdf} disabled={isExporting} size="sm">
+                                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="mr-2 h-4 w-4" />}
+                                Export PDF
+                            </Button>
+                            <Button onClick={onSettleUp} size="sm">
+                                <WhatsappIcon />
+                                <span className="ml-2">Settlement</span>
+                            </Button>
+                            <DialogClose asChild>
+                            <Button variant="outline" size="icon"><X /></Button>
+                            </DialogClose>
+                        </div>
                     </div>
                 </DialogHeader>
-                <ScrollArea className="flex-1 -mx-2 md:-mx-6">
-                    <div ref={reportContentRef} className="px-2 md:px-6 py-4 bg-background space-y-6">
+                <ScrollArea className="flex-1 -mx-6">
+                    <div ref={reportContentRef} className="px-6 py-4 bg-background space-y-6">
                         {accountingSummary && (activeGame.playerEntryFee || 0) > 0 && (
                             <Card>
                                 <CardHeader><CardTitle>Accounting Summary</CardTitle></CardHeader>
@@ -2661,7 +2663,10 @@ const ReportsDialog: FC<{
                         <Card>
                             <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
                             <CardContent>
-                                <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                                <ScrollArea className="w-full whitespace-nowrap">
+                                    <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
+                                    <div className="w-full h-px" />
+                                </ScrollArea>
                             </CardContent>
                         </Card>
                          {/* Player Timeline Analysis */}
