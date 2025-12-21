@@ -2503,10 +2503,10 @@ const ReportsDialog: FC<{
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-1">
-                            <DialogTitle className="text-2xl sm:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
-                            <DialogDescription className="text-base sm:text-lg">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
+                            <DialogTitle className="text-xl md:text-2xl lg:text-3xl">Game Report: {activeGame.venue}</DialogTitle>
+                            <DialogDescription className="text-sm md:text-base">{format(new Date(activeGame.timestamp), "dd MMMM yyyy")}</DialogDescription>
                             {activeGame.startTime && (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-xs md:text-sm text-muted-foreground">
                                     Started: {format(new Date(activeGame.startTime), 'p')}
                                     {activeGame.endTime && ` - Ended: ${format(new Date(activeGame.endTime), 'p')}`}
                                 </p>
@@ -2528,7 +2528,7 @@ const ReportsDialog: FC<{
                     </div>
                 </DialogHeader>
                 <ScrollArea className="flex-1 -mx-6">
-                    <div ref={reportContentRef} className="px-6 py-4 bg-background space-y-6">
+                    <div ref={reportContentRef} className="px-2 sm:px-4 md:px-6 py-4 bg-background space-y-6">
                         {accountingSummary && (activeGame.playerEntryFee || 0) > 0 && (
                             <Card>
                                 <CardHeader><CardTitle>Accounting Summary</CardTitle></CardHeader>
@@ -2566,8 +2566,8 @@ const ReportsDialog: FC<{
                          {/* Player Summary & Accumulative Report */}
                         <Card>
                             <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
-                            <CardContent>
-                                <Table>
+                            <CardContent className="overflow-x-auto">
+                                <Table className="text-xs sm:text-sm">
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="px-2 sm:px-4 text-left">Player</TableHead>
@@ -2578,8 +2578,8 @@ const ReportsDialog: FC<{
                                     </TableHeader>
                                     <TableBody>
                                         {sortedStandings.map((p) => (
-                                            <TableRow key={p.id} className="text-xs sm:text-sm">
-                                                <TableCell className="font-medium px-2 sm:px-4 text-left">{p.name}</TableCell>
+                                            <TableRow key={p.id}>
+                                                <TableCell className="font-medium px-2 sm:px-4 text-left whitespace-nowrap">{p.name}</TableCell>
                                                 <TableCell className="px-2 sm:px-4 text-right">₹{p.totalBuyIns}</TableCell>
                                                 <TableCell className="px-2 sm:px-4 text-right">₹{p.finalChips}</TableCell>
                                                 <TableCell className={`px-2 sm:px-4 text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>₹{p.profitLoss.toFixed(0)}</TableCell>
@@ -2587,7 +2587,7 @@ const ReportsDialog: FC<{
                                         ))}
                                     </TableBody>
                                     <TableFoot>
-                                        <TableRow className="font-bold border-t-2 border-foreground text-xs sm:text-sm">
+                                        <TableRow className="font-bold border-t-2 border-foreground">
                                             <TableCell className="px-2 sm:px-4 text-left">Accumulative Report</TableCell>
                                             <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalBuyin}</TableCell>
                                             <TableCell className="px-2 sm:px-4 text-right">₹{grandTotalChips}</TableCell>
@@ -2604,7 +2604,7 @@ const ReportsDialog: FC<{
                             </CardHeader>
                             <CardContent>
                                 {transfers.length > 0 ? (
-                                    <ul className="space-y-2">
+                                    <ul className="space-y-2 text-sm sm:text-base">
                                         {transfers.map((t, i) => (
                                             <li key={i} className="flex items-center gap-2 p-2 rounded-md bg-muted" dangerouslySetInnerHTML={{ __html: t.replace(/<strong>(.*?)<\/strong>/g, '<strong class="font-bold text-primary">$1</strong>') }} />
                                         ))}
@@ -3829,3 +3829,5 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+
+    
