@@ -2449,7 +2449,7 @@ const ReportsDialog: FC<{
         const totalEntryFees = (activeGame.players.length || 0) * (activeGame.playerEntryFee || 0);
         const totalExpenses = (activeGame.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
         const netProfit = totalEntryFees - totalExpenses;
-        return { totalEntryFees, totalExpenses, netProfit };
+        return { totalEntryFees, totalExpenses, cashInHand: netProfit };
     }, [activeGame]);
 
 
@@ -2553,8 +2553,8 @@ const ReportsDialog: FC<{
                                         <TableFoot>
                                             <TableRow className="font-bold text-lg">
                                                 <TableCell>Cash in Hand</TableCell>
-                                                <TableCell className={cn("text-right font-mono", accountingSummary.netProfit >= 0 ? "text-green-600" : "text-red-600")}>
-                                                    ₹{accountingSummary.netProfit.toFixed(2)}
+                                                <TableCell className={cn("text-right font-mono", accountingSummary.cashInHand >= 0 ? "text-green-600" : "text-red-600")}>
+                                                    ₹{accountingSummary.cashInHand.toFixed(2)}
                                                 </TableCell>
                                             </TableRow>
                                         </TableFoot>
@@ -3829,5 +3829,6 @@ export default function DashboardPage() {
     </Suspense>
   );
 }
+    
 
     
