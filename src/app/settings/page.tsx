@@ -545,6 +545,7 @@ const ScheduleGameDialog: FC<{
     onSchedule: (gameData: Omit<ScheduledGame, 'id'|'createdAt'>) => void;
 }> = ({ isOpen, onOpenChange, club, onSchedule }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
+    const [showCalendar, setShowCalendar] = useState(false);
     const [startTime, setStartTime] = useState('13:30');
     const [seats, setSeats] = useState(10);
     const [entryFee, setEntryFee] = useState(2500);
@@ -558,6 +559,7 @@ const ScheduleGameDialog: FC<{
             setSeats(10);
             setEntryFee(2500);
             setExpenses([{name: 'Rent', amount: 0}]);
+            setShowCalendar(false);
         }
     }, [isOpen]);
 
@@ -600,29 +602,29 @@ const ScheduleGameDialog: FC<{
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <Label>Game Date</Label>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !date && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIconLucide className="mr-2 h-4 w-4" />
-                                  {date ? format(date, "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={date}
-                                    onSelect={setDate}
-                                    disabled={(date) => date < new Date()}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !date && "text-muted-foreground"
+                          )}
+                          onClick={() => setShowCalendar(!showCalendar)}
+                        >
+                          <CalendarIconLucide className="mr-2 h-4 w-4" />
+                          {date ? format(date, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                        {showCalendar && (
+                            <Calendar
+                                mode="single"
+                                selected={date}
+                                onSelect={(newDate) => {
+                                    setDate(newDate);
+                                    setShowCalendar(false);
+                                }}
+                                disabled={(date) => date < new Date()}
+                                initialFocus
+                            />
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="start-time">Start Time</Label>
