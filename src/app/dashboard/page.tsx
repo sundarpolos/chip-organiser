@@ -3517,7 +3517,7 @@ const BookingView: FC<{
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Upcoming Games &amp; Bookings</CardTitle>
+                <CardTitle className="flex items-center gap-2"><CalendarCheck className="h-6 w-6"/> Bookings</CardTitle>
                 <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
             </CardHeader>
             <CardContent>
@@ -3816,3 +3816,4 @@ export default function DashboardPage() {
     
 
     
+
