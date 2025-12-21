@@ -107,6 +107,7 @@ import {
   CalendarCheck,
   CalendarPlus,
   Banknote,
+  LayoutDashboard,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -1366,19 +1367,12 @@ function DashboardContent() {
             {(isAdmin || isBanker) && <>
                 <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
             </>}
-             <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="outline" size="icon" disabled={whatsappStatus === 'checking'}>
-                            {whatsappStatus === 'open' ? <WhatsappIcon className="text-green-500" /> : <WhatsappIcon className="text-red-500" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>WhatsApp Status: {whatsappStatus}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-             <Button asChild variant="outline">
+            <Button asChild variant="outline" size="icon">
+                <Link href="/dashboard">
+                    <LayoutDashboard className="h-4 w-4" />
+                </Link>
+            </Button>
+            <Button asChild variant="outline">
                 <Link href="/expenses">
                     <Banknote className="mr-2 h-4 w-4" />
                     Daily Expenses
