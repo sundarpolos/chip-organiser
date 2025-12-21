@@ -608,7 +608,6 @@ function DashboardContent() {
   const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
   const [activeClub, setActiveClub] = useState<Club | null>(null);
   const [greeting, setGreeting] = useState('');
-  const [whatsappStatus, setWhatsappStatus] = useState<'checking' | 'open' | 'closed'>('checking');
 
 
   // Master Data State
@@ -712,32 +711,6 @@ function DashboardContent() {
           setActiveTab("");
         }
   }, [currentUser, isAdmin]);
-
-  // Check WhatsApp status periodically
-    useEffect(() => {
-        if (!whatsappConfig.apiToken) return;
-
-        const checkStatus = async () => {
-            try {
-                const response = await fetch(`https://cloud.wazoneindia.com/api/connection-state?token=${whatsappConfig.apiToken}`);
-                if (!response.ok) {
-                    setWhatsappStatus('closed');
-                    return;
-                }
-                const data = await response.json();
-                setWhatsappStatus(data.state === 'open' ? 'open' : 'closed');
-            } catch (error) {
-                console.error("Failed to fetch WhatsApp status", error);
-                setWhatsappStatus('closed');
-            }
-        };
-
-        checkStatus();
-        const interval = setInterval(checkStatus, 30000); // Check every 30 seconds
-
-        return () => clearInterval(interval);
-    }, [whatsappConfig.apiToken]);
-
 
   // Load data from Firestore on initial render
   useEffect(() => {
@@ -1364,19 +1337,18 @@ function DashboardContent() {
         </div>
         
         <div className="flex items-center justify-start sm:justify-end gap-2 flex-wrap">
-            {(isAdmin || isBanker) && <>
-                <Button onClick={handleNewGame} variant="destructive" size="icon"><Plus className="h-4 w-4" /></Button>
-            </>}
             <Button asChild variant="outline" size="icon">
                 <Link href="/dashboard">
                     <LayoutDashboard className="h-4 w-4" />
                 </Link>
             </Button>
-            <Button asChild variant="outline" size="icon">
-                <Link href="/expenses">
-                    <Banknote className="h-4 w-4" />
-                </Link>
-            </Button>
+            {isAdmin && (
+                <Button asChild variant="outline" size="icon">
+                    <Link href="/expenses">
+                        <Banknote className="h-4 w-4" />
+                    </Link>
+                </Button>
+            )}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
                 <History className="mr-2 h-4 w-4" />
                 Load Game
@@ -1403,6 +1375,12 @@ function DashboardContent() {
                           <MapIcon className="h-4 w-4 mr-2" />
                           Merge Venues
                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/bookings/all">
+                            <BookUser className="h-4 w-4 mr-2" />
+                            Bookings
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     </>
@@ -2560,7 +2538,7 @@ const ReportsDialog: FC<{
                           <Card>
                               <CardHeader><CardTitle>Player Summary</CardTitle></CardHeader>
                               <CardContent>
-                                  <div className="overflow-x-auto">
+                                  <div className="w-full overflow-x-auto">
                                       <Table className="text-xs sm:text-sm">
                                           <TableHeader>
                                               <TableRow>
@@ -3524,6 +3502,13 @@ const BookingView: FC<{
     useEffect(() => {
         refreshData();
     }, [refreshData]);
+    
+    const upcomingGames = useMemo(() => {
+        return scheduledGames.filter(game => {
+             const gameDateTime = parse(`${game.gameDate} ${game.gameStartTime}`, 'yyyy-MM-dd HH:mm', new Date());
+             return new Date() < gameDateTime;
+        });
+    }, [scheduledGames]);
 
     if (isLoading) {
         return <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin" /></div>;
@@ -3536,11 +3521,11 @@ const BookingView: FC<{
                 <CardDescription>View and book your seat for upcoming games. Seats are limited!</CardDescription>
             </CardHeader>
             <CardContent>
-                {scheduledGames.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No games have been scheduled yet.</p>
+                {upcomingGames.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No upcoming games are scheduled yet.</p>
                 ) : (
                     <div className="space-y-4">
-                        {scheduledGames.map(game => (
+                        {upcomingGames.map(game => (
                             <GameBookingCard
                                 key={game.id}
                                 game={game}

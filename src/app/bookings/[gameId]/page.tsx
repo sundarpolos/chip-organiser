@@ -67,7 +67,7 @@ const ManageBookingsPage: FC = () => {
         }
     }, [router, toast]);
     
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         if (!gameId) return;
 
         try {
@@ -102,13 +102,13 @@ const ManageBookingsPage: FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [gameId, isSuperAdmin, router, toast]);
 
     useEffect(() => {
         if (currentUser?.isAdmin) {
             refreshData();
         }
-    }, [currentUser, gameId]);
+    }, [currentUser, gameId, refreshData]);
 
     const groupUpdateMessage = useMemo(() => {
         if (!game) return '';
