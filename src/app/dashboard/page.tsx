@@ -2499,7 +2499,7 @@ const ReportsDialog: FC<{
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-sm md:max-w-2xl lg:max-w-4xl xl:max-w-6xl w-full h-[95vh] flex flex-col">
+            <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col">
                 <DialogHeader className="flex-shrink-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-1">
@@ -2663,10 +2663,9 @@ const ReportsDialog: FC<{
                         <Card>
                             <CardHeader><CardTitle>Player Buy-in Summary</CardTitle></CardHeader>
                             <CardContent>
-                                <ScrollArea className="w-full whitespace-nowrap">
+                                <div className="w-full overflow-x-auto">
                                     <PlayerBuyInSummaryTable calculatedPlayers={calculatedPlayers} />
-                                    <div className="w-full h-px" />
-                                </ScrollArea>
+                                </div>
                             </CardContent>
                         </Card>
                          {/* Player Timeline Analysis */}
