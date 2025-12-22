@@ -170,8 +170,8 @@ const DailyExpensesListPage = () => {
   }, [currentUser, toast]);
   
   const accountingRecords = useMemo(() => {
-      const playerMap = new Map(allPlayers.map(p => [p.id, p.name]));
-      return allGames
+    const playerMap = new Map(allPlayers.map(p => [p.id, p.name]));
+    return allGames
         .filter(g => {
             if (g.clubId !== activeClubId || g.venue !== 'Daily Accounting') return false;
             const gameDate = new Date(g.timestamp);
@@ -200,7 +200,7 @@ const DailyExpensesListPage = () => {
             };
         })
         .sort((a,b) => b.date.getTime() - a.date.getTime());
-  }, [allGames, allPlayers, activeClubId, dateRange]);
+}, [allGames, allPlayers, activeClubId, dateRange]);
 
   const summary = useMemo(() => {
     return accountingRecords.reduce((acc, record) => {
