@@ -112,22 +112,28 @@ const ManageBookingsPage: FC = () => {
 
     const groupUpdateMessage = useMemo(() => {
         if (!game) return '';
-        const confirmedPlayers = bookings
-            .filter(b => b.status === 'confirmed')
-            .map((b, index) => `${index + 1}. ${b.playerName}`)
-            .join('\n');
-
-        return `🎉 Confirmed Players for ${format(new Date(game.gameDate), 'PPP')} 🎉
+        
+        const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
+        const confirmedPlayerNames = confirmedBookings.map((b, index) => `${index + 1}. ${b.playerName}`).join('\n');
+        
+        let message = `🎉 Confirmed Players for ${format(new Date(game.gameDate), 'PPP')} 🎉
 
 Game Time: ${game.gameStartTime} ⏰
 
 -----------------------------
-${confirmedPlayers || 'No confirmations yet.'}
+${confirmedPlayerNames || 'No confirmations yet.'}
 -----------------------------
 
-Total: ${bookings.filter(b => b.status === 'confirmed').length} players
+Total: ${confirmedBookings.length} players
 
 Please be on time!`;
+
+        const remainingSeats = game.totalSeats - confirmedBookings.length;
+        if (remainingSeats > 0) {
+            message += `\n\n${remainingSeats} seat(s) still open for booking!`;
+        }
+
+        return message;
     }, [game, bookings]);
 
     const handleSendToGroup = async () => {
