@@ -116,7 +116,7 @@ const ManageBookingsPage: FC = () => {
         const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
         const confirmedPlayerNames = confirmedBookings.map((b, index) => `${index + 1}. ${b.playerName}`).join('\n');
         
-        let message = `🎉 Confirmed Players for ${format(new Date(game.gameDate), 'PPP')} 🎉
+        let message = `🎉 Confirmed Players for ${format(new Date(game.gameDate), 'EEEE, PPP')} 🎉
 
 Game Time: ${game.gameStartTime} ⏰
 
