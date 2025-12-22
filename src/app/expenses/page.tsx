@@ -15,10 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, Plus, Edit, Trash2, Banknote, CalendarIcon } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, Banknote, CalendarIcon, FileDown } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths, startOfToday, endOfYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 const DateRangePicker: FC<{
     date: DateRange | undefined,
@@ -121,6 +123,7 @@ const DailyExpensesListPage = () => {
   const [activeClubId, setActiveClubId] = useState<string>('');
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
@@ -207,6 +210,58 @@ const DailyExpensesListPage = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    setIsExporting(true);
+    try {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const clubName = allClubs.find(c => c.id === activeClubId)?.name || 'Your Club';
+        const dateRangeStr = dateRange?.from
+            ? `${format(dateRange.from, 'PPP')} to ${dateRange.to ? format(dateRange.to, 'PPP') : 'present'}`
+            : 'All Time';
+
+        doc.setFontSize(18);
+        doc.text("Daily Accounting Log", pageWidth / 2, 15, { align: "center" });
+        doc.setFontSize(12);
+        doc.text(`${clubName} - ${dateRangeStr}`, pageWidth / 2, 22, { align: "center" });
+
+        const netProfit = summary.totalCollections - summary.totalExpenses;
+        (doc as any).autoTable({
+            startY: 30,
+            head: [['Summary for Period']],
+            body: [
+                [`Total Collections`, `+ ₹${summary.totalCollections.toFixed(2)}`],
+                [`Total Expenses`, `- ₹${summary.totalExpenses.toFixed(2)}`],
+                [`Net Profit/Loss`, `₹${netProfit.toFixed(2)}`],
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [41, 128, 185], halign: 'center' },
+            bodyStyles: { fontStyle: 'bold' },
+        });
+
+        (doc as any).autoTable({
+            startY: (doc as any).lastAutoTable.finalY + 10,
+            head: [['Date', 'Collections', 'Expenses', 'Cash in Hand']],
+            body: accountingRecords.map(rec => [
+                format(rec.date, 'PPP'),
+                `₹${rec.totalCollections.toFixed(2)}`,
+                `₹${rec.totalExpenses.toFixed(2)}`,
+                `₹${rec.cashInHand.toFixed(2)}`,
+            ]),
+            theme: 'striped',
+        });
+        
+        doc.save(`daily_log_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        toast({ title: 'PDF Exported', description: 'Your accounting log has been successfully exported.' });
+
+    } catch (error) {
+        console.error("PDF export failed:", error);
+        toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not generate the PDF.' });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -224,11 +279,17 @@ const DailyExpensesListPage = () => {
                   <CardTitle className="flex items-center gap-2"><Banknote /> Daily Accounting Log</CardTitle>
                   <CardDescription>View and manage historical daily financial records for your club.</CardDescription>
                 </div>
-                 <Button asChild>
-                    <Link href={`/expenses/${format(new Date(), 'yyyy-MM-dd')}`}>
-                        <Plus className="mr-2 h-4 w-4" /> New Daily Entry
-                    </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button asChild>
+                        <Link href={`/expenses/${format(new Date(), 'yyyy-MM-dd')}`}>
+                            <Plus className="mr-2 h-4 w-4" /> New Daily Entry
+                        </Link>
+                    </Button>
+                     <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
+                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                        Export PDF
+                    </Button>
+                </div>
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                  {isSuperAdmin && (
