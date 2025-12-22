@@ -282,7 +282,7 @@ const DailyExpensesListPage = () => {
                 },
                 foot: [[
                     { content: 'Cash in Hand', styles: { fontStyle: 'bold' } },
-                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'right', fontStyle: 'bold' } }
+                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'left', fontStyle: 'bold' } }
                 ]]
             });
             yPos = (doc as any).lastAutoTable.finalY + 15;
