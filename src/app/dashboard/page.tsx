@@ -1343,11 +1343,17 @@ function DashboardContent() {
                 </Link>
             </Button>
             {isAdmin && (
-                <Button asChild variant="outline" size="icon">
-                    <Link href="/expenses">
-                        <Banknote className="h-4 w-4" />
-                    </Link>
-                </Button>
+                <>
+                    <Button asChild variant="outline" size="icon">
+                        <Link href="/expenses">
+                            <Banknote className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                    <Button onClick={handleNewGame} variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Game
+                    </Button>
+                </>
             )}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
                 <History className="mr-2 h-4 w-4" />
@@ -3818,5 +3824,6 @@ export default function DashboardPage() {
     
 
     
+
 
 
