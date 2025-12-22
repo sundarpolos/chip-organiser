@@ -243,9 +243,9 @@ const DailyExpensesListPage = () => {
             startY: yPos,
             head: [['Summary for Period']],
             body: [
-                [`Total Collections`, `+ ₹${summary.totalCollections.toFixed(2)}`],
-                [`Total Expenses`, `- ₹${summary.totalExpenses.toFixed(2)}`],
-                [`Net Profit/Loss`, `₹${netProfit.toFixed(2)}`],
+                [`Total Collections: + ₹${summary.totalCollections.toFixed(2)}`],
+                [`Total Expenses: - ₹${summary.totalExpenses.toFixed(2)}`],
+                [`Net Profit/Loss: ₹${netProfit.toFixed(2)}`],
             ],
             theme: 'grid',
             headStyles: { fillColor: [41, 128, 185], halign: 'center' },
@@ -268,7 +268,9 @@ const DailyExpensesListPage = () => {
             // Collections from players
             detailsBody.push([{ content: 'Collections', colSpan: 2, styles: { fontStyle: 'bold' } }]);
             detailsBody.push([`Total from ${record.playerCount} players`, `+ ₹${record.totalCollections.toFixed(2)}`]);
-            detailsBody.push([{ content: `Paid Players: ${record.paidPlayerNames.join(', ')}`, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100] } }]);
+            if(record.paidPlayerNames && record.paidPlayerNames.length > 0) {
+              detailsBody.push([{ content: `Paid Players: ${record.paidPlayerNames.join(', ')}`, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100] } }]);
+            }
             
             // Expenses
             if (record.expenses.length > 0) {
@@ -293,7 +295,7 @@ const DailyExpensesListPage = () => {
                 },
                 foot: [[
                     { content: 'Cash in Hand', styles: { fontStyle: 'bold' } },
-                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'right', fontStyle: 'bold' } }
+                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'left', fontStyle: 'bold' } }
                 ]]
             });
             yPos = (doc as any).lastAutoTable.finalY + 15;
