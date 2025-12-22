@@ -1350,12 +1350,12 @@ function DashboardContent() {
                         </Link>
                     </Button>
                     <Button onClick={handleNewGame} variant="outline" size="icon">
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4 text-green-500" />
                     </Button>
                 </>
             )}
             <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" size="icon">
-                <History className="h-4 w-4" />
+                <History className="h-4 w-4 text-blue-500" />
             </Button>
             <ThemeToggle />
             <DropdownMenu>
@@ -3822,6 +3822,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
