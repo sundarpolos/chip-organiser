@@ -266,16 +266,13 @@ const DailyExpensesListPage = () => {
             let detailsBody: any[][] = [];
             
             // Collections from players
-            detailsBody.push([{ content: 'Collections', styles: { fontStyle: 'bold' } }, `+ ₹${record.totalCollections.toFixed(2)}`]);
-            if(record.paidPlayerNames && record.paidPlayerNames.length > 0) {
-              detailsBody.push([`Paid Players (${record.playerCount}): ${record.paidPlayerNames.join(', ')}`, '']);
-            }
+            detailsBody.push([{ content: `Collections (${record.playerCount} players)`, styles: { fontStyle: 'bold' } }, { content: `+ ₹${record.totalCollections.toFixed(2)}`, styles: { halign: 'left' } }]);
             
             // Expenses
             if (record.expenses.length > 0) {
-              detailsBody.push([{ content: 'Expenses', styles: { fontStyle: 'bold' } }, `- ₹${record.totalExpenses.toFixed(2)}`]);
+              detailsBody.push([{ content: 'Expenses', styles: { fontStyle: 'bold' } }, { content: `- ₹${record.totalExpenses.toFixed(2)}`, styles: { halign: 'left' } }]);
               record.expenses.forEach(exp => {
-                if (exp.name && exp.amount > 0) detailsBody.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
+                if (exp.name && exp.amount > 0) detailsBody.push([`  - ${exp.name}`, { content: `- ₹${exp.amount.toFixed(2)}`, styles: { halign: 'left' } }])
               });
             }
             
@@ -284,21 +281,16 @@ const DailyExpensesListPage = () => {
                 body: detailsBody,
                 theme: 'grid',
                 tableWidth: 'auto',
-                columnStyles: { 0: { cellWidth: 'auto'}, 1: { halign: 'right' } },
+                columnStyles: { 0: { cellWidth: 'auto'}, 1: { halign: 'left' } },
                 didParseCell: function (data: any) {
                     if (data.cell.section === 'body') {
                         if (data.cell.text[0].includes('+')) data.cell.styles.textColor = [0, 128, 0]; // Green
                         if (data.cell.text[0].includes('-')) data.cell.styles.textColor = [255, 0, 0]; // Red
-                        // Make player list cell smaller font
-                        if (data.cell.text[0].startsWith('Paid Players')) {
-                            data.cell.styles.fontSize = 8;
-                            data.cell.styles.textColor = [100, 100, 100];
-                        }
                     }
                 },
                 foot: [[
                     { content: 'Cash in Hand', styles: { fontStyle: 'bold' } },
-                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'right', fontStyle: 'bold' } }
+                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'left', fontStyle: 'bold' } }
                 ]]
             });
             yPos = (doc as any).lastAutoTable.finalY + 15;
