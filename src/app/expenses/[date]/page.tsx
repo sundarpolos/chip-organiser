@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check, FileDown, CalendarIcon } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check, FileDown, CalendarIcon, ChevronsUpDown } from 'lucide-react';
 import { format, startOfDay, parse } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -35,6 +35,76 @@ import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+
+
+const ExpenseCombobox: React.FC<{
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}> = ({ value, onChange, options }) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+        >
+          {value
+            ? options.find((option) => option.value.toLowerCase() === value.toLowerCase())?.label
+            : "Select expense..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput
+            placeholder="Search or add expense..."
+            onValueChange={(search) => {
+              if (!options.some(opt => opt.label.toLowerCase() === search.toLowerCase())) {
+                onChange(search)
+              }
+            }}
+          />
+          <CommandList>
+            <CommandEmpty>No expense found. Type to add.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.value}
+                  onSelect={(currentValue) => {
+                    onChange(currentValue === value ? "" : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value.toLowerCase() === option.value.toLowerCase() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 
 const DailyExpensesPage = () => {
@@ -158,6 +228,16 @@ const DailyExpensesPage = () => {
     const cashInHand = openingBalance + netProfit;
     return { totalEntryFees, totalExpenses, netProfit, cashInHand };
   }, [paidPlayerIds, collectionAmount, expenses, openingBalance]);
+
+  const masterExpenseNames = useMemo(() => {
+    const nameSet = new Set<string>();
+    allGames.forEach(game => {
+        (game.expenses || []).forEach(exp => {
+            if (exp.name) nameSet.add(exp.name);
+        });
+    });
+    return Array.from(nameSet).sort();
+  }, [allGames]);
 
   const handleExpenseChange = (index: number, field: 'name' | 'amount', value: string | number) => {
     const newExpenses = [...expenses];
@@ -472,7 +552,11 @@ const DailyExpensesPage = () => {
                                     <div className="space-y-2">
                                         {expenses.map((exp, index) => (
                                             <div key={index} className="flex gap-2 items-center">
-                                                <Input placeholder="Expense Name (e.g., Rent)" value={exp.name} onChange={(e) => handleExpenseChange(index, 'name', e.target.value)}/>
+                                                <ExpenseCombobox
+                                                  options={masterExpenseNames.map(name => ({ value: name, label: name }))}
+                                                  value={exp.name}
+                                                  onChange={(value) => handleExpenseChange(index, 'name', value)}
+                                                />
                                                 <Input type="number" placeholder="Amount" value={exp.amount === 0 ? '' : exp.amount} onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)} className="w-32"/>
                                                 <Button variant="ghost" size="icon" onClick={() => removeExpense(index)}><Trash2 className="h-4 w-4" /></Button>
                                             </div>
