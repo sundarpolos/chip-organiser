@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check, FileDown } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, Banknote, MessageSquare, Send, Copy, Check, FileDown, CalendarIcon } from 'lucide-react';
 import { format, startOfDay, parse } from 'date-fns';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -33,6 +33,9 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+
 
 const DailyExpensesPage = () => {
   const { toast } = useToast();
@@ -318,6 +321,10 @@ const DailyExpensesPage = () => {
             setIsExporting(false);
         }
     };
+
+  const handleDateChange = (date: Date) => {
+    router.push(`/expenses/${format(date, 'yyyy-MM-dd')}`);
+  }
     
   if (isLoading || isNaN(selectedDate.getTime())) {
     return (
@@ -340,7 +347,31 @@ const DailyExpensesPage = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Banknote /> Daily Expenses & Accounting</CardTitle>
-          <CardDescription>Manage daily income, expenses, and profit/loss for your club on {format(selectedDate, 'PPP')}.</CardDescription>
+          <CardDescription className="flex items-center gap-2">
+            Manage daily income, expenses, and profit/loss for your club on
+             <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-[200px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && handleDateChange(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </CardDescription>
         </CardHeader>
         <CardContent>
             {isSuperAdmin && (
