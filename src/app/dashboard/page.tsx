@@ -1,4 +1,5 @@
 
+
 "use client"
 // firebase
 import { useState, useEffect, useMemo, useCallback, useRef, type FC, Suspense } from "react"
@@ -8,7 +9,7 @@ import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
-import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
+import { sendDeletePlayerOtp } from "@/aiflows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
 import { sendBookingOtp } from "@/ai/flows/send-booking-otp";
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking, GameExpense } from "@/lib/types"
@@ -1171,7 +1172,6 @@ function DashboardContent() {
   const handleStartGameFromSchedule = async (scheduledGame: ScheduledGame) => {
     if (!activeClub) return;
   
-    // Fetch confirmed players
     const bookings = await getSeatBookingsForGame(scheduledGame.id);
     const confirmedPlayers = bookings.filter(b => b.status === 'confirmed');
     
@@ -1204,6 +1204,9 @@ function DashboardContent() {
     try {
         const savedGame = await saveGameHistory(newGame);
         await loadGameIntoState(savedGame);
+        if (savedGame.players.length > 0) {
+            setActiveTab(savedGame.players[0].id);
+        }
         toast({ title: "Game Started!", description: `The game for ${format(new Date(scheduledGame.gameDate), 'PPP')} has started.` });
     } catch (error) {
         toast({ variant: 'destructive', title: 'Error Starting Game', description: 'Could not start the game session.'});
@@ -3822,6 +3825,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
