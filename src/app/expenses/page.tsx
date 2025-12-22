@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Loader2, Plus, Edit, Trash2, Banknote, CalendarIcon } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfYesterday, endOfToday, subMonths, startOfToday, endOfYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { DateRange } from 'react-day-picker';
 
@@ -25,8 +25,10 @@ const DateRangePicker: FC<{
     onDateChange: (date: DateRange | undefined) => void,
     className?: string,
 }> = ({ date, onDateChange, className }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
     return (
-        <Popover>
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <Button
                     id="date"
@@ -52,15 +54,59 @@ const DateRangePicker: FC<{
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={date?.from}
-                    selected={date}
-                    onSelect={onDateChange}
-                    numberOfMonths={2}
-                />
+            <PopoverContent className="w-auto p-0 flex flex-col sm:flex-row" align="start">
+                <div className="flex flex-col gap-2 border-b sm:border-r sm:border-b-0 p-2">
+                    <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfToday(), to: endOfToday() }); setIsOpen(false); }}
+                    >Today</Button>
+                    <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfYesterday(), to: endOfYesterday() }); setIsOpen(false); }}
+                    >Yesterday</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: subDays(new Date(), 6), to: new Date() }); setIsOpen(false); }}
+                    >Last 7 days</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: subDays(new Date(), 29), to: new Date() }); setIsOpen(false); }}
+                    >Last 30 days</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }); setIsOpen(false); }}
+                    >This Month</Button>
+                     <Button
+                        variant="ghost"
+                        className="justify-start"
+                        onClick={() => { onDateChange({ from: startOfMonth(subMonths(new Date(), 1)), to: endOfMonth(subMonths(new Date(), 1)) }); setIsOpen(false); }}
+                    >Last Month</Button>
+                </div>
+                <div className="flex flex-col">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={onDateChange}
+                        numberOfMonths={2}
+                        className="hidden sm:block"
+                    />
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={date?.from}
+                        selected={date}
+                        onSelect={onDateChange}
+                        numberOfMonths={1}
+                        className="block sm:hidden"
+                    />
+                </div>
             </PopoverContent>
         </Popover>
     )
@@ -75,7 +121,6 @@ const DailyExpensesListPage = () => {
   const [activeClubId, setActiveClubId] = useState<string>('');
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateForNewEntry, setDateForNewEntry] = useState<Date | undefined>(new Date());
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: subDays(new Date(), 29),
     to: new Date(),
@@ -162,13 +207,6 @@ const DailyExpensesListPage = () => {
     }
   };
 
-  const handleDateSelectForNewEntry = (date: Date | undefined) => {
-    if (date) {
-      setDateForNewEntry(date);
-      router.push(`/expenses/${format(date, 'yyyy-MM-dd')}`);
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -186,21 +224,11 @@ const DailyExpensesListPage = () => {
                   <CardTitle className="flex items-center gap-2"><Banknote /> Daily Accounting Log</CardTitle>
                   <CardDescription>View and manage historical daily financial records for your club.</CardDescription>
                 </div>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                       <Button>
-                         <Plus className="mr-2 h-4 w-4" /> New Daily Entry
-                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                        <Calendar
-                            mode="single"
-                            selected={dateForNewEntry}
-                            onSelect={handleDateSelectForNewEntry}
-                            initialFocus
-                        />
-                    </PopoverContent>
-                </Popover>
+                 <Button asChild>
+                    <Link href={`/expenses/${format(new Date(), 'yyyy-MM-dd')}`}>
+                        <Plus className="mr-2 h-4 w-4" /> New Daily Entry
+                    </Link>
+                </Button>
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                  {isSuperAdmin && (
