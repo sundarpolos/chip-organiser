@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getGameHistory, deleteGameHistory } from '@/services/game-service';
 import { getClubs } from '@/services/club-service';
+import { getMasterPlayers } from '@/services/player-service';
 import type { GameHistory, Club, MasterPlayer, GameExpense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -122,6 +123,7 @@ const DailyExpensesListPage = () => {
   const [allClubs, setAllClubs] = useState<Club[]>([]);
   const [activeClubId, setActiveClubId] = useState<string>('');
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
+  const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -154,9 +156,10 @@ const DailyExpensesListPage = () => {
         if (!currentUser) return;
         setIsLoading(true);
         try {
-            const [clubs, games] = await Promise.all([getClubs(), getGameHistory()]);
+            const [clubs, games, players] = await Promise.all([getClubs(), getGameHistory(), getMasterPlayers()]);
             setAllClubs(clubs);
             setAllGames(games);
+            setAllPlayers(players);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load initial data.' });
         } finally {
@@ -167,6 +170,7 @@ const DailyExpensesListPage = () => {
   }, [currentUser, toast]);
   
   const accountingRecords = useMemo(() => {
+      const playerMap = new Map(allPlayers.map(p => [p.id, p.name]));
       return allGames
         .filter(g => {
             if (g.clubId !== activeClubId || g.venue !== 'Daily Accounting') return false;
@@ -179,6 +183,9 @@ const DailyExpensesListPage = () => {
         })
         .map(g => {
             const paidCount = g.paidPlayerIds?.length || g.players.length;
+            const paidPlayerNames = (g.paidPlayerIds || g.players.map(p => p.id))
+                .map(id => playerMap.get(id) || 'Unknown Player')
+                .sort();
             const totalCollections = paidCount * (g.playerEntryFee || 0);
             const totalExpenses = (g.expenses || []).reduce((sum, exp) => sum + exp.amount, 0);
             return {
@@ -188,11 +195,12 @@ const DailyExpensesListPage = () => {
                 totalExpenses,
                 cashInHand: totalCollections - totalExpenses,
                 playerCount: paidCount,
+                paidPlayerNames,
                 expenses: g.expenses || [],
             };
         })
         .sort((a,b) => b.date.getTime() - a.date.getTime());
-  }, [allGames, activeClubId, dateRange]);
+  }, [allGames, allPlayers, activeClubId, dateRange]);
 
   const summary = useMemo(() => {
     return accountingRecords.reduce((acc, record) => {
@@ -240,49 +248,52 @@ const DailyExpensesListPage = () => {
                 [`Net Profit/Loss`, `₹${netProfit.toFixed(2)}`],
             ],
             theme: 'grid',
-            tableWidth: 'auto',
             headStyles: { fillColor: [41, 128, 185], halign: 'center' },
             bodyStyles: { fontStyle: 'bold' },
         });
 
         yPos = (doc as any).lastAutoTable.finalY + 15;
         
-        accountingRecords.forEach((record, index) => {
-            if (yPos + 80 > doc.internal.pageSize.getHeight()) { // Check if there's enough space for the next table
+        accountingRecords.forEach((record) => {
+            if (yPos + 80 > doc.internal.pageSize.getHeight()) { // Check for space
                  doc.addPage();
                  yPos = 15;
             }
             doc.setFontSize(14);
             doc.text(`Details for ${format(record.date, 'PPP')}`, pageWidth / 2, yPos, { align: 'center'});
             yPos += 10;
-            
-            const bodyData = [
-                [`Players`, `${record.playerCount}`],
-                [`Collections`, `+ ₹${record.totalCollections.toFixed(2)}`],
-            ];
 
-            (record.expenses || []).forEach(exp => {
-                if (exp.name && exp.amount > 0) bodyData.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
-            });
-            bodyData.push([`Total Expenses`, `- ₹${record.totalExpenses.toFixed(2)}`]);
+            let detailsBody: any[][] = [];
             
-             (doc as any).autoTable({
+            // Collections from players
+            detailsBody.push([{ content: 'Collections', colSpan: 2, styles: { fontStyle: 'bold' } }]);
+            detailsBody.push([`Total from ${record.playerCount} players`, `+ ₹${record.totalCollections.toFixed(2)}`]);
+            detailsBody.push([{ content: `Paid Players: ${record.paidPlayerNames.join(', ')}`, colSpan: 2, styles: { fontSize: 8, textColor: [100, 100, 100] } }]);
+            
+            // Expenses
+            if (record.expenses.length > 0) {
+              detailsBody.push([{ content: 'Expenses', colSpan: 2, styles: { fontStyle: 'bold' } }]);
+              record.expenses.forEach(exp => {
+                if (exp.name && exp.amount > 0) detailsBody.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
+              });
+            }
+            detailsBody.push(['Total Expenses', `- ₹${record.totalExpenses.toFixed(2)}`]);
+            
+            (doc as any).autoTable({
                 startY: yPos,
-                body: bodyData,
+                body: detailsBody,
                 theme: 'grid',
                 tableWidth: 'auto',
+                columnStyles: { 1: { halign: 'right' } },
                 didParseCell: function (data: any) {
                     if (data.cell.section === 'body') {
-                        data.cell.styles.fontStyle = (data.row.index === 0 || data.row.index === 1 || data.row.index === bodyData.length -1) ? 'bold' : 'normal';
-                        if (data.column.index === 1) {
-                            if (data.cell.text[0].includes('+')) data.cell.styles.textColor = [0, 128, 0];
-                            if (data.cell.text[0].includes('-')) data.cell.styles.textColor = [255, 0, 0];
-                        }
+                         if (data.cell.text[0].includes('+')) data.cell.styles.textColor = [0, 128, 0]; // Green
+                         if (data.cell.text[0].includes('-')) data.cell.styles.textColor = [255, 0, 0]; // Red
                     }
                 },
                 foot: [[
                     { content: 'Cash in Hand', styles: { fontStyle: 'bold' } },
-                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'left', fontStyle: 'bold' } }
+                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'right', fontStyle: 'bold' } }
                 ]]
             });
             yPos = (doc as any).lastAutoTable.finalY + 15;
