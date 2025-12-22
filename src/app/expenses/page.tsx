@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getGameHistory, deleteGameHistory } from '@/services/game-service';
 import { getClubs } from '@/services/club-service';
-import type { GameHistory, Club, MasterPlayer } from '@/lib/types';
+import type { GameHistory, Club, MasterPlayer, GameExpense } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -187,6 +187,8 @@ const DailyExpensesListPage = () => {
                 totalCollections,
                 totalExpenses,
                 cashInHand: totalCollections - totalExpenses,
+                playerCount: paidCount,
+                expenses: g.expenses || [],
             };
         })
         .sort((a,b) => b.date.getTime() - a.date.getTime());
@@ -214,6 +216,7 @@ const DailyExpensesListPage = () => {
     setIsExporting(true);
     try {
         const doc = new jsPDF();
+        let yPos = 15;
         const pageWidth = doc.internal.pageSize.getWidth();
         const clubName = allClubs.find(c => c.id === activeClubId)?.name || 'Your Club';
         const dateRangeStr = dateRange?.from
@@ -221,13 +224,15 @@ const DailyExpensesListPage = () => {
             : 'All Time';
 
         doc.setFontSize(18);
-        doc.text("Daily Accounting Log", pageWidth / 2, 15, { align: "center" });
+        doc.text("Daily Accounting Log", pageWidth / 2, yPos, { align: "center" });
+        yPos += 7;
         doc.setFontSize(12);
-        doc.text(`${clubName} - ${dateRangeStr}`, pageWidth / 2, 22, { align: "center" });
-
+        doc.text(`${clubName} - ${dateRangeStr}`, pageWidth / 2, yPos, { align: "center" });
+        yPos += 15;
+        
         const netProfit = summary.totalCollections - summary.totalExpenses;
         (doc as any).autoTable({
-            startY: 30,
+            startY: yPos,
             head: [['Summary for Period']],
             body: [
                 [`Total Collections`, `+ ₹${summary.totalCollections.toFixed(2)}`],
@@ -239,18 +244,48 @@ const DailyExpensesListPage = () => {
             bodyStyles: { fontStyle: 'bold' },
         });
 
-        (doc as any).autoTable({
-            startY: (doc as any).lastAutoTable.finalY + 10,
-            head: [['Date', 'Collections', 'Expenses', 'Cash in Hand']],
-            body: accountingRecords.map(rec => [
-                format(rec.date, 'PPP'),
-                `₹${rec.totalCollections.toFixed(2)}`,
-                `₹${rec.totalExpenses.toFixed(2)}`,
-                `₹${rec.cashInHand.toFixed(2)}`,
-            ]),
-            theme: 'striped',
-        });
+        yPos = (doc as any).lastAutoTable.finalY + 15;
         
+        accountingRecords.forEach((record, index) => {
+            if (index > 0) {
+                 doc.addPage();
+                 yPos = 15;
+            }
+            doc.setFontSize(14);
+            doc.text(`Details for ${format(record.date, 'PPP')}`, pageWidth / 2, yPos, { align: 'center'});
+            yPos += 10;
+            
+            const bodyData = [
+                [`Players`, `${record.playerCount}`],
+                [`Collections`, `+ ₹${record.totalCollections.toFixed(2)}`],
+            ];
+
+            (record.expenses || []).forEach(exp => {
+                bodyData.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
+            });
+            bodyData.push([`Total Expenses`, `- ₹${record.totalExpenses.toFixed(2)}`]);
+            
+             (doc as any).autoTable({
+                startY: yPos,
+                body: bodyData,
+                theme: 'grid',
+                didParseCell: function (data: any) {
+                    if (data.cell.section === 'body') {
+                        data.cell.styles.fontStyle = (data.row.index === 0 || data.row.index === 1 || data.row.index === bodyData.length -1) ? 'bold' : 'normal';
+                        if (data.column.index === 1) {
+                            if (data.cell.text[0].includes('+')) data.cell.styles.textColor = [0, 128, 0];
+                            if (data.cell.text[0].includes('-')) data.cell.styles.textColor = [255, 0, 0];
+                        }
+                    }
+                },
+                foot: [[
+                    { content: 'Cash in Hand', styles: { fontStyle: 'bold' } },
+                    { content: `₹${record.cashInHand.toFixed(2)}`, styles: { halign: 'right', fontStyle: 'bold' } }
+                ]]
+            });
+            yPos = (doc as any).lastAutoTable.finalY + 15;
+        });
+
         doc.save(`daily_log_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
         toast({ title: 'PDF Exported', description: 'Your accounting log has been successfully exported.' });
 
@@ -285,7 +320,7 @@ const DailyExpensesListPage = () => {
                             <Plus className="mr-2 h-4 w-4" /> New Daily Entry
                         </Link>
                     </Button>
-                     <Button variant="outline" onClick={handleExportPdf} disabled={isExporting}>
+                     <Button variant="outline" onClick={handleExportPdf} disabled={isExporting || accountingRecords.length === 0}>
                         {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                         Export PDF
                     </Button>
