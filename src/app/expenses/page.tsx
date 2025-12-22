@@ -13,8 +13,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Edit, Trash2, Banknote } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Loader2, Plus, Edit, Trash2, Banknote, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const DailyExpensesListPage = () => {
   const { toast } = useToast();
@@ -25,6 +28,7 @@ const DailyExpensesListPage = () => {
   const [activeClubId, setActiveClubId] = useState<string>('');
   const [allGames, setAllGames] = useState<GameHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateForNewEntry, setDateForNewEntry] = useState<Date | undefined>(new Date());
 
   const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === '919843350000', [currentUser]);
 
@@ -91,6 +95,13 @@ const DailyExpensesListPage = () => {
     }
   };
 
+  const handleDateSelectForNewEntry = (date: Date | undefined) => {
+    if (date) {
+      setDateForNewEntry(date);
+      router.push(`/expenses/${format(date, 'yyyy-MM-dd')}`);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -108,11 +119,21 @@ const DailyExpensesListPage = () => {
                   <CardTitle className="flex items-center gap-2"><Banknote /> Daily Accounting Log</CardTitle>
                   <CardDescription>View and manage historical daily financial records for your club.</CardDescription>
                 </div>
-                <Button asChild>
-                    <Link href={`/expenses/${format(new Date(), 'yyyy-MM-dd')}`}>
-                        <Plus className="mr-2 h-4 w-4"/> New Daily Entry
-                    </Link>
-                </Button>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                       <Button>
+                         <Plus className="mr-2 h-4 w-4" /> New Daily Entry
+                       </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={dateForNewEntry}
+                            onSelect={handleDateSelectForNewEntry}
+                            initialFocus
+                        />
+                    </PopoverContent>
+                </Popover>
             </div>
         </CardHeader>
         <CardContent>
