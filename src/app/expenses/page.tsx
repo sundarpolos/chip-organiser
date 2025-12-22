@@ -240,6 +240,7 @@ const DailyExpensesListPage = () => {
                 [`Net Profit/Loss`, `₹${netProfit.toFixed(2)}`],
             ],
             theme: 'grid',
+            tableWidth: 'auto',
             headStyles: { fillColor: [41, 128, 185], halign: 'center' },
             bodyStyles: { fontStyle: 'bold' },
         });
@@ -247,7 +248,7 @@ const DailyExpensesListPage = () => {
         yPos = (doc as any).lastAutoTable.finalY + 15;
         
         accountingRecords.forEach((record, index) => {
-            if (index > 0) {
+            if (yPos + 80 > doc.internal.pageSize.getHeight()) { // Check if there's enough space for the next table
                  doc.addPage();
                  yPos = 15;
             }
@@ -261,7 +262,7 @@ const DailyExpensesListPage = () => {
             ];
 
             (record.expenses || []).forEach(exp => {
-                bodyData.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
+                if (exp.name && exp.amount > 0) bodyData.push([`  - ${exp.name}`, `- ₹${exp.amount.toFixed(2)}`])
             });
             bodyData.push([`Total Expenses`, `- ₹${record.totalExpenses.toFixed(2)}`]);
             
@@ -269,6 +270,7 @@ const DailyExpensesListPage = () => {
                 startY: yPos,
                 body: bodyData,
                 theme: 'grid',
+                tableWidth: 'auto',
                 didParseCell: function (data: any) {
                     if (data.cell.section === 'body') {
                         data.cell.styles.fontStyle = (data.row.index === 0 || data.row.index === 1 || data.row.index === bodyData.length -1) ? 'bold' : 'normal';
