@@ -51,6 +51,11 @@ const ExpenseCombobox: React.FC<{
   options: { value: string; label: string }[];
 }> = ({ value, onChange, options }) => {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,8 +67,8 @@ const ExpenseCombobox: React.FC<{
           className="w-full justify-between"
         >
           {value
-            ? options.find((option) => option.value.toLowerCase() === value.toLowerCase())?.label
-            : "Select expense..."}
+            ? options.find((option) => option.value.toLowerCase() === value.toLowerCase())?.label || value
+            : "Select or add expense..."}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -71,21 +76,26 @@ const ExpenseCombobox: React.FC<{
         <Command>
           <CommandInput
             placeholder="Search or add expense..."
+            value={inputValue}
             onValueChange={(search) => {
+              setInputValue(search);
+              // Allow adding new items by calling onChange directly
               if (!options.some(opt => opt.label.toLowerCase() === search.toLowerCase())) {
-                onChange(search)
+                  onChange(search);
               }
             }}
           />
           <CommandList>
-            <CommandEmpty>No expense found. Type to add.</CommandEmpty>
+            <CommandEmpty>No expense found. Type to add a new one.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.value}
                   onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "" : currentValue);
+                    const newValue = currentValue === value ? "" : currentValue;
+                    onChange(newValue);
+                    setInputValue(newValue);
                     setOpen(false);
                   }}
                 >
