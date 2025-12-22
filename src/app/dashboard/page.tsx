@@ -1349,15 +1349,13 @@ function DashboardContent() {
                             <Banknote className="h-4 w-4" />
                         </Link>
                     </Button>
-                    <Button onClick={handleNewGame} variant="outline">
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Game
+                    <Button onClick={handleNewGame} variant="outline" size="icon">
+                        <Plus className="h-4 w-4" />
                     </Button>
                 </>
             )}
-            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline">
-                <History className="mr-2 h-4 w-4" />
-                Load Game
+            <Button onClick={() => setLoadGameModalOpen(true)} variant="outline" size="icon">
+                <History className="h-4 w-4" />
             </Button>
             <ThemeToggle />
             <DropdownMenu>
@@ -3824,6 +3822,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
