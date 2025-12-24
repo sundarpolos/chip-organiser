@@ -91,8 +91,6 @@ export interface ScheduledGame {
   gameDate: string; // YYYY-MM-DD
   gameStartTime: string; // HH:mm
   totalSeats: number;
-  playerEntryFee: number;
-  expenses: GameExpense[];
   createdAt: string;
 }
 

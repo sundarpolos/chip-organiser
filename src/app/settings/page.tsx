@@ -16,12 +16,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory, ScheduledGame, GameExpense } from '@/lib/types';
+import type { WhatsappConfig, Club, MasterPlayer, MasterVenue, GameHistory, ScheduledGame, GameExpense, SeatBooking } from '@/lib/types';
 import { getClubs, createClub, updateClub, deleteClub, getClub } from '@/services/club-service';
 import { getMasterPlayers, saveMasterPlayer, deleteMasterPlayer } from '@/services/player-service';
 import { getMasterVenues } from '@/services/venue-service';
 import { getGameHistory } from '@/services/game-service';
-import { createScheduledGame, deleteScheduledGame, getScheduledGamesForClub } from '@/services/booking-service';
+import { createScheduledGame, deleteScheduledGame, getScheduledGamesForClub, createSeatBooking } from '@/services/booking-service';
 import { Switch } from '@/components/ui/switch';
 import { sendDeletePlayerOtp } from '@/ai/flows/send-delete-player-otp';
 import { verifyWhatsappNumber } from '@/ai/flows/verify-whatsapp-number';
@@ -374,9 +374,25 @@ const SeatBookingManagement: FC<{
         loadGames();
     }, [isSuperAdmin, allClubs, activeClub]);
 
-    const handleCreateGame = async (newGameData: Omit<ScheduledGame, 'id' | 'createdAt'>) => {
+    const handleCreateGame = async (newGameData: Omit<ScheduledGame, 'id' | 'createdAt'>, playerIds: string[]) => {
         try {
             const newGame = await createScheduledGame(newGameData);
+
+            // Create bookings for selected players
+            const selectedPlayers = players.filter(p => playerIds.includes(p.id));
+            for (const player of selectedPlayers) {
+                const bookingData: Omit<SeatBooking, 'id' | 'bookedAt'> = {
+                    scheduledGameId: newGame.id,
+                    clubId: newGame.clubId,
+                    playerId: player.id,
+                    playerName: player.name,
+                    playerWhatsappNumber: player.whatsappNumber,
+                    status: 'confirmed',
+                    confirmationType: 'admin',
+                };
+                await createSeatBooking(bookingData);
+            }
+
             setScheduledGames(prev => [...prev, newGame].sort((a,b) => new Date(a.gameDate).getTime() - new Date(b.gameDate).getTime()));
             toast({ title: 'Game Scheduled', description: `A game has been scheduled for ${format(new Date(newGame.gameDate), 'PPP')}.` });
             
@@ -469,6 +485,7 @@ const SeatBookingManagement: FC<{
                     onOpenChange={setCreateModalOpen}
                     club={clubForNewGame}
                     onSchedule={handleCreateGame}
+                    players={players.filter(p => p.clubId === clubForNewGame.id)}
                 />
             )}
             {gameForAnnouncement && (
@@ -492,7 +509,6 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
                 <TableHead>Game Date</TableHead>
                 <TableHead>Start Time</TableHead>
                 <TableHead>Total Seats</TableHead>
-                <TableHead>Entry Fee</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow>
         </TableHeader>
@@ -502,7 +518,6 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
                     <TableCell className="font-medium">{format(new Date(game.gameDate), 'PPP')}</TableCell>
                     <TableCell>{game.gameStartTime}</TableCell>
                     <TableCell>{game.totalSeats}</TableCell>
-                    <TableCell>₹{game.playerEntryFee}</TableCell>
                     <TableCell className="text-right space-x-2">
                         <Button asChild variant="outline" size="sm">
                             <Link href={`/bookings/${game.id}`}>
@@ -530,7 +545,7 @@ const GamesTable: FC<{ games: ScheduledGame[], onDelete: (gameId: string) => voi
             ))}
             {games.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center">No games scheduled yet.</TableCell>
+                    <TableCell colSpan={4} className="text-center">No games scheduled yet.</TableCell>
                 </TableRow>
             )}
         </TableBody>
@@ -542,39 +557,31 @@ const ScheduleGameDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     club: Club;
-    onSchedule: (gameData: Omit<ScheduledGame, 'id'|'createdAt'>) => void;
-}> = ({ isOpen, onOpenChange, club, onSchedule }) => {
+    onSchedule: (gameData: Omit<ScheduledGame, 'id'|'createdAt'>, playerIds: string[]) => void;
+    players: MasterPlayer[];
+}> = ({ isOpen, onOpenChange, club, onSchedule, players }) => {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [showCalendar, setShowCalendar] = useState(false);
     const [startTime, setStartTime] = useState('13:30');
     const [seats, setSeats] = useState(10);
-    const [entryFee, setEntryFee] = useState(2500);
-    const [expenses, setExpenses] = useState<GameExpense[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     
+    const activePlayers = useMemo(() => players.filter(p => p.isActive).sort((a,b) => a.name.localeCompare(b.name)), [players]);
+
     useEffect(() => {
         if(isOpen) {
             setDate(new Date());
             setStartTime('13:30');
             setSeats(10);
-            setEntryFee(2500);
-            setExpenses([{name: 'Rent', amount: 0}]);
             setShowCalendar(false);
+            setSelectedPlayerIds([]);
         }
     }, [isOpen]);
 
-    const handleExpenseChange = (index: number, field: 'name'|'amount', value: string | number) => {
-        const newExpenses = [...expenses];
-        if (field === 'amount') {
-            newExpenses[index][field] = Number(value);
-        } else {
-            newExpenses[index][field] = value as string;
-        }
-        setExpenses(newExpenses);
-    };
-
-    const addExpense = () => setExpenses([...expenses, {name: '', amount: 0}]);
-    const removeExpense = (index: number) => setExpenses(expenses.filter((_, i) => i !== index));
+    const handlePlayerSelect = (playerId: string, isSelected: boolean) => {
+        setSelectedPlayerIds(prev => isSelected ? [...prev, playerId] : prev.filter(id => id !== playerId));
+    }
 
     const handleSave = () => {
         if (date && seats > 0 && startTime) {
@@ -584,9 +591,7 @@ const ScheduleGameDialog: FC<{
                 gameDate: format(date, 'yyyy-MM-dd'), 
                 gameStartTime: startTime, 
                 totalSeats: seats,
-                playerEntryFee: entryFee,
-                expenses: expenses.filter(e => e.name && e.amount > 0),
-            });
+            }, selectedPlayerIds);
             setIsSaving(false);
             onOpenChange(false);
         }
@@ -645,42 +650,22 @@ const ScheduleGameDialog: FC<{
                             min="1"
                         />
                     </div>
-                    <Separator />
-                    <h3 className="text-lg font-medium">Accounting</h3>
+                    <Separator/>
                     <div className="space-y-2">
-                        <Label htmlFor="entry-fee">Player Entry Fee (₹)</Label>
-                        <Input
-                            id="entry-fee"
-                            type="number"
-                            value={entryFee}
-                            onChange={(e) => setEntryFee(Number(e.target.value))}
-                            min="0"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Game Expenses</Label>
-                        {expenses.map((exp, index) => (
-                            <div key={index} className="flex gap-2 items-center">
-                                <Input 
-                                    placeholder="Expense Name (e.g., Rent)" 
-                                    value={exp.name}
-                                    onChange={(e) => handleExpenseChange(index, 'name', e.target.value)}
-                                />
-                                <Input 
-                                    type="number" 
-                                    placeholder="Amount" 
-                                    value={exp.amount === 0 ? '' : exp.amount}
-                                    onChange={(e) => handleExpenseChange(index, 'amount', e.target.value)}
-                                    className="w-32"
-                                />
-                                <Button variant="ghost" size="icon" onClick={() => removeExpense(index)} disabled={expenses.length === 1}>
-                                    <Trash2 className="h-4 w-4"/>
-                                </Button>
-                            </div>
-                        ))}
-                        <Button variant="outline" size="sm" onClick={addExpense}>
-                            <Plus className="mr-2 h-4 w-4"/> Add Expense
-                        </Button>
+                         <Label>Pre-book Players</Label>
+                         <p className="text-sm text-muted-foreground">Select players to automatically confirm their seats for this game.</p>
+                         <ScrollArea className="h-48 border rounded-md p-2">
+                            {activePlayers.map(player => (
+                                <div key={player.id} className="flex items-center space-x-3 p-1">
+                                    <Checkbox
+                                        id={`player-book-${player.id}`}
+                                        checked={selectedPlayerIds.includes(player.id)}
+                                        onCheckedChange={checked => handlePlayerSelect(player.id, !!checked)}
+                                    />
+                                    <Label htmlFor={`player-book-${player.id}`}>{player.name}</Label>
+                                </div>
+                            ))}
+                         </ScrollArea>
                     </div>
                 </div>
                 </ScrollArea>
