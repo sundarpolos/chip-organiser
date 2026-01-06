@@ -2016,6 +2016,10 @@ const GameCreationDialog: FC<{
     const [preBookedPlayerIds, setPreBookedPlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     
+    const sortedVenues = useMemo(() => {
+        return [...masterVenues].sort((a,b) => a.name.localeCompare(b.name));
+    }, [masterVenues]);
+
     useEffect(() => {
         if (isOpen) {
             const now = new Date();
@@ -2065,7 +2069,7 @@ const GameCreationDialog: FC<{
                             <Label htmlFor="venue-name">Venue Name</Label>
                             <Input id="venue-name" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g., The Poker Den" />
                         </div>
-                        {masterVenues.length > 0 && (
+                        {sortedVenues.length > 0 && (
                             <div className="space-y-2">
                                 <Label>Or Select Existing</Label>
                                 <Select onValueChange={setVenue}>
@@ -2073,7 +2077,7 @@ const GameCreationDialog: FC<{
                                         <SelectValue placeholder="Select a venue..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {masterVenues.map(v => (
+                                        {sortedVenues.map(v => (
                                             <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -2985,6 +2989,103 @@ ${formattedTransfers}
     );
 };
 
+const SendMessageDialog: FC<{
+  isOpen: boolean,
+  onOpenChange: (open: boolean) => void,
+  whatsappConfig: WhatsappConfig,
+  masterPlayers: MasterPlayer[],
+  toast: ReturnType<typeof useToast>['toast'],
+}> = ({ isOpen, onOpenChange, whatsappConfig, toast }) => {
+    const [message, setMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMessage('');
+        }
+    }, [isOpen]);
+
+    const handleSend = async () => {
+        if (!whatsappConfig.whatsappGroupId) {
+            toast({
+                variant: 'destructive',
+                title: 'Group ID is not set',
+                description: 'Please configure the WhatsApp Group ID in the club settings.',
+            });
+            return;
+        }
+        if (!message) {
+            toast({
+                variant: 'destructive',
+                title: 'Message is empty',
+                description: 'Please enter a message to send.',
+            });
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: whatsappConfig.whatsappGroupId,
+                message,
+                isGroup: true,
+                ...whatsappConfig
+            });
+
+            if (result.success) {
+                toast({
+                    title: 'Message Sent!',
+                    description: 'Your message has been sent to the group.',
+                });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || 'Unknown error');
+            }
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Failed to Send Message',
+                description: error.message,
+            });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Send Group Message</DialogTitle>
+                    <DialogDescription>
+                        This message will be sent to your configured WhatsApp group.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="group-message">Message</Label>
+                    <Textarea
+                        id="group-message"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Type your message here..."
+                        className="mt-2 min-h-[120px]"
+                    />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline" disabled={isSending}>Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleSend} disabled={isSending}>
+                        {isSending ? <Loader2 className="animate-spin" /> : 'Send'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+};
+
+
 const BuyInSummaryDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
@@ -3514,103 +3615,6 @@ const GameBookingCard: FC<{
     );
 };
 
-const SendMessageDialog: FC<{
-  isOpen: boolean,
-  onOpenChange: (open: boolean) => void,
-  whatsappConfig: WhatsappConfig,
-  masterPlayers: MasterPlayer[],
-  toast: ReturnType<typeof useToast>['toast'],
-}> = ({ isOpen, onOpenChange, whatsappConfig, toast }) => {
-    const [message, setMessage] = useState('');
-    const [isSending, setIsSending] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            setMessage('');
-        }
-    }, [isOpen]);
-
-    const handleSend = async () => {
-        if (!whatsappConfig.whatsappGroupId) {
-            toast({
-                variant: 'destructive',
-                title: 'Group ID is not set',
-                description: 'Please configure the WhatsApp Group ID in the club settings.',
-            });
-            return;
-        }
-        if (!message) {
-            toast({
-                variant: 'destructive',
-                title: 'Message is empty',
-                description: 'Please enter a message to send.',
-            });
-            return;
-        }
-
-        setIsSending(true);
-        try {
-            const result = await sendWhatsappMessage({
-                to: whatsappConfig.whatsappGroupId,
-                message,
-                isGroup: true,
-                ...whatsappConfig
-            });
-
-            if (result.success) {
-                toast({
-                    title: 'Message Sent!',
-                    description: 'Your message has been sent to the group.',
-                });
-                onOpenChange(false);
-            } else {
-                throw new Error(result.error || 'Unknown error');
-            }
-
-        } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Failed to Send Message',
-                description: error.message,
-            });
-        } finally {
-            setIsSending(false);
-        }
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Send Group Message</DialogTitle>
-                    <DialogDescription>
-                        This message will be sent to your configured WhatsApp group.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Label htmlFor="group-message">Message</Label>
-                    <Textarea
-                        id="group-message"
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        placeholder="Type your message here..."
-                        className="mt-2 min-h-[120px]"
-                    />
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline" disabled={isSending}>Cancel</Button>
-                    </DialogClose>
-                    <Button onClick={handleSend} disabled={isSending}>
-                        {isSending ? <Loader2 className="animate-spin" /> : 'Send'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-};
-
-
 const ImportGameDialog: FC<{
   isOpen: boolean,
   onOpenChange: (open: boolean) => void,
@@ -3774,6 +3778,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
