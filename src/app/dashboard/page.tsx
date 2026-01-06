@@ -130,7 +130,7 @@ import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClub, getClubs } from "@/services/club-service"
-import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking, getScheduledGame } from "@/services/booking-service"
+import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking, getScheduledGame, createScheduledGame, deleteScheduledGame } from "@/services/booking-service"
 
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
@@ -635,7 +635,7 @@ function DashboardContent() {
 
 
   // Modal & Dialog State
-  const [isVenueModalOpen, setVenueModalOpen] = useState(false);
+  const [isGameCreationModalOpen, setGameCreationModalOpen] = useState(false);
   const [isLoadGameModalOpen, setLoadGameModalOpen] = useState(false);
   const [isReportsModalOpen, setReportsModalOpen] = useState(false);
   const [isSendMessageModalOpen, setSendMessageModalOpen] = useState(false);
@@ -1135,11 +1135,16 @@ function DashboardContent() {
   };
   
   const handleNewGame = () => {
-    setActiveGame(null);
-    setVenueModalOpen(true);
+    setGameCreationModalOpen(true);
   }
   
-  const handleStartGameFromVenue = async (venue: string, date: Date) => {
+  const handleStartGame = async (
+    venue: string,
+    date: Date,
+    time: string,
+    seats: number,
+    preBookedPlayerIds: string[]
+  ) => {
     if (!activeClub) return;
 
     if (!masterVenues.some(v => v.name === venue)) {
@@ -1148,72 +1153,36 @@ function DashboardContent() {
         setMasterVenues(prev => [...prev, savedVenue]);
     }
     
-    const now = new Date();
-    const finalTimestamp = set(date, { 
-      hours: now.getHours(), 
-      minutes: now.getMinutes(), 
-      seconds: now.getSeconds() 
-    }).toISOString();
+    const [hours, minutes] = time.split(':').map(Number);
+    const finalTimestamp = set(date, { hours, minutes, seconds: 0 }).toISOString();
+    
+    // Create new players for the game from the pre-booked list
+    const preBookedPlayers = masterPlayers.filter(p => preBookedPlayerIds.includes(p.id));
+    const newGamePlayers: Player[] = preBookedPlayers.map(p => ({
+        id: `player-${Date.now()}-${p.id}`,
+        name: p.name,
+        whatsappNumber: p.whatsappNumber,
+        buyIns: [],
+        finalChips: 0,
+        clubId: activeClub.id,
+    }));
 
     const newGame: GameHistory = {
         id: `game-${Date.now()}`,
         venue: venue,
         timestamp: finalTimestamp,
-        players: [],
-        startTime: now.toISOString(),
+        startTime: new Date().toISOString(),
+        players: newGamePlayers,
         clubId: activeClub.id,
         progressLog: [],
-    }
+    };
+    
     await saveGameHistory(newGame);
-    setActiveGame(newGame);
+    await loadGameIntoState(newGame);
     
-    setVenueModalOpen(false);
-    setAddPlayerModalOpen(true);
+    setGameCreationModalOpen(false);
+    toast({ title: "Game Started!", description: `A new game has started at ${venue}.` });
   }
-
-  const handleStartGameFromSchedule = async (scheduledGame: ScheduledGame) => {
-    if (!activeClub) return;
-  
-    const bookings = await getSeatBookingsForGame(scheduledGame.id);
-    const confirmedPlayers = bookings.filter(b => b.status === 'confirmed');
-    
-    const newPlayers: Player[] = confirmedPlayers.map(booking => ({
-        id: `player-${Date.now()}-${booking.playerId}`,
-        name: booking.playerName,
-        whatsappNumber: booking.playerWhatsappNumber,
-        buyIns: [],
-        finalChips: 0,
-        clubId: scheduledGame.clubId,
-    }));
-    
-    const now = new Date();
-
-    const venues = await getMasterVenues();
-    const venueName = venues.find(v => v.id === scheduledGame.gameDate)?.name ?? "Scheduled Game";
-  
-    const newGame: GameHistory = {
-        id: `game-${Date.now()}`,
-        venue: venueName,
-        timestamp: now.toISOString(),
-        players: newPlayers,
-        startTime: now.toISOString(),
-        clubId: activeClub.id,
-        progressLog: [],
-        playerEntryFee: scheduledGame.playerEntryFee,
-        expenses: scheduledGame.expenses,
-    }
-  
-    try {
-        const savedGame = await saveGameHistory(newGame);
-        await loadGameIntoState(savedGame);
-        if (savedGame.players.length > 0) {
-            setActiveTab(savedGame.players[0].id);
-        }
-        toast({ title: "Game Started!", description: `The game for ${format(new Date(scheduledGame.gameDate), 'PPP')} has started.` });
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Error Starting Game', description: 'Could not start the game session.'});
-    }
-  };
 
   const handleVenueChange = async (newVenue: string) => {
     if (!activeGame || newVenue === activeGame.venue || !activeClub) return;
@@ -1461,25 +1430,25 @@ function DashboardContent() {
                 currentUser={currentUser}
                 activeClub={activeClub}
                 toast={toast}
-                onStartGame={handleStartGameFromSchedule}
+                onStartGame={handleStartGame}
             />
         ) : ((isAdmin) && !activeGame && isDataReady && (
             <BookingView 
                 currentUser={currentUser}
                 activeClub={activeClub}
                 toast={toast}
-                onStartGame={handleStartGameFromSchedule}
+                onStartGame={handleStartGame}
             />
         ))}
 
-      <VenueDialog 
-        isOpen={isVenueModalOpen}
-        onOpenChange={setVenueModalOpen}
+      <GameCreationDialog
+        isOpen={isGameCreationModalOpen}
+        onOpenChange={setGameCreationModalOpen}
         masterVenues={masterVenues}
-        onStartGame={handleStartGameFromVenue}
-        setMasterVenues={setMasterVenues}
+        onStartGame={handleStartGame}
         toast={toast}
-        initialDate={new Date()}
+        activeClub={activeClub}
+        masterPlayers={masterPlayers}
       />
        <AddPlayerDialog
         isOpen={isAddPlayerModalOpen}
@@ -2031,71 +2000,131 @@ const PlayerCard: FC<{
   )
 }
 
-const VenueDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  masterVenues: MasterVenue[];
-  setMasterVenues: React.Dispatch<React.SetStateAction<MasterVenue[]>>;
-  onStartGame: (venue: string, date: Date) => void;
-  toast: ReturnType<typeof useToast>['toast'];
-  initialDate: Date;
-}> = ({ isOpen, onOpenChange, masterVenues, setMasterVenues, onStartGame, toast, initialDate }) => {
+const GameCreationDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    masterVenues: MasterVenue[];
+    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[]) => void;
+    toast: ReturnType<typeof useToast>['toast'];
+    activeClub: Club | null;
+    masterPlayers: MasterPlayer[];
+}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, toast, activeClub, masterPlayers }) => {
     const [venue, setVenue] = useState("");
-    const [selectedDate, setSelectedDate] = useState(initialDate);
+    const [date, setDate] = useState<Date | undefined>(new Date());
+    const [time, setTime] = useState('13:30');
+    const [seats, setSeats] = useState(10);
+    const [preBookedPlayerIds, setPreBookedPlayerIds] = useState<string[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    useEffect(() => {
+        if (isOpen) {
+            const now = new Date();
+            setDate(now);
+            setTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+            setSeats(10);
+            setVenue("");
+            setPreBookedPlayerIds([]);
+        }
+    }, [isOpen]);
 
     const handleStart = () => {
         if (!venue.trim()) {
             toast({ variant: "destructive", title: "Venue Required", description: "Please enter or select a venue name." });
             return;
         }
-        onStartGame(venue.trim(), selectedDate);
+        if (!date) {
+            toast({ variant: "destructive", title: "Date Required", description: "Please select a game date." });
+            return;
+        }
+        setIsSaving(true);
+        onStartGame(venue.trim(), date, time, seats, preBookedPlayerIds);
+        setIsSaving(false);
+        onOpenChange(false);
     };
+    
+    const clubPlayers = useMemo(() => {
+        if (!activeClub) return [];
+        return masterPlayers.filter(p => p.clubId === activeClub.id && p.isActive !== false)
+            .sort((a,b) => a.name.localeCompare(b.name));
+    }, [masterPlayers, activeClub]);
+
+    const handlePlayerSelect = (playerId: string, isSelected: boolean) => {
+        setPreBookedPlayerIds(prev => isSelected ? [...prev, playerId] : prev.filter(id => id !== playerId));
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Start New Game</DialogTitle>
-                    <DialogDescription>Enter a new venue or select from your saved list.</DialogDescription>
+                    <DialogTitle>Start or Schedule Game</DialogTitle>
+                    <DialogDescription>Enter game details. You can start a game now or schedule one for the future.</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="venue-name">Venue Name</Label>
-                        <Input id="venue-name" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g., The Poker Den" />
-                    </div>
-                    {masterVenues.length > 0 && (
+                <ScrollArea className="max-h-[70vh] py-4 pr-4">
+                    <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Or Select Existing</Label>
-                            <Select onValueChange={setVenue}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a venue..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {masterVenues.map(v => (
-                                        <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label htmlFor="venue-name">Venue Name</Label>
+                            <Input id="venue-name" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g., The Poker Den" />
                         </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor="game-date">Game Date</Label>
-                       <Popover>
-                          <PopoverTrigger asChild>
-                              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
-                              </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                              <Calendar mode="single" selected={selectedDate} onSelect={date => date && setSelectedDate(date)} initialFocus />
-                          </PopoverContent>
-                      </Popover>
+                        {masterVenues.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Or Select Existing</Label>
+                                <Select onValueChange={setVenue}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a venue..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {masterVenues.map(v => (
+                                            <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="game-date">Game Date</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="start-time">Start Time</Label>
+                                <Input id="start-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+                            </div>
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="seats">Total Seats</Label>
+                            <Input id="seats" type="number" value={seats} onChange={(e) => setSeats(Number(e.target.value))} min="1" />
+                        </div>
+                         <div className="space-y-2">
+                             <Label>Pre-book Players (Optional)</Label>
+                             <p className="text-sm text-muted-foreground">Select players to automatically add them to the game.</p>
+                             <ScrollArea className="h-48 border rounded-md p-2">
+                                {clubPlayers.map(player => (
+                                    <div key={player.id} className="flex items-center space-x-3 p-1">
+                                        <Checkbox
+                                            id={`player-book-${player.id}`}
+                                            checked={preBookedPlayerIds.includes(player.id)}
+                                            onCheckedChange={checked => handlePlayerSelect(player.id, !!checked)}
+                                        />
+                                        <Label htmlFor={`player-book-${player.id}`}>{player.name}</Label>
+                                    </div>
+                                ))}
+                             </ScrollArea>
+                        </div>
                     </div>
-                </div>
+                </ScrollArea>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleStart}>Start Game</Button>
+                    <Button onClick={handleStart} disabled={isSaving}>Start Game</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -3745,6 +3774,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
