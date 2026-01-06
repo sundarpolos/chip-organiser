@@ -3485,6 +3485,246 @@ const GameBookingCard: FC<{
     );
 };
 
+const SendMessageDialog: FC<{
+  isOpen: boolean,
+  onOpenChange: (open: boolean) => void,
+  whatsappConfig: WhatsappConfig,
+  masterPlayers: MasterPlayer[],
+  toast: ReturnType<typeof useToast>['toast'],
+}> = ({ isOpen, onOpenChange, whatsappConfig, toast }) => {
+    const [message, setMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMessage('');
+        }
+    }, [isOpen]);
+
+    const handleSend = async () => {
+        if (!whatsappConfig.whatsappGroupId) {
+            toast({
+                variant: 'destructive',
+                title: 'Group ID is not set',
+                description: 'Please configure the WhatsApp Group ID in the club settings.',
+            });
+            return;
+        }
+        if (!message) {
+            toast({
+                variant: 'destructive',
+                title: 'Message is empty',
+                description: 'Please enter a message to send.',
+            });
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: whatsappConfig.whatsappGroupId,
+                message,
+                isGroup: true,
+                ...whatsappConfig
+            });
+
+            if (result.success) {
+                toast({
+                    title: 'Message Sent!',
+                    description: 'Your message has been sent to the group.',
+                });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || 'Unknown error');
+            }
+
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Failed to Send Message',
+                description: error.message,
+            });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Send Group Message</DialogTitle>
+                    <DialogDescription>
+                        This message will be sent to your configured WhatsApp group.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="group-message">Message</Label>
+                    <Textarea
+                        id="group-message"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Type your message here..."
+                        className="mt-2 min-h-[120px]"
+                    />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline" disabled={isSending}>Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleSend} disabled={isSending}>
+                        {isSending ? <Loader2 className="animate-spin" /> : 'Send'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+};
+
+
+const ImportGameDialog: FC<{
+  isOpen: boolean,
+  onOpenChange: (open: boolean) => void,
+  onImport: (gameData: { venue: string; timestamp: string; players: Player[] }) => void,
+  toast: ReturnType<typeof useToast>['toast'],
+}> = ({ isOpen, onOpenChange, onImport, toast }) => {
+    const [gameLog, setGameLog] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+
+    const handleImport = async () => {
+        if (!gameLog.trim()) {
+            toast({ variant: 'destructive', title: 'Empty Log', description: 'Please paste the game log to import.' });
+            return;
+        }
+        setIsImporting(true);
+        try {
+            const result = await importGameFromText({ gameLog });
+            if (result && result.players) {
+                onImport(result);
+            } else {
+                throw new Error('Failed to parse the game log properly.');
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
+        } finally {
+            setIsImporting(false);
+        }
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Import Game from Text</DialogTitle>
+                    <DialogDescription>
+                        Paste a raw text log from another poker application. The AI will parse it into a structured game.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="game-log">Game Log</Label>
+                    <Textarea
+                        id="game-log"
+                        className="h-64 mt-2 font-mono text-xs"
+                        placeholder="Paste your game log here..."
+                        value={gameLog}
+                        onChange={(e) => setGameLog(e.target.value)}
+                    />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleImport} disabled={isImporting}>
+                        {isImporting ? <Loader2 className="animate-spin" /> : <><Upload className="mr-2" />Import &amp; Process</>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+const SaveConfirmDialog: FC<{
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    activeGame: GameHistory | null,
+    onConfirmSave: (players: CalculatedPlayer[]) => void,
+    title: string,
+    description: string,
+    buttonText: string,
+    isEndGame?: boolean,
+}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, title, description, buttonText, isEndGame = false }) => {
+    const [players, setPlayers] = useState<CalculatedPlayer[]>([]);
+    
+    useEffect(() => {
+        if (activeGame && activeGame.players) {
+            setPlayers(activeGame.players.map(p => {
+                const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
+                return {
+                    ...p,
+                    totalBuyIns,
+                    profitLoss: p.finalChips - totalBuyIns
+                }
+            }));
+        }
+    }, [activeGame, isOpen]);
+
+    const handleChipChange = (id: string, value: string) => {
+        const numericValue = parseInt(value) || 0;
+        setPlayers(prevPlayers => 
+            prevPlayers.map(p => p.id === id ? { ...p, finalChips: numericValue } : p)
+        );
+    };
+    
+    const handleSave = () => {
+        const finalPlayers = players.map(p => ({
+            ...p,
+            profitLoss: p.finalChips - p.totalBuyIns
+        }));
+        onConfirmSave(finalPlayers);
+    }
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-96 pr-4">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Player</TableHead>
+                                <TableHead>Total Buy-in</TableHead>
+                                <TableHead>{isEndGame ? 'Final Chip Count' : 'Current Chip Count'}</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {players.map(player => (
+                                <TableRow key={player.id}>
+                                    <TableCell className="font-medium">{player.name}</TableCell>
+                                    <TableCell>₹{player.totalBuyIns}</TableCell>
+                                    <TableCell>
+                                        <Input 
+                                            type="number" 
+                                            value={player.finalChips === 0 ? '' : player.finalChips}
+                                            onChange={e => handleChipChange(player.id, e.target.value)}
+                                            placeholder="Chip count"
+                                            className="w-32"
+                                        />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} variant={isEndGame ? 'destructive' : 'default'} dangerouslySetInnerHTML={{ __html: buttonText }}></Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 // Main component with Suspense boundary
 export default function DashboardPage() {
   return (
@@ -3505,6 +3745,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
