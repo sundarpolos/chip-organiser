@@ -109,6 +109,8 @@ import {
   CalendarPlus,
   Banknote,
   LayoutDashboard,
+  MessageSquare,
+  Copy,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -1345,7 +1347,7 @@ function DashboardContent() {
                     <LayoutDashboard className="h-4 w-4" />
                 </Link>
             </Button>
-            {isAdmin && (
+            {(isAdmin || isBanker) && (
                 <>
                     <Button asChild variant="outline" size="icon">
                         <Link href="/expenses">
@@ -2666,381 +2668,6 @@ const ReportsDialog: FC<{
     )
 }
 
-const SendMessageDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  whatsappConfig: WhatsappConfig;
-  masterPlayers: MasterPlayer[];
-  toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, whatsappConfig, masterPlayers, toast }) => {
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const playersWithWhatsapp = useMemo(() => {
-    return masterPlayers.filter(p => p.whatsappNumber && (p.isActive ?? true));
-  }, [masterPlayers]);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Pre-select all active players with whatsapp numbers
-      setSelectedPlayerIds(playersWithWhatsapp.map(p => p.id));
-      setMessage('');
-    }
-  }, [isOpen, playersWithWhatsapp]);
-
-  const handleSelectPlayer = (id: string, isSelected: boolean) => {
-    if (isSelected) {
-      setSelectedPlayerIds(prev => [...prev, id]);
-    } else {
-      setSelectedPlayerIds(prev => prev.filter(pId => pId !== id));
-    }
-  };
-
-  const handleSelectAll = (isChecked: boolean) => {
-    setSelectedPlayerIds(isChecked ? playersWithWhatsapp.map(p => p.id) : []);
-  };
-
-  const handleSend = async () => {
-    if (selectedPlayerIds.length === 0 || !message) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Information',
-        description: 'Please select recipients and enter a message.',
-      });
-      return;
-    }
-    
-    setIsSending(true);
-    const playersToSend = masterPlayers.filter(p => selectedPlayerIds.includes(p.id));
-    const totalToSend = playersToSend.length;
-    
-    onOpenChange(false);
-    const { id: toastId, update } = toast({
-      title: `Sending ${totalToSend} message(s)...`,
-      description: <Progress value={0} className="w-full" />,
-    });
-
-    let successfulSends = 0;
-    let failedSends = 0;
-
-    for (let i = 0; i < totalToSend; i++) {
-        const player = playersToSend[i];
-        
-        try {
-            const result = await sendWhatsappMessage({ 
-              to: player.whatsappNumber, 
-              message,
-              ...whatsappConfig
-            });
-
-            if (result.success) {
-                successfulSends++;
-            } else {
-                failedSends++;
-                console.error(`Failed to send to ${player.name}:`, result.error);
-            }
-        } catch (error) {
-            failedSends++;
-            console.error(`Exception while sending to ${player.name}:`, error);
-        }
-        
-        const progress = ((i + 1) / totalToSend) * 100;
-        update({ id: toastId, description: <Progress value={progress} className="w-full" /> });
-        
-        if (i < totalToSend - 1) {
-            await new Promise(resolve => setTimeout(resolve, 10000));
-        }
-    }
-    
-    setIsSending(false);
-
-    update({
-        id: toastId,
-        title: 'Sending Complete!',
-        description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
-    });
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Send Group WhatsApp Message</DialogTitle>
-          <DialogDescription>
-            Select players to message. Only players with saved WhatsApp numbers are shown. A 10s delay is applied between messages.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Recipients</Label>
-            <div className="flex items-center space-x-2 border-b pb-2">
-                <Checkbox
-                    id="select-all"
-                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
-                    checked={playersWithWhatsapp.length > 0 && selectedPlayerIds.length === playersWithWhatsapp.length}
-                    disabled={playersWithWhatsapp.length === 0}
-                />
-                <Label htmlFor="select-all" className="font-medium">Select All</Label>
-            </div>
-            <ScrollArea className="h-48 border rounded-md p-2">
-                {playersWithWhatsapp.length > 0 ? (
-                    playersWithWhatsapp.map(player => (
-                        <div key={player.id} className="flex items-center space-x-2 p-1">
-                            <Checkbox 
-                                id={`p-${player.id}`} 
-                                onCheckedChange={(checked) => handleSelectPlayer(player.id, !!checked)}
-                                checked={selectedPlayerIds.includes(player.id)}
-                            />
-                            <Label htmlFor={`p-${player.id}`}>{player.name}</Label>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers found.</p>
-                )}
-            </ScrollArea>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
-            <Textarea
-              id="message"
-              placeholder="Enter your group message here."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0 || !message}>
-            {isSending ? <Loader2 className="animate-spin" /> : `Send to ${selectedPlayerIds.length} Player(s)`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-const ImportGameDialog: FC<{
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onImport: (gameData: { venue: string; timestamp: string; players: Player[] }) => void;
-  toast: (options: { variant?: "default" | "destructive" | null, title: string, description: string }) => void;
-}> = ({ isOpen, onOpenChange, onImport, toast }) => {
-  const [gameLog, setGameLog] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [showFormat, setShowFormat] = useState(false);
-
-  const exampleLog = `Poker game at "The Den" - 2024-07-25 19:30
-
-Player: Alice
-Buy In: 1000
-Buy In: 500
-Chip Return: 2500
-
-Player: Bob
-Buy In: 1000
-Chip Return: 500
-
-Player: Charlie
-Buy In: 2000
-Chip Return: 0`;
-
-  const handleImport = async () => {
-    if (!gameLog.trim()) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please paste the game log to import.' });
-      return;
-    }
-    setIsImporting(true);
-    try {
-      const result = await importGameFromText({ gameLog });
-      onImport(result);
-      toast({ title: 'Success', description: 'Game data has been imported successfully.' });
-      setGameLog(''); // Clear text area on success
-    } catch (error) {
-      console.error('Import failed', error);
-      const errorMessage = error instanceof Error ? error.message : 'Could not parse the game log.';
-      toast({ variant: 'destructive', title: 'Import Failed', description: errorMessage });
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Import Game from Text</DialogTitle>
-          <div className="flex justify-between items-center">
-             <DialogDescription>
-                Paste your raw game log below. The AI will parse the players, buy-ins, and final chip counts.
-            </DialogDescription>
-            <Button variant="outline" size="sm" onClick={() => setShowFormat(!showFormat)}>
-                <Info className="mr-2 h-4 w-4" />
-                {showFormat ? "Hide Format" : "Show Format"}
-            </Button>
-          </div>
-        </DialogHeader>
-        {showFormat && (
-            <Alert>
-                <AlertTitle>Example Log Format</AlertTitle>
-                <AlertDescription>
-                    <pre className="mt-2 w-full rounded-md bg-muted p-4 text-sm whitespace-pre-wrap">
-                        <code>{exampleLog}</code>
-                    </pre>
-                </AlertDescription>
-            </Alert>
-        )}
-        <div className="py-4">
-          <Textarea
-            placeholder="Paste your game log here..."
-            className="h-64"
-            value={gameLog}
-            onChange={e => setGameLog(e.target.value)}
-          />
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button onClick={handleImport} disabled={isImporting}>
-            {isImporting ? <Loader2 className="animate-spin" /> : <> <Upload className="mr-2 h-4 w-4" /> Import Game </>}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-const SaveConfirmDialog: FC<{
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    activeGame: GameHistory | null;
-    onConfirmSave: (finalPlayers: CalculatedPlayer[]) => void;
-    title: string;
-    description: string;
-    buttonText: string;
-    isEndGame?: boolean;
-}> = ({ isOpen, onOpenChange, activeGame, onConfirmSave, title, description, buttonText, isEndGame = false }) => {
-    const [localPlayers, setLocalPlayers] = useState<CalculatedPlayer[]>([]);
-
-    const calculatedPlayers = useMemo((): CalculatedPlayer[] => {
-        if (!activeGame || !activeGame.players) return [];
-        return activeGame.players.map(p => {
-            const totalBuyIns = (p.buyIns || []).reduce((sum, bi) => sum + (bi.status === 'verified' ? bi.amount : 0), 0);
-            return {
-                ...p,
-                totalBuyIns,
-                profitLoss: p.finalChips - totalBuyIns,
-            }
-        });
-    }, [activeGame]);
-
-    useEffect(() => {
-        if (isOpen) {
-            setLocalPlayers(JSON.parse(JSON.stringify(calculatedPlayers)));
-        }
-    }, [isOpen, calculatedPlayers]);
-    
-    const handleFinalChipsChange = (playerId: string, newFinalChips: number) => {
-        setLocalPlayers(currentPlayers => 
-            currentPlayers.map(p => 
-                p.id === playerId 
-                    ? { ...p, finalChips: newFinalChips, profitLoss: newFinalChips - p.totalBuyIns }
-                    : p
-            )
-        );
-    };
-
-    const { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced } = useMemo(() => {
-        if (!localPlayers) return { totalBuyInsSum: 0, totalFinalChipsSum: 0, totalProfitLossSum: 0, isBalanced: false };
-        const totalBuyInsSum = localPlayers.reduce((sum, p) => sum + p.totalBuyIns, 0);
-        const totalFinalChipsSum = localPlayers.reduce((sum, p) => sum + p.finalChips, 0);
-        const totalProfitLossSum = localPlayers.reduce((sum, p) => sum + p.profitLoss, 0);
-        const isBalanced = Math.abs(totalBuyInsSum - totalFinalChipsSum) < 0.01;
-        return { totalBuyInsSum, totalFinalChipsSum, totalProfitLossSum, isBalanced };
-    }, [localPlayers]);
-    
-    if (!activeGame || activeGame.players.length === 0) return null;
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
-                </DialogHeader>
-                <div className="relative max-h-[60vh] flex flex-col">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-right">Total Buy-in</TableHead>
-                                <TableHead className="w-32 text-right">Final Chips</TableHead>
-                                <TableHead className="text-right">Profit/Loss</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                    </Table>
-                    <ScrollArea className="h-72">
-                        <Table>
-                            <TableBody>
-                                {localPlayers.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.name}</TableCell>
-                                        <TableCell className="text-right">{p.totalBuyIns}</TableCell>
-                                        <TableCell className="w-32 text-right">
-                                            <Input
-                                                type="number"
-                                                className="h-8 text-right"
-                                                value={p.finalChips === 0 ? "" : p.finalChips}
-                                                onChange={(e) => handleFinalChipsChange(p.id, parseInt(e.target.value) || 0)}
-                                                placeholder="Chips"
-                                            />
-                                        </TableCell>
-                                        <TableCell className={`text-right font-bold ${p.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {p.profitLoss.toFixed(0)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                    <Table>
-                        <TableFoot className="sticky bottom-0 bg-background z-10">
-                            <TableRow className="bg-muted/50 font-bold">
-                                <TableCell>Totals</TableCell>
-                                <TableCell className="text-right">{totalBuyInsSum}</TableCell>
-                                <TableCell className="w-32 text-right">{totalFinalChipsSum}</TableCell>
-                                <TableCell className="text-right">{totalProfitLossSum.toFixed(0)}</TableCell>
-                            </TableRow>
-                        </TableFoot>
-                    </Table>
-                </div>
-                {isEndGame && !isBalanced && (
-                    <Alert variant="destructive" className="mt-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Totals Do Not Match!</AlertTitle>
-                        <AlertDescription>
-                            The total buy-ins ({totalBuyInsSum}) and total final chips ({totalFinalChipsSum}) must be equal. Please correct the values before saving.
-                        </AlertDescription>
-                    </Alert>
-                )}
-                <DialogFooter className="pt-4">
-                    <DialogClose asChild>
-                        <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button onClick={() => onConfirmSave(localPlayers)} disabled={isEndGame && !isBalanced}>
-                        <Save className="mr-2 h-4 w-4" />
-                        {buttonText}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
 const SettlementDialog: FC<{
     isOpen: boolean,
     onOpenChange: (open: boolean) => void,
@@ -3051,6 +2678,8 @@ const SettlementDialog: FC<{
 }> = ({ isOpen, onOpenChange, activeGame, whatsappConfig, toast, masterPlayers }) => {
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     const [isSending, setIsSending] = useState(false);
+    const [isGroupSending, setIsGroupSending] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
     const [includeSummary, setIncludeSummary] = useState(false);
     const [includeTimeline, setIncludeTimeline] = useState(false);
     const [previewMessage, setPreviewMessage] = useState('');
@@ -3087,6 +2716,7 @@ const SettlementDialog: FC<{
         if (isOpen) {
             setSelectedPlayerIds(allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id));
             setIsSending(false);
+            setIsGroupSending(false);
             setIncludeSummary(false);
             setIncludeTimeline(false);
         }
@@ -3146,6 +2776,41 @@ ${formattedTransfers}
     const handleSelectAll = (isChecked: boolean) => {
         setSelectedPlayerIds(isChecked ? allPlayersInGame.filter(p => p.whatsappNumber).map(p => p.id) : []);
     };
+    
+    const handleCopyToClipboard = () => {
+        navigator.clipboard.writeText(previewMessage).then(() => {
+            setIsCopied(true);
+            toast({ title: 'Copied!', description: 'Settlement message copied to clipboard.' });
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
+
+    const handleSendToGroup = async () => {
+        if (!whatsappConfig.whatsappGroupId) {
+            toast({ variant: 'destructive', title: 'Group ID Missing', description: 'WhatsApp Group ID is not configured for this club.'});
+            return;
+        }
+        setIsGroupSending(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: whatsappConfig.whatsappGroupId,
+                message: previewMessage,
+                isGroup: true,
+                ...whatsappConfig,
+            });
+            if (result.success) {
+                toast({ title: 'Sent to Group!', description: 'The settlement details have been sent.'});
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || 'Failed to send to group.');
+            }
+        } catch(e) {
+            const err = e as Error;
+            toast({ variant: 'destructive', title: 'Group Send Failed', description: err.message });
+        } finally {
+            setIsGroupSending(false);
+        }
+    }
 
     const handleSend = async () => {
         if (!activeGame || selectedPlayerIds.length === 0) {
@@ -3259,17 +2924,32 @@ ${formattedTransfers}
                      </div>
 
                      <div className="space-y-2">
-                        <Label>Message Preview</Label>
+                        <div className="flex justify-between items-center">
+                            <Label>Message Preview</Label>
+                             <Button variant="ghost" size="icon" onClick={handleCopyToClipboard}>
+                                {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                        </div>
                         <ScrollArea className="h-40 w-full rounded-md border bg-muted p-4">
                            <pre className="text-sm whitespace-pre-wrap">{previewMessage}</pre>
                         </ScrollArea>
                      </div>
                 </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline" disabled={isSending}>Cancel</Button></DialogClose>
-                    <Button onClick={handleSend} disabled={isSending || selectedPlayerIds.length === 0}>
-                        {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
+                <DialogFooter className="sm:justify-between">
+                     <Button
+                        variant="secondary"
+                        onClick={handleSendToGroup}
+                        disabled={isSending || isGroupSending || !whatsappConfig.whatsappGroupId}
+                    >
+                        {isGroupSending ? <Loader2 className="animate-spin mr-2" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                        Send to Group
                     </Button>
+                    <div className="flex gap-2">
+                        <DialogClose asChild><Button variant="outline" disabled={isSending}>Cancel</Button></DialogClose>
+                        <Button onClick={handleSend} disabled={isSending || isGroupSending || selectedPlayerIds.length === 0}>
+                            {isSending ? <Loader2 className="animate-spin" /> : <> <Send className="mr-2 h-4 w-4" /> Send to {selectedPlayerIds.length} Player(s) </>}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -3825,6 +3505,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
