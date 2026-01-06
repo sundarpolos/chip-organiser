@@ -1686,7 +1686,7 @@ const SendGameAnnouncementDialog: FC<{
     const [isGenerating, setIsGenerating] = useState(false);
 
     const playersWithWhatsapp = useMemo(() => {
-        return players.filter(p => p.whatsappNumber);
+        return players.filter(p => p.whatsappNumber && (p.isActive ?? true));
     }, [players]);
 
     useEffect(() => {
