@@ -1124,7 +1124,7 @@ const PlayerManagement: FC<{
                                             <TableRow>
                                                 <TableHead>Player Name</TableHead>
                                                 <TableHead>WhatsApp Number</TableHead>
-                                                <TableHead>Role &amp; Status</TableHead>
+                                                <TableHead>Role & Status</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
