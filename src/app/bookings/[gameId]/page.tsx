@@ -331,8 +331,8 @@ Please be on time!`;
         return allPlayers
             .filter(p =>
                 p.clubId === selectedClubId &&
-                p.isActive &&
-                !bookings.some(b => b.playerId === p.id && b.status === 'confirmed')
+                (p.isActive ?? true) &&
+                !bookings.some(b => b.playerId === p.id)
             )
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [allPlayers, selectedClubId, bookings]);
