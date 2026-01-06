@@ -9,7 +9,7 @@ import { detectAnomalousBuyins } from "@/ai/flows/detect-anomalies"
 import { sendWhatsappMessage } from "@/ai/flows/send-whatsapp-message"
 import { sendBuyInOtp } from "@/ai/flows/send-buyin-otp"
 import { importGameFromText } from "@/ai/flows/import-game"
-import { sendDeletePlayerOtp } from "@/aiflows/send-delete-player-otp";
+import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
 import { sendBookingOtp } from "@/ai/flows/send-booking-otp";
 import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking, GameExpense } from "@/lib/types"
@@ -614,6 +614,9 @@ function DashboardContent() {
 
 
   // Master Data State
+  const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
+  const [allVenues, setAllVenues] = useState<MasterVenue[]>([]);
+  const [allClubs, setAllClubs] = useState<Club[]>([]);
   const [masterPlayers, setMasterPlayers] = useState<MasterPlayer[]>([]);
   const [masterVenues, setMasterVenues] = useState<MasterVenue[]>([]);
   
@@ -650,6 +653,7 @@ function DashboardContent() {
 
   
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
+  const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === '919843350000', [currentUser]);
   const isBanker = useMemo(() => currentUser?.isBanker === true, [currentUser]);
 
   const canEditGame = useMemo(() => {
@@ -722,7 +726,25 @@ function DashboardContent() {
         if (!currentUser || !clubId) return;
 
         try {
-            const club = await getClub(clubId);
+            const [
+                loadedClubs,
+                loadedMasterPlayers,
+                loadedMasterVenues,
+                loadedGameHistory,
+            ] = await Promise.all([
+                getClubs(),
+                getMasterPlayers(),
+                getMasterVenues(),
+                getGameHistory(),
+            ]);
+
+            setAllClubs(loadedClubs);
+            setAllPlayers(loadedMasterPlayers);
+            setAllVenues(loadedMasterVenues);
+            setGameHistory(loadedGameHistory);
+            
+            const club = loadedClubs.find(c => c.id === clubId);
+
             if (!club) {
                 toast({ variant: "destructive", title: "Club not found", description: "The selected club does not exist. Please select another club." });
                 handleLogout();
@@ -732,19 +754,8 @@ function DashboardContent() {
             setWhatsappConfig(club.whatsappConfig || { apiUrl: '', apiToken: '', senderMobile: '' });
             setDeckChangeInterval(club.deckChangeIntervalHours || 2);
             
-            const [
-                loadedMasterPlayers,
-                loadedMasterVenues,
-                loadedGameHistory,
-            ] = await Promise.all([
-                getMasterPlayers(),
-                getMasterVenues(),
-                getGameHistory(),
-            ]);
-
             setMasterPlayers(loadedMasterPlayers.filter(p => p.clubId === clubId));
             setMasterVenues(loadedMasterVenues.filter(v => v.clubId === clubId));
-            setGameHistory(loadedGameHistory.filter(g => g.clubId === clubId));
             
             const savedOtpPreference = localStorage.getItem("isOtpVerificationEnabled");
             if (savedOtpPreference !== null) {
@@ -1143,28 +1154,36 @@ function DashboardContent() {
     date: Date,
     time: string,
     seats: number,
-    preBookedPlayerIds: string[]
+    preBookedPlayerIds: string[],
+    clubIdForGame: string,
   ) => {
-    if (!activeClub) return;
-
-    if (!masterVenues.some(v => v.name === venue)) {
-        const venueData: Omit<MasterVenue, 'id'> = { name: venue, clubId: activeClub.id };
+    
+    const targetClubId = isSuperAdmin ? clubIdForGame : activeClub?.id;
+    if (!targetClubId) {
+        toast({ variant: "destructive", title: "Club not selected", description: "Please select a club to start the game in." });
+        return;
+    }
+    
+    const clubVenues = allVenues.filter(v => v.clubId === targetClubId);
+    if (!clubVenues.some(v => v.name === venue)) {
+        const venueData: Omit<MasterVenue, 'id'> = { name: venue, clubId: targetClubId };
         const savedVenue = await saveMasterVenue(venueData);
-        setMasterVenues(prev => [...prev, savedVenue]);
+        setAllVenues(prev => [...prev, savedVenue]);
     }
     
     const [hours, minutes] = time.split(':').map(Number);
     const finalTimestamp = set(date, { hours, minutes, seconds: 0 }).toISOString();
     
-    // Create new players for the game from the pre-booked list
-    const preBookedPlayers = masterPlayers.filter(p => preBookedPlayerIds.includes(p.id));
+    const clubPlayers = allPlayers.filter(p => p.clubId === targetClubId);
+    const preBookedPlayers = clubPlayers.filter(p => preBookedPlayerIds.includes(p.id));
+    
     const newGamePlayers: Player[] = preBookedPlayers.map(p => ({
         id: `player-${Date.now()}-${p.id}`,
         name: p.name,
         whatsappNumber: p.whatsappNumber,
         buyIns: [],
         finalChips: 0,
-        clubId: activeClub.id,
+        clubId: targetClubId,
     }));
 
     const newGame: GameHistory = {
@@ -1173,7 +1192,7 @@ function DashboardContent() {
         timestamp: finalTimestamp,
         startTime: new Date().toISOString(),
         players: newGamePlayers,
-        clubId: activeClub.id,
+        clubId: targetClubId,
         progressLog: [],
     };
     
@@ -1444,11 +1463,13 @@ function DashboardContent() {
       <GameCreationDialog
         isOpen={isGameCreationModalOpen}
         onOpenChange={setGameCreationModalOpen}
-        masterVenues={masterVenues}
+        masterVenues={isSuperAdmin ? allVenues : masterVenues}
         onStartGame={handleStartGame}
         toast={toast}
         activeClub={activeClub}
-        masterPlayers={masterPlayers}
+        masterPlayers={isSuperAdmin ? allPlayers : masterPlayers}
+        allClubs={allClubs}
+        isSuperAdmin={isSuperAdmin}
       />
        <AddPlayerDialog
         isOpen={isAddPlayerModalOpen}
@@ -2004,21 +2025,31 @@ const GameCreationDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     masterVenues: MasterVenue[];
-    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[]) => void;
+    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[], clubId: string) => void;
     toast: ReturnType<typeof useToast>['toast'];
     activeClub: Club | null;
     masterPlayers: MasterPlayer[];
-}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, toast, activeClub, masterPlayers }) => {
+    allClubs: Club[];
+    isSuperAdmin: boolean;
+}> = ({ isOpen, onOpenChange, masterVenues, onStartGame, toast, activeClub, masterPlayers, allClubs, isSuperAdmin }) => {
     const [venue, setVenue] = useState("");
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [time, setTime] = useState('13:30');
     const [seats, setSeats] = useState(10);
     const [preBookedPlayerIds, setPreBookedPlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    
+    const [selectedClubId, setSelectedClubId] = useState<string>('');
+
     const sortedVenues = useMemo(() => {
-        return [...masterVenues].sort((a,b) => a.name.localeCompare(b.name));
-    }, [masterVenues]);
+        const venuesToShow = isSuperAdmin ? masterVenues.filter(v => v.clubId === selectedClubId) : masterVenues;
+        return [...venuesToShow].sort((a,b) => a.name.localeCompare(b.name));
+    }, [masterVenues, isSuperAdmin, selectedClubId]);
+
+    const clubPlayers = useMemo(() => {
+        const playersToShow = isSuperAdmin ? masterPlayers.filter(p => p.clubId === selectedClubId) : masterPlayers;
+        return playersToShow.filter(p => p.isActive !== false)
+            .sort((a,b) => a.name.localeCompare(b.name));
+    }, [masterPlayers, isSuperAdmin, selectedClubId]);
 
     useEffect(() => {
         if (isOpen) {
@@ -2028,8 +2059,9 @@ const GameCreationDialog: FC<{
             setSeats(10);
             setVenue("");
             setPreBookedPlayerIds([]);
+            setSelectedClubId(activeClub?.id || '');
         }
-    }, [isOpen]);
+    }, [isOpen, activeClub]);
 
     const handleStart = () => {
         if (!venue.trim()) {
@@ -2040,18 +2072,18 @@ const GameCreationDialog: FC<{
             toast({ variant: "destructive", title: "Date Required", description: "Please select a game date." });
             return;
         }
+        const clubIdForGame = isSuperAdmin ? selectedClubId : activeClub?.id;
+        if (!clubIdForGame) {
+            toast({ variant: "destructive", title: "Club Required", description: "A club must be selected." });
+            return;
+        }
+
         setIsSaving(true);
-        onStartGame(venue.trim(), date, time, seats, preBookedPlayerIds);
+        onStartGame(venue.trim(), date, time, seats, preBookedPlayerIds, clubIdForGame);
         setIsSaving(false);
         onOpenChange(false);
     };
     
-    const clubPlayers = useMemo(() => {
-        if (!activeClub) return [];
-        return masterPlayers.filter(p => p.clubId === activeClub.id && p.isActive !== false)
-            .sort((a,b) => a.name.localeCompare(b.name));
-    }, [masterPlayers, activeClub]);
-
     const handlePlayerSelect = (playerId: string, isSelected: boolean) => {
         setPreBookedPlayerIds(prev => isSelected ? [...prev, playerId] : prev.filter(id => id !== playerId));
     }
@@ -2065,6 +2097,21 @@ const GameCreationDialog: FC<{
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh] py-4 pr-4">
                     <div className="space-y-4">
+                        {isSuperAdmin && (
+                            <div className="space-y-2">
+                                <Label htmlFor="club-select">Club</Label>
+                                <Select value={selectedClubId} onValueChange={setSelectedClubId}>
+                                    <SelectTrigger id="club-select">
+                                        <SelectValue placeholder="Select a club..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allClubs.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="venue-name">Venue Name</Label>
                             <Input id="venue-name" value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g., The Poker Den" />
@@ -2122,6 +2169,9 @@ const GameCreationDialog: FC<{
                                         <Label htmlFor={`player-book-${player.id}`}>{player.name}</Label>
                                     </div>
                                 ))}
+                                {isSuperAdmin && !selectedClubId && (
+                                     <p className="text-center text-muted-foreground p-4">Please select a club to see players.</p>
+                                )}
                              </ScrollArea>
                         </div>
                     </div>
@@ -2993,7 +3043,6 @@ const SendMessageDialog: FC<{
   isOpen: boolean,
   onOpenChange: (open: boolean) => void,
   whatsappConfig: WhatsappConfig,
-  masterPlayers: MasterPlayer[],
   toast: ReturnType<typeof useToast>['toast'],
 }> = ({ isOpen, onOpenChange, whatsappConfig, toast }) => {
     const [message, setMessage] = useState('');
@@ -3285,7 +3334,7 @@ const BookingView: FC<{
     currentUser: MasterPlayer;
     activeClub: Club | null;
     toast: ReturnType<typeof useToast>['toast'];
-    onStartGame: (game: ScheduledGame) => void;
+    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[], clubId: string) => void;
 }> = ({ currentUser, activeClub, toast, onStartGame }) => {
     const [scheduledGames, setScheduledGames] = useState<ScheduledGame[]>([]);
     const [bookings, setBookings] = useState<Record<string, SeatBooking[]>>({});
@@ -3326,6 +3375,20 @@ const BookingView: FC<{
              return new Date() < gameDateTime;
         });
     }, [scheduledGames]);
+    
+    const handleStartScheduledGame = (game: ScheduledGame) => {
+        const confirmedBookingsForGame = (bookings[game.id] || []).filter(b => b.status === 'confirmed');
+        const preBookedPlayerIds = confirmedBookingsForGame.map(b => b.playerId);
+        
+        onStartGame(
+            'Scheduled Game', // Venue will be set from a master list or created. Here we use a placeholder.
+            parse(game.gameDate, 'yyyy-MM-dd', new Date()),
+            game.gameStartTime,
+            game.totalSeats,
+            preBookedPlayerIds,
+            game.clubId
+        );
+    };
 
     if (isLoading) {
         return <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin" /></div>;
@@ -3352,7 +3415,7 @@ const BookingView: FC<{
                                 activeClub={activeClub}
                                 toast={toast}
                                 onBookingChange={refreshData}
-                                onStartGame={onStartGame}
+                                onStartGame={handleStartScheduledGame}
                             />
                         ))}
                     </div>
@@ -3778,6 +3841,7 @@ export default function DashboardPage() {
     
 
     
+
 
 
 
