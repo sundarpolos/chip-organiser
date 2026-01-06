@@ -567,7 +567,7 @@ const ScheduleGameDialog: FC<{
     const [isSaving, setIsSaving] = useState(false);
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     
-    const activePlayers = useMemo(() => players.filter(p => p.isActive).sort((a,b) => a.name.localeCompare(b.name)), [players]);
+    const clubPlayers = useMemo(() => players.sort((a,b) => a.name.localeCompare(b.name)), [players]);
 
     useEffect(() => {
         if(isOpen) {
@@ -655,7 +655,7 @@ const ScheduleGameDialog: FC<{
                          <Label>Pre-book Players</Label>
                          <p className="text-sm text-muted-foreground">Select players to automatically confirm their seats for this game.</p>
                          <ScrollArea className="h-48 border rounded-md p-2">
-                            {activePlayers.map(player => (
+                            {clubPlayers.map(player => (
                                 <div key={player.id} className="flex items-center space-x-3 p-1">
                                     <Checkbox
                                         id={`player-book-${player.id}`}
