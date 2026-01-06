@@ -567,7 +567,9 @@ const ScheduleGameDialog: FC<{
     const [isSaving, setIsSaving] = useState(false);
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
     
-    const clubPlayers = useMemo(() => players.sort((a,b) => a.name.localeCompare(b.name)), [players]);
+    const clubPlayers = useMemo(() => {
+        return players.filter(p => p.isActive !== false).sort((a,b) => a.name.localeCompare(b.name));
+    }, [players]);
 
     useEffect(() => {
         if(isOpen) {
@@ -1686,7 +1688,7 @@ const SendGameAnnouncementDialog: FC<{
     const [isGenerating, setIsGenerating] = useState(false);
 
     const playersWithWhatsapp = useMemo(() => {
-        return players.filter(p => p.whatsappNumber && (p.isActive ?? true));
+        return players.filter(p => p.whatsappNumber && p.isActive !== false);
     }, [players]);
 
     useEffect(() => {
@@ -1840,7 +1842,7 @@ const SendGameAnnouncementDialog: FC<{
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center p-4">No players with WhatsApp numbers in this club.</p>
+                                <p className="text-sm text-muted-foreground text-center p-4">No active players with WhatsApp numbers in this club.</p>
                             )}
                         </ScrollArea>
                     </div>
@@ -1886,6 +1888,7 @@ export default function SettingsPage() {
   
   const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === SUPER_ADMIN_WHATSAPP, [currentUser]);
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
+  const isBanker = useMemo(() => currentUser?.isBanker === true, [currentUser]);
 
   useEffect(() => {
     const userStr = localStorage.getItem('chip-maestro-user');
@@ -1971,7 +1974,7 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       {isAdmin && (
+       {(isAdmin || isBanker) && (
           <SeatBookingManagement 
             isSuperAdmin={isSuperAdmin}
             allClubs={clubs}
