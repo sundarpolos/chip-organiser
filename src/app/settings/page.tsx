@@ -1732,7 +1732,6 @@ const SendGameAnnouncementDialog: FC<{
         const playersToSend = players.filter(p => selectedPlayerIds.includes(p.id));
         const totalToSend = playersToSend.length;
         
-        onOpenChange(false);
         const { id: toastId, update } = toast({
             title: `Sending ${totalToSend} announcement(s)...`,
             description: <Progress value={0} className="w-full" />,
@@ -1768,12 +1767,14 @@ const SendGameAnnouncementDialog: FC<{
             }
         }
 
-        setIsSending(false);
         update({
             id: toastId,
             title: 'Sending Complete!',
             description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
         });
+
+        setIsSending(false);
+        onOpenChange(false);
     };
     
     const handleSendToGroup = async () => {

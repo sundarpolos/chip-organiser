@@ -2909,7 +2909,6 @@ ${formattedTransfers}
         
         const totalToSend = playersToSend.length;
         
-        onOpenChange(false);
         const { id: toastId, update } = toast({
             title: `Sending ${totalToSend} settlement message(s)...`,
             description: <Progress value={0} className="w-full" />,
@@ -2947,13 +2946,14 @@ ${formattedTransfers}
             }
         }
         
-        setIsSending(false);
-
         update({
             id: toastId,
             title: 'Sending Complete!',
             description: `Sent to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
         });
+
+        setIsSending(false);
+        onOpenChange(false);
     };
 
     return (
@@ -3183,7 +3183,6 @@ const BuyInSummaryDialog: FC<{
         const playersToSend = playersInGame.filter(p => selectedPlayerIds.includes(p.id) && p.whatsappNumber);
         const totalToSend = playersToSend.length;
         
-        onOpenChange(false);
         const { id: toastId, update } = toast({
             title: `Sending ${totalToSend} summary message(s)...`,
             description: <Progress value={0} className="w-full" />,
@@ -3230,13 +3229,14 @@ const BuyInSummaryDialog: FC<{
             }
         }
         
-        setIsSending(false);
-        
         update({
             id: toastId,
             title: 'Sending Complete!',
             description: `Sent summaries to ${successfulSends} player(s). ${failedSends > 0 ? `${failedSends} failed.` : ''}`,
         });
+
+        setIsSending(false);
+        onOpenChange(false);
     };
 
     return (
@@ -3874,4 +3874,5 @@ export default function DashboardPage() {
 
 
     
+
 
