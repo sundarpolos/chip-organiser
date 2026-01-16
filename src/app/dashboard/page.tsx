@@ -3043,8 +3043,9 @@ const SendMessageDialog: FC<{
   isOpen: boolean,
   onOpenChange: (open: boolean) => void,
   whatsappConfig: WhatsappConfig,
+  masterPlayers: MasterPlayer[],
   toast: ReturnType<typeof useToast>['toast'],
-}> = ({ isOpen, onOpenChange, whatsappConfig, toast }) => {
+}> = ({ isOpen, onOpenChange, whatsappConfig, toast, masterPlayers }) => {
     const [message, setMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
 
@@ -3762,6 +3763,14 @@ const SaveConfirmDialog: FC<{
         }
     }, [activeGame, isOpen]);
 
+    const totals = useMemo(() => {
+        return players.reduce((acc, player) => {
+            acc.totalBuyIns += player.totalBuyIns || 0;
+            acc.finalChips += player.finalChips || 0;
+            return acc;
+        }, { totalBuyIns: 0, finalChips: 0 });
+    }, [players]);
+
     const handleChipChange = (id: string, value: string) => {
         const numericValue = parseInt(value) || 0;
         setPlayers(prevPlayers => 
@@ -3810,6 +3819,13 @@ const SaveConfirmDialog: FC<{
                                 </TableRow>
                             ))}
                         </TableBody>
+                        <TableFoot>
+                            <TableRow className="font-bold border-t-2 bg-muted">
+                                <TableCell>Totals</TableCell>
+                                <TableCell>₹{totals.totalBuyIns}</TableCell>
+                                <TableCell>₹{totals.finalChips}</TableCell>
+                            </TableRow>
+                        </TableFoot>
                     </Table>
                 </ScrollArea>
                 <DialogFooter>
@@ -3852,3 +3868,6 @@ export default function DashboardPage() {
 
 
 
+
+
+    
