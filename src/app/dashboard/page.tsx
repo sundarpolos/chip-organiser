@@ -1202,7 +1202,6 @@ function DashboardContent() {
     await saveGameHistory(newGame);
     await loadGameIntoState(newGame);
     
-    setGameCreationModalOpen(false);
     toast({ title: "Game Started!", description: `A new game has started at ${venue}.` });
   }
 
@@ -2028,7 +2027,7 @@ const GameCreationDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     masterVenues: MasterVenue[];
-    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[], clubId: string) => void;
+    onStartGame: (venue: string, date: Date, time: string, seats: number, preBookedPlayerIds: string[], clubId: string) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
     activeClub: Club | null;
     masterPlayers: MasterPlayer[];
@@ -2066,7 +2065,7 @@ const GameCreationDialog: FC<{
         }
     }, [isOpen, activeClub]);
 
-    const handleStart = () => {
+    const handleStart = async () => {
         if (!venue.trim()) {
             toast({ variant: "destructive", title: "Venue Required", description: "Please enter or select a venue name." });
             return;
@@ -2082,7 +2081,7 @@ const GameCreationDialog: FC<{
         }
 
         setIsSaving(true);
-        onStartGame(venue.trim(), date, time, seats, preBookedPlayerIds, clubIdForGame);
+        await onStartGame(venue.trim(), date, time, seats, preBookedPlayerIds, clubIdForGame);
         setIsSaving(false);
         onOpenChange(false);
     };
@@ -2181,7 +2180,9 @@ const GameCreationDialog: FC<{
                 </ScrollArea>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleStart} disabled={isSaving}>Start Game</Button>
+                    <Button onClick={handleStart} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : 'Start Game'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -2872,21 +2873,22 @@ ${formattedTransfers}
     };
 
     const handleSendToGroup = async () => {
-        if (!whatsappConfig.whatsappGroupId) {
+        const groupId = whatsappConfig.whatsappGroupId;
+        if (!groupId) {
             toast({ variant: 'destructive', title: 'Group ID Missing', description: 'WhatsApp Group ID is not configured for this club.'});
             return;
         }
         setIsGroupSending(true);
         try {
             const result = await sendWhatsappMessage({
-                to: whatsappConfig.whatsappGroupId,
+                to: groupId,
                 message: previewMessage,
                 isGroup: true,
                 ...whatsappConfig,
             });
             if (result.success) {
                 toast({ title: 'Sent to Group!', description: 'The settlement details have been sent.'});
-                onOpenChange(false);
+                if (!isSending) onOpenChange(false);
             } else {
                 throw new Error(result.error || 'Failed to send to group.');
             }
@@ -2953,7 +2955,7 @@ ${formattedTransfers}
         });
 
         setIsSending(false);
-        onOpenChange(false);
+        if (!isGroupSending) onOpenChange(false);
     };
 
     return (
@@ -3090,7 +3092,7 @@ const SendMessageDialog: FC<{
                     title: 'Message Sent!',
                     description: 'Your message has been sent to the group.',
                 });
-                onOpenChange(false);
+                if (!isSending) onOpenChange(false);
             } else {
                 throw new Error(result.error || 'Unknown error');
             }
@@ -3874,5 +3876,3 @@ export default function DashboardPage() {
 
 
     
-
-
