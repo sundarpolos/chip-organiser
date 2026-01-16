@@ -654,17 +654,20 @@ function DashboardContent() {
   
   const isAdmin = useMemo(() => currentUser?.isAdmin === true, [currentUser]);
   const isSuperAdmin = useMemo(() => currentUser?.whatsappNumber === '919843350000', [currentUser]);
-  const isBanker = useMemo(() => currentUser?.isBanker === true, [currentUser]);
+  const isBanker = useMemo(() => {
+    if (!currentUser) return false;
+    const masterPlayer = masterPlayers.find(p => p.id === currentUser.id);
+    return masterPlayer?.isBanker === true;
+  }, [currentUser, masterPlayers]);
 
   const canEditGame = useMemo(() => {
     if (!activeGame || !currentUser) return false;
     if (isAdmin) return true;
     
-    // Check if the current user (master player) is a banker
     const masterPlayer = masterPlayers.find(mp => mp.id === currentUser.id);
-    if (masterPlayer?.isBanker) {
-        // Check if this banker is actually a player in the current game
-        return activeGame.players.some(p => p.name === currentUser.name);
+    // Allow bankers to edit any game within their club.
+    if (masterPlayer?.isBanker && masterPlayer.clubId === activeGame.clubId) {
+        return true;
     }
     
     return false;
@@ -3871,3 +3874,4 @@ export default function DashboardPage() {
 
 
     
+
