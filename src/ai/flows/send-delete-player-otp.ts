@@ -52,10 +52,12 @@ const sendDeletePlayerOtpFlow = ai.defineFlow(
       const otp = generateOtp();
       const message = `OTP to delete player "${playerToDeleteName}" is ${otp}. This is a critical action.`;
 
+      // The payload for the super admin should not use club-specific credentials.
+      // By creating a new object without spreading whatsappConfig, we ensure
+      // the sendWhatsappMessage flow uses its fallback (environment variables).
       const whatsappPayload: SendWhatsappMessageInput = {
         to: SUPER_ADMIN_WHATSAPP,
         message,
-        ...whatsappConfig
       };
 
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
