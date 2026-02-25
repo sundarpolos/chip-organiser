@@ -59,6 +59,10 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         token: finalApiToken,
       });
 
+      if (finalSenderMobile) {
+        body.append('sender', finalSenderMobile);
+      }
+
       if (isGroup) {
         // For group messages, 'to' is the group ID.
         // The API seems to use the 'group' param for the ID and also expects it as 'receiver'
