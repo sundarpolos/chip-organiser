@@ -65,9 +65,9 @@ const sendWhatsappMessageFlow = ai.defineFlow(
 
       if (isGroup) {
         // For group messages, 'to' is the group ID.
-        // The API seems to use the 'group' param for the ID and also expects it as 'receiver'
         body.append('group', to);
         body.append('receiver', to); 
+        body.append('is_group', 'true'); // Added for providers that require this flag
       } else {
         body.append('receiver', to);
       }
@@ -87,19 +87,18 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       if (response.ok) {
         try {
           const responseData = JSON.parse(responseText);
-          // According to the provided PHP logic, success is determined by the absence of an 'error' key.
-          if (responseData.error === undefined) {
+          // Check for explicit error status or an 'error' key. Some APIs return 200 OK but have an error in the body.
+          if (responseData.status !== 'error' && responseData.error === undefined) {
             console.log(`Successfully sent WhatsApp message. Status: ${response.status}. Response:`, responseText);
             return { success: true, messageId: responseData.message_id || 'N/A' };
           } else {
-            // The API returned a 200 OK status but included an error field in the JSON.
+            const errorMessage = responseData.error || responseData.message || 'API returned a success status code but indicated an error in the response body.';
             console.error('API indicated failure with an error key. API Response:', responseText);
-            return { success: false, error: `API Error: ${responseData.error}` };
+            return { success: false, error: `API Error: ${errorMessage}` };
           }
         } catch (e) {
            // This case handles non-JSON success responses, like "OK" or just a string.
-           // If we get here, it means the request was successful (response.ok is true), but the body wasn't valid JSON.
-           // We can treat this as a success, as some APIs might respond this way.
+           // This is kept for backward compatibility with providers that might respond this way.
           console.log(`Successfully sent WhatsApp message with non-JSON response. Status: ${response.status}. Response:`, responseText);
           return { success: true, messageId: 'N/A' };
         }
@@ -107,7 +106,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
         let apiError = `API returned status ${response.status}`;
         try {
             const responseData = JSON.parse(responseText);
-            apiError = responseData.error || responseData.message || `API returned status '${responseData.status}'`;
+            apiError = responseData.error || responseData.message || `API returned status '${responseData.status || response.statusText}'`;
         } catch (e) {
             apiError = `API returned status ${response.status}. Response: ${responseText.substring(0, 200)}...`
         }
