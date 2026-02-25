@@ -72,8 +72,6 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       if (isGroup) {
         // For group messages, 'to' is the group ID.
         body.append('group', to);
-        body.append('receiver', to); 
-        body.append('is_group', 'true'); // Added for providers that require this flag
       } else {
         body.append('receiver', to);
       }
