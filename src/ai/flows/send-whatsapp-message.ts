@@ -47,6 +47,12 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
     const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
+    console.log('--- WhatsApp API Settings Used ---');
+    console.log('URL:', finalApiUrl);
+    console.log('Token is set:', !!finalApiToken);
+    console.log('Sender Mobile:', finalSenderMobile || 'Not Set');
+    console.log('------------------------------------');
+
     if (!finalApiUrl || !finalApiToken) {
       const errorMsg = 'WhatsApp API URL and Token are not configured. Please provide them in the WA Settings or in the .env file.';
       console.error(errorMsg);
