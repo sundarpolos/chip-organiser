@@ -10,8 +10,9 @@ import {
   addProfitLoss,
   updateProfitLoss,
   deleteProfitLoss,
+  getOnlineClubs
 } from '@/services/online-club-service';
-import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry } from '@/lib/types';
+import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, OnlineClub } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -22,6 +23,8 @@ import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote } from 'lucide-re
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import Link from 'next/link';
 
 
 const OnlineClubPage: FC = () => {
@@ -30,6 +33,7 @@ const OnlineClubPage: FC = () => {
     const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
     const [account, setAccount] = useState<OnlinePlayerAccount | null>(null);
     const [ledger, setLedger] = useState<OnlineLedgerEntry[]>([]);
+    const [onlineClubs, setOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,38 +49,37 @@ const OnlineClubPage: FC = () => {
         }
     }, [router]);
 
-    useEffect(() => {
-        async function loadData() {
-            if (!currentUser) return;
-            try {
-                const [playerAccount, playerLedger] = await Promise.all([
-                    getOnlinePlayerAccount(currentUser.id),
-                    getOnlineLedgerEntries(currentUser.id),
-                ]);
-                setAccount(playerAccount);
-                setLedger(playerLedger);
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Failed to load online account data.' });
-            } finally {
-                setIsLoading(false);
-            }
-        }
-        loadData();
-    }, [currentUser, toast]);
-
-    const handlePlSubmit = async (amount: number, notes: string, date: string) => {
+    const refreshData = async () => {
         if (!currentUser) return;
-        setIsSubmitting(true);
         try {
-            await addProfitLoss(currentUser.id, amount, notes, date);
-            toast({ title: 'Success', description: 'Your P/L has been recorded.' });
-            // Refresh data
-            const [playerAccount, playerLedger] = await Promise.all([
+            const [playerAccount, playerLedger, clubs] = await Promise.all([
                 getOnlinePlayerAccount(currentUser.id),
                 getOnlineLedgerEntries(currentUser.id),
+                getOnlineClubs(currentUser.clubId),
             ]);
             setAccount(playerAccount);
             setLedger(playerLedger);
+            setOnlineClubs(clubs);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load online account data.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (currentUser) {
+            refreshData();
+        }
+    }, [currentUser, toast]);
+
+    const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
+        if (!currentUser) return;
+        setIsSubmitting(true);
+        try {
+            await addProfitLoss(currentUser.id, amount, notes, date, onlineClubName);
+            toast({ title: 'Success', description: 'Your P/L has been recorded.' });
+            await refreshData();
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Could not save P/L.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
@@ -85,18 +88,13 @@ const OnlineClubPage: FC = () => {
         }
     };
     
-    const handleEditSubmit = async (entryId: string, amount: number, notes: string, date: string) => {
+    const handleEditSubmit = async (entryId: string, amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            await updateProfitLoss(currentUser.id, entryId, amount, notes, date);
+            await updateProfitLoss(currentUser.id, entryId, amount, notes, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L entry has been updated.' });
-            const [playerAccount, playerLedger] = await Promise.all([
-                getOnlinePlayerAccount(currentUser.id),
-                getOnlineLedgerEntries(currentUser.id),
-            ]);
-            setAccount(playerAccount);
-            setLedger(playerLedger);
+            await refreshData();
             setEditModalOpen(false);
             setEntryToEdit(null);
         } catch (error) {
@@ -112,12 +110,7 @@ const OnlineClubPage: FC = () => {
         try {
             await deleteProfitLoss(currentUser.id, entryId);
             toast({ title: 'Entry Deleted', description: 'The ledger entry has been removed.' });
-            const [playerAccount, playerLedger] = await Promise.all([
-                getOnlinePlayerAccount(currentUser.id),
-                getOnlineLedgerEntries(currentUser.id),
-            ]);
-            setAccount(playerAccount);
-            setLedger(playerLedger);
+            await refreshData();
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Could not delete entry.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
@@ -136,8 +129,17 @@ const OnlineClubPage: FC = () => {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Dashboard</CardTitle>
-                    <CardDescription>Welcome, {currentUser?.name}. Here you can manage your online play finances.</CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Dashboard</CardTitle>
+                            <CardDescription>Welcome, {currentUser?.name}. Here you can manage your online play finances.</CardDescription>
+                        </div>
+                         {currentUser?.isAdmin && (
+                            <Button asChild variant="outline">
+                                <Link href="/online-club/admin">Admin Dashboard</Link>
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="text-4xl font-bold">
@@ -147,7 +149,7 @@ const OnlineClubPage: FC = () => {
                 </CardContent>
             </Card>
 
-            <SubmitPlCard isSubmitting={isSubmitting} onSubmit={handlePlSubmit} />
+            <SubmitPlCard isSubmitting={isSubmitting} onSubmit={handlePlSubmit} onlineClubs={onlineClubs} />
 
             <Card>
                 <CardHeader>
@@ -159,6 +161,7 @@ const OnlineClubPage: FC = () => {
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Type</TableHead>
+                                <TableHead>Online Club</TableHead>
                                 <TableHead>Notes</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
@@ -170,6 +173,7 @@ const OnlineClubPage: FC = () => {
                                 <TableRow key={entry.id}>
                                     <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell className="capitalize">{entry.type}</TableCell>
+                                    <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                     <TableCell>{entry.notes}</TableCell>
                                     <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                         {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
@@ -201,7 +205,7 @@ const OnlineClubPage: FC = () => {
                             ))}
                             {ledger.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center h-24">No transactions yet.</TableCell>
+                                    <TableCell colSpan={7} className="text-center h-24">No transactions yet.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
@@ -216,27 +220,31 @@ const OnlineClubPage: FC = () => {
                 entry={entryToEdit}
                 isSubmitting={isSubmitting}
                 onSubmit={handleEditSubmit}
+                onlineClubs={onlineClubs}
               />
             )}
         </div>
     );
 };
 
-const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string) => void; }> = ({ isSubmitting, onSubmit }) => {
+const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [onlineClubName, setOnlineClubName] = useState('');
+
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const numAmount = parseFloat(amount);
-        if (isNaN(numAmount) || !notes) {
-            alert('Please enter a valid amount and notes.');
+        if (isNaN(numAmount) || !notes || !onlineClubName) {
+            alert('Please enter a valid amount, notes, and select an online club.');
             return;
         }
-        onSubmit(numAmount, notes, date);
+        onSubmit(numAmount, notes, date, onlineClubName);
         setAmount('');
         setNotes('');
+        setOnlineClubName('');
     };
 
     return (
@@ -255,6 +263,19 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                             <Label htmlFor="pl-date">Date</Label>
                             <Input id="pl-date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
                         </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="online-club">Online Club</Label>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName} required>
+                            <SelectTrigger id="online-club">
+                                <SelectValue placeholder="Select an online club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {onlineClubs.map(club => (
+                                    <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="pl-notes">Notes</Label>
@@ -277,27 +298,30 @@ const EditPlDialog: FC<{
   onOpenChange: (open: boolean) => void;
   entry: OnlineLedgerEntry;
   isSubmitting: boolean;
-  onSubmit: (entryId: string, amount: number, notes: string, date: string) => void;
-}> = ({ isOpen, onOpenChange, entry, isSubmitting, onSubmit }) => {
+  onSubmit: (entryId: string, amount: number, notes: string, date: string, onlineClubName: string) => void;
+  onlineClubs: OnlineClub[];
+}> = ({ isOpen, onOpenChange, entry, isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState('');
+    const [onlineClubName, setOnlineClubName] = useState('');
 
     useEffect(() => {
         if (entry) {
             setAmount(String(entry.amount));
             setNotes(entry.notes);
             setDate(format(parseISO(entry.date), 'yyyy-MM-dd'));
+            setOnlineClubName(entry.onlineClubName || '');
         }
     }, [entry]);
 
     const handleSubmit = () => {
         const numAmount = parseFloat(amount);
-        if (isNaN(numAmount) || !notes) {
-            alert('Please enter a valid amount and notes.');
+        if (isNaN(numAmount) || !notes || !onlineClubName) {
+            alert('Please enter a valid amount, notes, and select an online club.');
             return;
         }
-        onSubmit(entry.id, numAmount, notes, date);
+        onSubmit(entry.id, numAmount, notes, date, onlineClubName);
     };
 
     return (
@@ -314,6 +338,19 @@ const EditPlDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="edit-pl-date">Date</Label>
                         <Input id="edit-pl-date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="edit-online-club">Online Club</Label>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName} required>
+                            <SelectTrigger id="edit-online-club">
+                                <SelectValue placeholder="Select an online club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {onlineClubs.map(club => (
+                                    <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="edit-pl-notes">Notes</Label>

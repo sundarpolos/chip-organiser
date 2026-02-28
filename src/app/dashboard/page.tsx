@@ -1368,6 +1368,14 @@ function DashboardContent() {
                       Online Club
                    </Link>
                 </DropdownMenuItem>
+                 {(isAdmin) && (
+                    <DropdownMenuItem asChild>
+                        <Link href="/online-club/admin">
+                            <Landmark className="h-4 w-4 mr-2" />
+                            Online Club Admin
+                        </Link>
+                    </DropdownMenuItem>
+                 )}
                 {isAdmin && (
                     <>
                     <DropdownMenuItem asChild>

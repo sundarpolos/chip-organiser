@@ -109,6 +109,12 @@ export interface SeatBooking {
 }
 
 // Types for Online Club feature
+export interface OnlineClub {
+  id: string;
+  name: string;
+  clubId: string; // The main club it belongs to
+}
+
 export interface OnlinePlayerAccount {
   id: string; // Corresponds to MasterPlayer ID
   playerId: string;
@@ -126,4 +132,5 @@ export interface OnlineLedgerEntry {
   date: string;
   notes: string;
   runningBalance: number;
+  onlineClubName?: string;
 }

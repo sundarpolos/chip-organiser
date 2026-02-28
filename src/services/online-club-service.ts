@@ -2,13 +2,15 @@
 'use server';
 
 import { db } from "@/lib/firebase";
-import { OnlinePlayerAccount, OnlineLedgerEntry, MasterPlayer } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, addDoc, query, where, getDoc, runTransaction, orderBy, deleteDoc } from "firebase/firestore";
+import { OnlinePlayerAccount, OnlineLedgerEntry, MasterPlayer, OnlineClub } from "@/lib/types";
+import { collection, getDocs, doc, setDoc, addDoc, query, where, getDoc, runTransaction, orderBy, deleteDoc, limit } from "firebase/firestore";
 
 const ONLINE_ACCOUNTS_COLLECTION = "onlinePlayerAccounts";
 const ONLINE_LEDGER_COLLECTION = "onlineLedger";
+const ONLINE_CLUBS_COLLECTION = "onlineClubs";
 
-// Get or create a player's online account
+// ====== ACCOUNT FUNCTIONS ======
+
 export async function getOnlinePlayerAccount(playerId: string): Promise<OnlinePlayerAccount> {
     const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, playerId);
     const accountSnap = await getDoc(accountRef);
@@ -16,7 +18,6 @@ export async function getOnlinePlayerAccount(playerId: string): Promise<OnlinePl
     if (accountSnap.exists()) {
         return { id: accountSnap.id, ...accountSnap.data() } as OnlinePlayerAccount;
     } else {
-        // If account doesn't exist, create it.
         const playerDoc = await getDoc(doc(db, "masterPlayers", playerId));
         if (!playerDoc.exists()) {
             throw new Error("Master player not found, cannot create online account.");
@@ -35,7 +36,22 @@ export async function getOnlinePlayerAccount(playerId: string): Promise<OnlinePl
     }
 }
 
-// Get all ledger entries for a player
+export async function getOnlinePlayerAccounts(clubId?: string): Promise<OnlinePlayerAccount[]> {
+    const q = clubId
+        ? query(collection(db, ONLINE_ACCOUNTS_COLLECTION), where("clubId", "==", clubId))
+        : collection(db, ONLINE_ACCOUNTS_COLLECTION);
+    
+    const querySnapshot = await getDocs(q);
+    const accounts: OnlinePlayerAccount[] = [];
+    querySnapshot.forEach((doc) => {
+        accounts.push({ id: doc.id, ...doc.data() } as OnlinePlayerAccount);
+    });
+    return accounts.sort((a,b) => a.playerName.localeCompare(b.name));
+}
+
+
+// ====== LEDGER FUNCTIONS ======
+
 export async function getOnlineLedgerEntries(accountId: string): Promise<OnlineLedgerEntry[]> {
     const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "desc"));
     const querySnapshot = await getDocs(q);
@@ -46,17 +62,12 @@ export async function getOnlineLedgerEntries(accountId: string): Promise<OnlineL
     return entries;
 }
 
-// Add a new P/L entry and update the account balance
-export async function addProfitLoss(accountId: string, amount: number, notes: string, date: string): Promise<void> {
+export async function addProfitLoss(accountId: string, amount: number, notes: string, date: string, onlineClubName: string): Promise<void> {
     await runTransaction(db, async (transaction) => {
         const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
         const accountDoc = await transaction.get(accountRef);
 
-        if (!accountDoc.exists()) {
-            throw new Error("Player account not found.");
-        }
-
-        const currentBalance = accountDoc.data().balance;
+        const currentBalance = accountDoc.exists() ? accountDoc.data().balance : 0;
         const newBalance = currentBalance + amount;
 
         const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
@@ -66,11 +77,60 @@ export async function addProfitLoss(accountId: string, amount: number, notes: st
             date,
             notes,
             runningBalance: newBalance,
+            onlineClubName,
+        };
+        
+        const newLedgerDocRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+        transaction.set(newLedgerDocRef, newLedgerEntry);
+
+        if (accountDoc.exists()) {
+             transaction.update(accountRef, {
+                balance: newBalance,
+                lastUpdated: new Date().toISOString(),
+            });
+        } else {
+            // This case should be handled by getOnlinePlayerAccount, but as a fallback:
+            const playerDoc = await getDoc(doc(db, "masterPlayers", accountId));
+            if (!playerDoc.exists()) throw new Error("Player not found.");
+            const playerData = playerDoc.data() as MasterPlayer;
+            transaction.set(accountRef, {
+                id: accountId,
+                playerId: accountId,
+                playerName: playerData.name,
+                clubId: playerData.clubId,
+                balance: newBalance,
+                lastUpdated: new Date().toISOString()
+            });
+        }
+    });
+}
+
+export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, notes: string): Promise<void> {
+    const transactionAmount = type === 'deposit' ? amount : -amount;
+
+    await runTransaction(db, async (transaction) => {
+        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+        const accountDoc = await transaction.get(accountRef);
+
+        if (!accountDoc.exists()) {
+            throw new Error("Player account not found.");
+        }
+
+        const currentBalance = accountDoc.data().balance;
+        const newBalance = currentBalance + transactionAmount;
+
+        const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
+            accountId,
+            type,
+            amount: transactionAmount,
+            date: new Date().toISOString(),
+            notes,
+            runningBalance: newBalance,
         };
 
-        const ledgerCollectionRef = collection(db, ONLINE_LEDGER_COLLECTION);
-        transaction.add(addDoc(ledgerCollectionRef, newLedgerEntry));
-
+        const newLedgerDocRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+        transaction.set(newLedgerDocRef, newLedgerEntry);
+        
         transaction.update(accountRef, {
             balance: newBalance,
             lastUpdated: new Date().toISOString(),
@@ -78,93 +138,95 @@ export async function addProfitLoss(accountId: string, amount: number, notes: st
     });
 }
 
-// Update an existing P/L entry
-export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newNotes: string, newDate: string): Promise<void> {
-    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+async function recalculateLedger(transaction: any, accountId: string, fromDate?: string) {
+    const entriesQuery = fromDate
+        ? query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), where("date", ">=", fromDate), orderBy("date", "asc"))
+        : query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
     
+    const entriesSnapshot = await transaction.get(entriesQuery);
+
+    let previousBalance = 0;
+    if (fromDate) {
+        const previousEntryQuery = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), where("date", "<", fromDate), orderBy("date", "desc"), limit(1));
+        const previousEntrySnapshot = await transaction.get(previousEntryQuery);
+        if (!previousEntrySnapshot.empty) {
+            previousBalance = previousEntrySnapshot.docs[0].data().runningBalance;
+        }
+    }
+
+    let currentBalance = previousBalance;
+    for (const doc of entriesSnapshot.docs) {
+        currentBalance += doc.data().amount;
+        transaction.update(doc.ref, { runningBalance: currentBalance });
+    }
+
+    return currentBalance;
+}
+
+export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newNotes: string, newDate: string, newOnlineClubName: string): Promise<void> {
     await runTransaction(db, async (transaction) => {
+        const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
         const entryDoc = await transaction.get(entryRef);
+
         if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
             throw new Error("Ledger entry not found or permission denied.");
         }
 
-        const oldAmount = entryDoc.data().amount;
-        const amountDifference = newAmount - oldAmount;
-
-        // Update the account balance
-        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-        const accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) {
-            throw new Error("Player account not found.");
-        }
-        const newBalance = accountDoc.data().balance + amountDifference;
-        transaction.update(accountRef, { 
-            balance: newBalance,
-            lastUpdated: new Date().toISOString(),
-        });
-
-        // Update the ledger entry itself
         transaction.update(entryRef, {
             amount: newAmount,
             notes: newNotes,
             date: newDate,
-        });
-
-        // Adjust subsequent running balances
-        const q = query(
-            collection(db, ONLINE_LEDGER_COLLECTION),
-            where("accountId", "==", accountId),
-            where("date", ">", entryDoc.data().date)
-        );
-        const subsequentDocs = await getDocs(q);
-        subsequentDocs.forEach(doc => {
-            const newRunningBalance = doc.data().runningBalance + amountDifference;
-            transaction.update(doc.ref, { runningBalance: newRunningBalance });
+            onlineClubName: newOnlineClubName,
         });
         
-        // Update the current entry's running balance too
-        transaction.update(entryRef, { runningBalance: entryDoc.data().runningBalance + amountDifference });
+        const earliestDate = entryDoc.data().date < newDate ? entryDoc.data().date : newDate;
+        const newBalance = await recalculateLedger(transaction, accountId, earliestDate);
 
+        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+        transaction.update(accountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
     });
 }
 
-// Delete a P/L entry
 export async function deleteProfitLoss(accountId: string, entryId: string): Promise<void> {
-    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
-
     await runTransaction(db, async (transaction) => {
+        const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
         const entryDoc = await transaction.get(entryRef);
+        
         if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
             throw new Error("Ledger entry not found or permission denied.");
         }
 
-        const deletedAmount = entryDoc.data().amount;
-
-        // Update account balance
-        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-        const accountDoc = await transaction.get(accountRef);
-        if (!accountDoc.exists()) {
-            throw new Error("Player account not found.");
-        }
-        const newBalance = accountDoc.data().balance - deletedAmount;
-        transaction.update(accountRef, {
-            balance: newBalance,
-            lastUpdated: new Date().toISOString(),
-        });
-        
-        // Adjust subsequent running balances
-        const q = query(
-            collection(db, ONLINE_LEDGER_COLLECTION),
-            where("accountId", "==", accountId),
-            where("date", ">", entryDoc.data().date)
-        );
-        const subsequentDocs = await getDocs(q);
-        subsequentDocs.forEach(doc => {
-            const newRunningBalance = doc.data().runningBalance - deletedAmount;
-            transaction.update(doc.ref, { runningBalance: newRunningBalance });
-        });
-        
-        // Delete the entry
+        const deletedEntryDate = entryDoc.data().date;
         transaction.delete(entryRef);
+
+        const newBalance = await recalculateLedger(transaction, accountId, deletedEntryDate);
+        
+        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+        transaction.update(accountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
     });
+}
+
+// ====== ONLINE CLUB MANAGEMENT ======
+
+export async function createOnlineClub(name: string, clubId: string): Promise<OnlineClub> {
+    const newOnlineClub = { name, clubId };
+    const docRef = await addDoc(collection(db, ONLINE_CLUBS_COLLECTION), newOnlineClub);
+    return { id: docRef.id, ...newOnlineClub };
+}
+
+export async function getOnlineClubs(clubId?: string): Promise<OnlineClub[]> {
+    const q = clubId 
+        ? query(collection(db, ONLINE_CLUBS_COLLECTION), where("clubId", "==", clubId))
+        : collection(db, ONLINE_CLUBS_COLLECTION);
+        
+    const querySnapshot = await getDocs(q);
+    const clubs: OnlineClub[] = [];
+    querySnapshot.forEach((doc) => {
+        clubs.push({ id: doc.id, ...doc.data() } as OnlineClub);
+    });
+    return clubs.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function deleteOnlineClub(onlineClubId: string): Promise<void> {
+    await deleteDoc(doc(db, ONLINE_CLUBS_COLLECTION, onlineClubId));
 }
