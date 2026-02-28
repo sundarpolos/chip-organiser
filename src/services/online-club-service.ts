@@ -4,6 +4,7 @@
 import { db } from "@/lib/firebase";
 import { OnlinePlayerAccount, OnlineLedgerEntry, MasterPlayer, OnlineClub } from "@/lib/types";
 import { collection, getDocs, doc, setDoc, addDoc, query, where, getDoc, runTransaction, orderBy, deleteDoc, limit } from "firebase/firestore";
+import { getActiveStakingAgreementForPlayer } from "./staking-service";
 
 const ONLINE_ACCOUNTS_COLLECTION = "onlinePlayerAccounts";
 const ONLINE_LEDGER_COLLECTION = "onlineLedger";
@@ -64,46 +65,83 @@ export async function getOnlineLedgerEntries(accountId: string): Promise<OnlineL
 
 export async function addProfitLoss(accountId: string, amount: number, notes: string, date: string, onlineClubName: string): Promise<void> {
     await runTransaction(db, async (transaction) => {
-        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-        const accountDoc = await transaction.get(accountRef);
+        const playerAccountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+        const playerAccountDoc = await transaction.get(playerAccountRef);
 
-        const currentBalance = accountDoc.exists() ? accountDoc.data().balance : 0;
-        const newBalance = currentBalance + amount;
-
-        const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
-            accountId,
-            type: 'p/l',
-            amount,
-            date,
-            notes,
-            runningBalance: newBalance,
-            onlineClubName,
-        };
+        if (!playerAccountDoc.exists()) {
+             throw new Error("Player account does not exist.");
+        }
+        const playerAccount = playerAccountDoc.data() as OnlinePlayerAccount;
         
-        const newLedgerDocRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
-        transaction.set(newLedgerDocRef, newLedgerEntry);
+        const stakingAgreement = await getActiveStakingAgreementForPlayer(accountId);
 
-        if (accountDoc.exists()) {
-             transaction.update(accountRef, {
-                balance: newBalance,
-                lastUpdated: new Date().toISOString(),
+        // If player is NOT being staked
+        if (!stakingAgreement) {
+            const newBalance = playerAccount.balance + amount;
+            transaction.update(playerAccountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
+            
+            const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
+                accountId, type: 'p/l', amount, date, notes, onlineClubName, runningBalance: newBalance
+            };
+            const newLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+            transaction.set(newLedgerRef, newLedgerEntry);
+            return;
+        }
+
+        // If player IS being staked
+        const stakerAccountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, stakingAgreement.stakerId);
+        const stakerAccountDoc = await transaction.get(stakerAccountRef);
+        if (!stakerAccountDoc.exists()) {
+             throw new Error("Staker's account does not exist.");
+        }
+        const stakerAccount = stakerAccountDoc.data() as OnlinePlayerAccount;
+
+        if (amount > 0) { // Profit
+            const playerShare = amount * (1 - stakingAgreement.percentage / 100);
+            const stakerShare = amount * (stakingAgreement.percentage / 100);
+
+            // Update player account
+            const newPlayerBalance = playerAccount.balance + playerShare;
+            transaction.update(playerAccountRef, { balance: newPlayerBalance, lastUpdated: new Date().toISOString() });
+            const playerLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+            transaction.set(playerLedgerRef, {
+                accountId, type: 'p/l', amount: playerShare, date, 
+                notes: `Original profit: ₹${amount.toFixed(2)}. Your share: ₹${playerShare.toFixed(2)}. Notes: ${notes}`, 
+                onlineClubName, runningBalance: newPlayerBalance, sourceEntryId: playerLedgerRef.id
             });
-        } else {
-            // This case should be handled by getOnlinePlayerAccount, but as a fallback:
-            const playerDoc = await getDoc(doc(db, "masterPlayers", accountId));
-            if (!playerDoc.exists()) throw new Error("Player not found.");
-            const playerData = playerDoc.data() as MasterPlayer;
-            transaction.set(accountRef, {
-                id: accountId,
-                playerId: accountId,
-                playerName: playerData.name,
-                clubId: playerData.clubId,
-                balance: newBalance,
-                lastUpdated: new Date().toISOString()
+
+            // Update staker account
+            const newStakerBalance = stakerAccount.balance + stakerShare;
+            transaction.update(stakerAccountRef, { balance: newStakerBalance, lastUpdated: new Date().toISOString() });
+            const stakerLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+            transaction.set(stakerLedgerRef, {
+                accountId: stakerAccount.id, type: 'staking-payout', amount: stakerShare, date, 
+                notes: `From ${playerAccount.playerName}'s profit of ₹${amount.toFixed(2)}`,
+                onlineClubName, runningBalance: newStakerBalance, sourcePlayerName: playerAccount.playerName, sourceEntryId: playerLedgerRef.id
+            });
+
+        } else { // Loss
+            // Update staker account with the full loss
+            const newStakerBalance = stakerAccount.balance + amount; // amount is negative
+            transaction.update(stakerAccountRef, { balance: newStakerBalance, lastUpdated: new Date().toISOString() });
+            const stakerLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+            transaction.set(stakerLedgerRef, {
+                accountId: stakerAccount.id, type: 'p/l', amount, date,
+                notes: `Loss from staked player ${playerAccount.playerName}. Notes: ${notes}`,
+                onlineClubName, runningBalance: newStakerBalance
+            });
+            
+            // Player's balance is unaffected, but we log the event for them
+            const playerLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
+            transaction.set(playerLedgerRef, {
+                accountId, type: 'p/l', amount: 0, date,
+                notes: `Loss of ₹${(-amount).toFixed(2)} covered by staker ${stakerAccount.playerName}. Notes: ${notes}`,
+                onlineClubName, runningBalance: playerAccount.balance
             });
         }
     });
 }
+
 
 export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, notes: string): Promise<void> {
     const transactionAmount = type === 'deposit' ? amount : -amount;
@@ -171,6 +209,16 @@ export async function updateProfitLoss(accountId: string, entryId: string, newAm
         if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
             throw new Error("Ledger entry not found or permission denied.");
         }
+         if (entryDoc.data().type !== 'p/l') {
+            throw new Error("Only P/L entries can be edited this way.");
+        }
+        
+        // Staking logic is complex for edits, for now, disallow editing staked entries.
+        // A full implementation would need to reverse the old transaction and apply the new one.
+        const stakingAgreement = await getActiveStakingAgreementForPlayer(accountId);
+        if (stakingAgreement && new Date(entryDoc.data().date) >= new Date(stakingAgreement.createdAt)) {
+            throw new Error("Cannot edit P/L entries made while being staked. Please ask your staker to adjust.");
+        }
 
         transaction.update(entryRef, {
             amount: newAmount,
@@ -194,6 +242,15 @@ export async function deleteProfitLoss(accountId: string, entryId: string): Prom
         
         if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
             throw new Error("Ledger entry not found or permission denied.");
+        }
+        if (entryDoc.data().type !== 'p/l') {
+            throw new Error("Only P/L entries can be deleted this way.");
+        }
+        
+        // Staking logic is complex for deletions, for now, disallow deleting staked entries.
+        const stakingAgreement = await getActiveStakingAgreementForPlayer(accountId);
+        if (stakingAgreement && new Date(entryDoc.data().date) >= new Date(stakingAgreement.createdAt)) {
+            throw new Error("Cannot delete P/L entries made while being staked. Please ask your staker to adjust.");
         }
 
         const deletedEntryDate = entryDoc.data().date;

@@ -133,4 +133,19 @@ export interface OnlineLedgerEntry {
   notes: string;
   runningBalance: number;
   onlineClubName?: string;
+  sourcePlayerName?: string; // e.g., For staking payouts, who generated the profit
+  sourceEntryId?: string; // Link back to the original P/L entry
+}
+
+export interface StakingAgreement {
+  id: string;
+  stakerId: string; // The player providing the funds (the backer)
+  stakerName: string;
+  stakedPlayerId: string; // The player whose action is being funded
+  stakedPlayerName: string;
+  percentage: number; // The percentage of PROFIT that goes to the staker
+  status: 'active' | 'cancelled';
+  createdAt: string;
+  cancelledAt?: string;
+  clubId: string;
 }

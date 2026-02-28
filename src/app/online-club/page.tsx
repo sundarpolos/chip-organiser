@@ -12,14 +12,16 @@ import {
   deleteProfitLoss,
   getOnlineClubs
 } from '@/services/online-club-service';
-import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, OnlineClub } from '@/lib/types';
+import { getMasterPlayers } from '@/services/player-service';
+import { getActiveStakingAgreementForPlayer, getAgreementsByPlayer, createStakingAgreement, cancelStakingAgreement } from '@/services/staking-service';
+import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, OnlineClub, StakingAgreement } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, Users } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -36,6 +38,12 @@ const OnlineClubPage: FC = () => {
     const [onlineClubs, setOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
+    // Staking State
+    const [clubPlayers, setClubPlayers] = useState<MasterPlayer[]>([]);
+    const [agreementStakingMe, setAgreementStakingMe] = useState<StakingAgreement | null>(null);
+    const [agreementsWhereIAmStaker, setAgreementsWhereIAmStaker] = useState<StakingAgreement[]>([]);
+    const [isStakingModalOpen, setStakingModalOpen] = useState(false);
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
@@ -52,14 +60,20 @@ const OnlineClubPage: FC = () => {
     const refreshData = async () => {
         if (!currentUser) return;
         try {
-            const [playerAccount, playerLedger, clubs] = await Promise.all([
+            const [playerAccount, playerLedger, clubs, allPlayers, agreementStakingMe, agreementsIAmStaker] = await Promise.all([
                 getOnlinePlayerAccount(currentUser.id),
                 getOnlineLedgerEntries(currentUser.id),
                 getOnlineClubs(currentUser.clubId),
+                getMasterPlayers(),
+                getActiveStakingAgreementForPlayer(currentUser.id),
+                getAgreementsByPlayer(currentUser.id, 'staker'),
             ]);
             setAccount(playerAccount);
             setLedger(playerLedger);
             setOnlineClubs(clubs);
+            setClubPlayers(allPlayers.filter(p => p.clubId === currentUser.clubId && p.id !== currentUser.id));
+            setAgreementStakingMe(agreementStakingMe);
+            setAgreementsWhereIAmStaker(agreementsIAmStaker);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load online account data.' });
         } finally {
@@ -71,7 +85,7 @@ const OnlineClubPage: FC = () => {
         if (currentUser) {
             refreshData();
         }
-    }, [currentUser, toast]);
+    }, [currentUser]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -116,6 +130,35 @@ const OnlineClubPage: FC = () => {
             toast({ variant: 'destructive', title: 'Error', description: msg });
         }
     };
+    
+    const handleCreateStakingAgreement = async (stakedPlayerId: string, percentage: number) => {
+        if (!currentUser) return;
+        try {
+            await createStakingAgreement({
+                stakerId: currentUser.id,
+                stakedPlayerId,
+                percentage,
+                clubId: currentUser.clubId,
+            });
+            toast({ title: 'Staking Started!', description: `You are now staking the selected player.`});
+            await refreshData();
+        } catch (error) {
+             const msg = error instanceof Error ? error.message : 'Could not create staking agreement.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        }
+    };
+
+    const handleCancelStakingAgreement = async (agreementId: string) => {
+        try {
+            await cancelStakingAgreement(agreementId);
+            toast({ title: 'Staking Agreement Cancelled' });
+            await refreshData();
+        } catch (error) {
+             const msg = error instanceof Error ? error.message : 'Could not cancel agreement.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        }
+    };
+
 
     if (isLoading) {
         return (
@@ -148,8 +191,20 @@ const OnlineClubPage: FC = () => {
                     <p className="text-sm text-muted-foreground">Last updated: {account ? format(parseISO(account.lastUpdated), 'PPP p') : 'N/A'}</p>
                 </CardContent>
             </Card>
+            
+            <StakingDashboard
+                agreementStakingMe={agreementStakingMe}
+                agreementsWhereIAmStaker={agreementsWhereIAmStaker}
+                onOpenCreateDialog={() => setStakingModalOpen(true)}
+                onCancelAgreement={handleCancelStakingAgreement}
+            />
 
-            <SubmitPlCard isSubmitting={isSubmitting} onSubmit={handlePlSubmit} onlineClubs={onlineClubs} />
+            <SubmitPlCard 
+                isSubmitting={isSubmitting} 
+                onSubmit={handlePlSubmit} 
+                onlineClubs={onlineClubs} 
+                isStaked={!!agreementStakingMe}
+            />
 
             <Card>
                 <CardHeader>
@@ -223,16 +278,143 @@ const OnlineClubPage: FC = () => {
                 onlineClubs={onlineClubs}
               />
             )}
+             <CreateStakingDialog
+                isOpen={isStakingModalOpen}
+                onOpenChange={setStakingModalOpen}
+                players={clubPlayers}
+                onSubmit={handleCreateStakingAgreement}
+            />
         </div>
     );
 };
 
-const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
+const StakingDashboard: FC<{
+    agreementStakingMe: StakingAgreement | null;
+    agreementsWhereIAmStaker: StakingAgreement[];
+    onOpenCreateDialog: () => void;
+    onCancelAgreement: (agreementId: string) => void;
+}> = ({ agreementStakingMe, agreementsWhereIAmStaker, onOpenCreateDialog, onCancelAgreement }) => {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Users /> Staking Dashboard</CardTitle>
+                <CardDescription>Manage your staking agreements. You can stake other players or be staked by them.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 className="font-semibold mb-2">Who is Staking Me?</h3>
+                    {agreementStakingMe ? (
+                        <div className="p-3 border rounded-md bg-muted/50">
+                            <p>You are currently being staked by <strong>{agreementStakingMe.stakerName}</strong>.</p>
+                            <p className="text-sm text-muted-foreground">They receive {agreementStakingMe.percentage}% of your profits. Losses are covered by them.</p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">No one is currently staking you.</p>
+                    )}
+                </div>
+                 <div>
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-semibold">Players You Are Staking</h3>
+                        <Button size="sm" onClick={onOpenCreateDialog}><Plus className="mr-2 h-4 w-4" /> New Stake</Button>
+                    </div>
+                     {agreementsWhereIAmStaker.length > 0 ? (
+                        <div className="space-y-2">
+                            {agreementsWhereIAmStaker.map(agreement => (
+                                <div key={agreement.id} className="p-3 border rounded-md flex justify-between items-center">
+                                    <div>
+                                        <p>You are staking <strong>{agreement.stakedPlayerName}</strong>.</p>
+                                        <p className="text-sm text-muted-foreground">You receive {agreement.percentage}% of their profits and cover 100% of their losses.</p>
+                                    </div>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="sm">End</Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>End Staking Agreement?</AlertDialogTitle>
+                                                <AlertDialogDescription>Are you sure you want to stop staking {agreement.stakedPlayerName}? This cannot be undone.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => onCancelAgreement(agreement.id)}>Confirm & End</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">You are not currently staking any players.</p>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+const CreateStakingDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    players: MasterPlayer[];
+    onSubmit: (stakedPlayerId: string, percentage: number) => void;
+}> = ({ isOpen, onOpenChange, players, onSubmit }) => {
+    const [stakedPlayerId, setStakedPlayerId] = useState('');
+    const [percentage, setPercentage] = useState(50);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!stakedPlayerId || percentage <= 0 || percentage >= 100) {
+            alert('Please select a player and enter a percentage between 1 and 99.');
+            return;
+        }
+        setIsSubmitting(true);
+        await onSubmit(stakedPlayerId, percentage);
+        setIsSubmitting(false);
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Create New Staking Agreement</DialogTitle>
+                    <DialogDescription>Select a player to stake and the percentage of their profit you will receive.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="staked-player">Player to Stake</Label>
+                        <Select value={stakedPlayerId} onValueChange={setStakedPlayerId}>
+                            <SelectTrigger id="staked-player">
+                                <SelectValue placeholder="Select a player from your club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {players.map(p => (
+                                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="stake-percentage">Your Profit Share (%)</Label>
+                        <Input id="stake-percentage" type="number" min="1" max="99" value={percentage} onChange={e => setPercentage(Number(e.target.value))} />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="animate-spin"/> : "Create Agreement"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[], isStaked: boolean }> = ({ isSubmitting, onSubmit, onlineClubs, isStaked }) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [onlineClubName, setOnlineClubName] = useState('');
-
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -251,6 +433,7 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
         <Card>
             <CardHeader>
                 <CardTitle>Submit Daily Profit/Loss</CardTitle>
+                 {isStaked && <CardDescription className="text-amber-600 font-semibold">Note: You are currently being staked. Profits and losses will be split automatically.</CardDescription>}
             </CardHeader>
             <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
