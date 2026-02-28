@@ -107,3 +107,23 @@ export interface SeatBooking {
   otp?: string;
   otpExpiresAt?: string;
 }
+
+// Types for Online Club feature
+export interface OnlinePlayerAccount {
+  id: string; // Corresponds to MasterPlayer ID
+  playerId: string;
+  playerName: string;
+  clubId: string;
+  balance: number;
+  lastUpdated: string;
+}
+
+export interface OnlineLedgerEntry {
+  id: string;
+  accountId: string;
+  type: 'p/l' | 'deposit' | 'withdrawal' | 'staking-payout';
+  amount: number;
+  date: string;
+  notes: string;
+  runningBalance: number;
+}

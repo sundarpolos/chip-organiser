@@ -111,6 +111,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Copy,
+  Landmark,
 } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
@@ -1361,6 +1362,12 @@ function DashboardContent() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                 <DropdownMenuItem asChild>
+                   <Link href="/online-club">
+                      <Landmark className="h-4 w-4 mr-2" />
+                      Online Club
+                   </Link>
+                </DropdownMenuItem>
                 {isAdmin && (
                     <>
                     <DropdownMenuItem asChild>
