@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { db } from "@/lib/firebase";
@@ -53,13 +54,13 @@ export async function getOnlinePlayerAccounts(clubId?: string): Promise<OnlinePl
 // ====== LEDGER FUNCTIONS ======
 
 export async function getOnlineLedgerEntries(accountId: string): Promise<OnlineLedgerEntry[]> {
-    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "desc"));
+    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId));
     const querySnapshot = await getDocs(q);
     const entries: OnlineLedgerEntry[] = [];
     querySnapshot.forEach((doc) => {
         entries.push({ id: doc.id, ...doc.data() } as OnlineLedgerEntry);
     });
-    return entries;
+    return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export async function addProfitLoss(accountId: string, amount: number, notes: string, date: string, onlineClubName: string): Promise<void> {

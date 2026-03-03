@@ -131,7 +131,7 @@ import { getMasterVenues, saveMasterVenue, deleteMasterVenue } from "@/services/
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClub, getClubs } from "@/services/club-service"
-import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, getPlayerBookingForGame, updateSeatBooking, cancelSeatBooking, getScheduledGame, createScheduledGame, deleteScheduledGame } from "@/services/booking-service"
+import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, updateSeatBooking, cancelSeatBooking, getScheduledGame, createScheduledGame, deleteScheduledGame } from "@/services/booking-service"
 
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
@@ -3374,7 +3374,7 @@ const BookingView: FC<{
             for (const game of games) {
                 const gameBookings = await getSeatBookingsForGame(game.id);
                 allBookings[game.id] = gameBookings;
-                const playerBooking = await getPlayerBookingForGame(currentUser.id, game.id);
+                const playerBooking = gameBookings.find(b => b.playerId === currentUser.id) || null;
                 playerBookings[game.id] = playerBooking;
             }
             setBookings(allBookings);
@@ -3891,3 +3891,4 @@ export default function DashboardPage() {
 
 
     
+
