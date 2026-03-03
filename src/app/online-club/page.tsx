@@ -282,7 +282,8 @@ const OnlineClubPage: FC = () => {
                 doc.setFontSize(8);
                 doc.setFont('helvetica', 'normal');
                 balanceByClub.slice().reverse().forEach((clubBalance, index) => {
-                    const text = `${clubBalance.name}: ${clubBalance.currency}${clubBalance.balance.toFixed(0)}`;
+                    const currency = clubBalance.name === 'Phoenix' ? 'Rs.' : clubBalance.currency;
+                    const text = `${clubBalance.name}: ${currency}${clubBalance.balance.toFixed(0)}`;
                     const textWidth = doc.getTextWidth(text) + 12; // with padding
                     
                     if (currentX - textWidth < 20) { 
@@ -333,12 +334,15 @@ const OnlineClubPage: FC = () => {
                 const clubBalance = balanceByClub.find(b => b.name === clubName);
 
                 const tableColumn = ["Date", "Type", "Notes", "Amount"];
-                const tableRows = clubEntries.map(entry => [
-                    format(parseISO(entry.date), 'dd/MM/yyyy p'),
-                    entry.type.toUpperCase(),
-                    entry.notes || '-',
-                    `${entry.amount >= 0 ? '+' : '-'}${clubBalance?.currency || '₹'} ${Math.abs(entry.amount).toFixed(0).split('').join(' ')}`,
-                ]);
+                const tableRows = clubEntries.map(entry => {
+                    const currency = clubName === 'Phoenix' ? 'Rs.' : (clubBalance?.currency || '₹');
+                    return [
+                        format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                        entry.type.toUpperCase(),
+                        entry.notes || '-',
+                        `${entry.amount >= 0 ? '+' : '-'}${currency} ${Math.abs(entry.amount).toFixed(0).split('').join(' ')}`,
+                    ];
+                });
 
                 // Add a header for the club section
                 doc.setFontSize(14);
