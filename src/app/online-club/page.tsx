@@ -50,8 +50,44 @@ const OnlineClubPage: FC = () => {
         }
     }, [router]);
 
+    useEffect(() => {
+        const refreshData = async () => {
+            if (!currentUser) return;
+            setIsLoading(true);
+            try {
+                const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
+                const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
+
+                if (!activeClubId) {
+                    toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
+                    setIsLoading(false);
+                    return;
+                }
+
+                const [playerAccount, playerLedger, clubs] = await Promise.all([
+                    getOnlinePlayerAccount(currentUser.id),
+                    getOnlineLedgerEntries(currentUser.id),
+                    getOnlineClubs(activeClubId),
+                ]);
+                setAccount(playerAccount);
+                setLedger(playerLedger);
+                setOnlineClubs(clubs);
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
+                toast({ variant: 'destructive', title: 'Error', description: msg });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (currentUser) {
+            refreshData();
+        }
+    }, [currentUser, toast]);
+
     const refreshData = useCallback(async () => {
         if (!currentUser) return;
+        setIsLoading(true);
         try {
             const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
             const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
@@ -77,12 +113,6 @@ const OnlineClubPage: FC = () => {
             setIsLoading(false);
         }
     }, [currentUser, toast]);
-
-    useEffect(() => {
-        if (currentUser) {
-            refreshData();
-        }
-    }, [currentUser, refreshData]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
