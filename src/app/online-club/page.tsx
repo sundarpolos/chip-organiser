@@ -74,7 +74,7 @@ const OnlineClubPage: FC = () => {
             ]);
 
             setAccount(playerAccount);
-            setLedger(playerLedger);
+            setLedger(playerLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
             setOnlineClubs(clubs);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
@@ -110,11 +110,11 @@ const OnlineClubPage: FC = () => {
         };
     }, [currentUser, refreshData]);
 
-    const handlePlSubmit = async (amount: number, date: string, onlineClubName: string) => {
+    const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            await addProfitLoss(currentUser.id, amount, "", date, onlineClubName);
+            await addProfitLoss(currentUser.id, amount, notes, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L has been recorded.' });
             await refreshData(false);
         } catch (error) {
@@ -269,8 +269,9 @@ const OnlineClubPage: FC = () => {
     );
 };
 
-const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
+const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
+    const [notes, setNotes] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [onlineClubName, setOnlineClubName] = useState('');
 
@@ -281,8 +282,9 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, date:
             alert('Please enter a valid amount and select an online club.');
             return;
         }
-        onSubmit(numAmount, date, onlineClubName);
+        onSubmit(numAmount, notes, date, onlineClubName);
         setAmount('');
+        setNotes('');
         setOnlineClubName('');
     };
 
@@ -321,6 +323,10 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, date:
                                 )}
                             </SelectContent>
                         </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="pl-notes">Notes</Label>
+                        <Textarea id="pl-notes" placeholder="e.g. PokerBaazi session, 2 tables" value={notes} onChange={e => setNotes(e.target.value)} required />
                     </div>
                 </CardContent>
                 <CardFooter>
