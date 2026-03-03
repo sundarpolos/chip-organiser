@@ -76,8 +76,12 @@ export async function addProfitLoss(accountId: string, amount: number, notes: st
         const newBalance = playerAccount.balance + amount;
         transaction.update(accountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
         
+        // Convert yyyy-MM-dd to a full ISO string so it sorts correctly with transaction dates
+        const newDate = new Date(date);
+        newDate.setHours(12, 0, 0, 0); // Set to midday to avoid timezone issues.
+        
         const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
-            accountId, type: 'p/l', amount, date, notes, onlineClubName, runningBalance: newBalance
+            accountId, type: 'p/l', amount, date: newDate.toISOString(), notes, onlineClubName, runningBalance: newBalance
         };
         const newLedgerRef = doc(collection(db, ONLINE_LEDGER_COLLECTION));
         transaction.set(newLedgerRef, newLedgerEntry);
@@ -121,27 +125,52 @@ export async function recordTransaction(accountId: string, type: 'deposit' | 'wi
 export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newNotes: string, newDate: string, newOnlineClubName: string): Promise<void> {
     const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
     const entryDoc = await getDoc(entryRef);
+
     if (!entryDoc.exists() || entryDoc.data().accountId !== accountId || entryDoc.data().type !== 'p/l') {
         throw new Error("Ledger entry not found, is not a P/L entry, or permission denied.");
     }
     
     // 1. Update the single document
+    const updatedDate = new Date(newDate);
+    updatedDate.setHours(12, 0, 0, 0); // Set to midday for consistency
     await setDoc(entryRef, {
         amount: newAmount,
         notes: newNotes,
-        date: newDate,
+        date: updatedDate.toISOString(),
         onlineClubName: newOnlineClubName,
     }, { merge: true });
 
-    // 2. Refetch all entries for the account, sorted by date
-    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
+    // After updating, recalculate everything.
+    await recalculateAccountBalance(accountId);
+}
+
+export async function deleteProfitLoss(accountId: string, entryId: string): Promise<void> {
+    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+    const entryDoc = await getDoc(entryRef);
+    if (!entryDoc.exists() || entryDoc.data().accountId !== accountId || entryDoc.data().type !== 'p/l') {
+        throw new Error("Ledger entry not found, is not a P/L entry, or permission denied.");
+    }
+
+    // 1. Delete the doc
+    await deleteDoc(entryRef);
+
+    // 2. Recalculate everything
+    await recalculateAccountBalance(accountId);
+}
+
+async function recalculateAccountBalance(accountId: string): Promise<void> {
+    // 1. Refetch all entries for the account
+    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId));
     const querySnapshot = await getDocs(q);
     const entries: OnlineLedgerEntry[] = [];
     querySnapshot.forEach(doc => {
         entries.push({ id: doc.id, ...doc.data() } as OnlineLedgerEntry);
     });
 
-    // 3. Recalculate running balances for all entries
+    // 2. Sort entries chronologically
+    entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // 3. Recalculate running balances for all entries in a batch
     const batch = writeBatch(db);
     let currentBalance = 0;
     for (const entry of entries) {
@@ -156,41 +185,6 @@ export async function updateProfitLoss(accountId: string, entryId: string, newAm
     const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
     batch.update(accountRef, { balance: currentBalance, lastUpdated: new Date().toISOString() });
     
-    // 5. Commit all changes
-    await batch.commit();
-}
-
-export async function deleteProfitLoss(accountId: string, entryId: string): Promise<void> {
-    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
-    const entryDoc = await getDoc(entryRef);
-    if (!entryDoc.exists() || entryDoc.data().accountId !== accountId || entryDoc.data().type !== 'p/l') {
-        throw new Error("Ledger entry not found, is not a P/L entry, or permission denied.");
-    }
-
-    // 1. Delete the doc
-    await deleteDoc(entryRef);
-
-    // 2. Refetch all entries for the account, sorted by date
-    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
-    const querySnapshot = await getDocs(q);
-    const entries: OnlineLedgerEntry[] = [];
-    querySnapshot.forEach(doc => {
-        entries.push({ id: doc.id, ...doc.data() } as OnlineLedgerEntry);
-    });
-
-    // 3. Recalculate running balances for all entries
-    const batch = writeBatch(db);
-    let currentBalance = 0;
-    for (const entry of entries) {
-        currentBalance += entry.amount;
-        const entryRefToUpdate = doc(db, ONLINE_LEDGER_COLLECTION, entry.id);
-        batch.update(entryRefToUpdate, { runningBalance: currentBalance });
-    }
-
-    // 4. Update the main account balance
-    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-    batch.update(accountRef, { balance: currentBalance, lastUpdated: new Date().toISOString() });
-
     // 5. Commit all changes
     await batch.commit();
 }
