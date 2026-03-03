@@ -5,9 +5,9 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
-import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club } from '@/lib/types';
+import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club, OnlineClub } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -27,6 +27,7 @@ const AdminOnlineClubPage: FC = () => {
     const [currentUser, setCurrentUser] = useState<MasterPlayer | null>(null);
     const [accounts, setAccounts] = useState<OnlinePlayerAccount[]>([]);
     const [allClubs, setAllClubs] = useState<Club[]>([]);
+    const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     
@@ -70,12 +71,14 @@ const AdminOnlineClubPage: FC = () => {
         if (!currentUser) return;
         setIsLoading(true);
         try {
-            const [playerAccounts, clubs] = await Promise.all([
+            const [playerAccounts, clubs, onlineClubs] = await Promise.all([
                 getOnlinePlayerAccounts(),
-                isSuperAdmin ? getClubs() : Promise.resolve([])
+                isSuperAdmin ? getClubs() : Promise.resolve([]),
+                getOnlineClubs(),
             ]);
             setAccounts(playerAccounts);
             setAllClubs(clubs);
+            setAllOnlineClubs(onlineClubs);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -311,6 +314,7 @@ const AdminOnlineClubPage: FC = () => {
                         account={selectedAccount}
                         type={transactionType}
                         onSuccess={refreshData}
+                        onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
                     />
                     <LedgerDialog
                         isOpen={isLedgerModalOpen}
@@ -337,6 +341,7 @@ const AdminOnlineClubPage: FC = () => {
                                 setPlayerLedger(ledger);
                                 setLedgerModalOpen(true);
                             }}
+                            onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
                         />
                     )}
                 </>
@@ -351,18 +356,21 @@ const TransactionDialog: FC<{
     account: OnlinePlayerAccount;
     type: 'deposit' | 'withdrawal';
     onSuccess: () => void;
-}> = ({ isOpen, onOpenChange, account, type, onSuccess }) => {
+    onlineClubs: OnlineClub[];
+}> = ({ isOpen, onOpenChange, account, type, onSuccess, onlineClubs }) => {
     const { toast } = useToast();
     const [amount, setAmount] = useState('');
     const [paymentMode, setPaymentMode] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [onlineClubName, setOnlineClubName] = useState('');
     
     useEffect(() => {
         if (isOpen) {
             setAmount('');
             setPaymentMode('');
             setDate(format(new Date(), 'yyyy-MM-dd'));
+            setOnlineClubName('');
         }
     }, [isOpen]);
 
@@ -376,9 +384,13 @@ const TransactionDialog: FC<{
             toast({ variant: 'destructive', title: 'Payment Mode Required', description: 'Please select a payment mode.' });
             return;
         }
+        if (!onlineClubName) {
+            toast({ variant: 'destructive', title: 'Online Club Required', description: 'Please select an online club.' });
+            return;
+        }
         setIsSubmitting(true);
         try {
-            await recordTransaction(account.id, type, numAmount, paymentMode, date);
+            await recordTransaction(account.id, type, numAmount, paymentMode, date, onlineClubName);
             toast({ title: 'Success', description: `Transaction recorded for ${account.playerName}.` });
             onSuccess();
             onOpenChange(false);
@@ -417,6 +429,25 @@ const TransactionDialog: FC<{
                                 <SelectItem value="Net Banking">Net Banking</SelectItem>
                                 <SelectItem value="Cash">Cash</SelectItem>
                                 <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="tx-online-club">Online Club</Label>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName}>
+                            <SelectTrigger id="tx-online-club">
+                                <SelectValue placeholder="Select an online club" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {onlineClubs && onlineClubs.length > 0 ? (
+                                    onlineClubs.map(club => (
+                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No online clubs found for this club.
+                                    </div>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
@@ -513,18 +544,21 @@ const EditTransactionDialog: FC<{
     onOpenChange: (open: boolean) => void;
     entry: OnlineLedgerEntry;
     onSuccess: () => void;
-}> = ({ isOpen, onOpenChange, entry, onSuccess }) => {
+    onlineClubs: OnlineClub[];
+}> = ({ isOpen, onOpenChange, entry, onSuccess, onlineClubs }) => {
     const { toast } = useToast();
     const [amount, setAmount] = useState('');
     const [paymentMode, setPaymentMode] = useState('');
     const [date, setDate] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [onlineClubName, setOnlineClubName] = useState('');
     
     useEffect(() => {
         if (isOpen && entry) {
             setAmount(String(Math.abs(entry.amount)));
             setPaymentMode(entry.notes);
             setDate(format(parseISO(entry.date), 'yyyy-MM-dd'));
+            setOnlineClubName(entry.onlineClubName || '');
         }
     }, [isOpen, entry]);
 
@@ -538,9 +572,13 @@ const EditTransactionDialog: FC<{
             toast({ variant: 'destructive', title: 'Payment Mode Required' });
             return;
         }
+        if (!onlineClubName) {
+            toast({ variant: 'destructive', title: 'Online Club Required' });
+            return;
+        }
         setIsSubmitting(true);
         try {
-            await updateTransaction(entry.accountId, entry.id, numAmount, paymentMode, date);
+            await updateTransaction(entry.accountId, entry.id, numAmount, paymentMode, date, onlineClubName);
             toast({ title: 'Success', description: `Transaction updated.` });
             onSuccess();
             onOpenChange(false);
@@ -578,6 +616,25 @@ const EditTransactionDialog: FC<{
                                 <SelectItem value="Net Banking">Net Banking</SelectItem>
                                 <SelectItem value="Cash">Cash</SelectItem>
                                 <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-tx-online-club">Online Club</Label>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName}>
+                            <SelectTrigger id="edit-tx-online-club">
+                                <SelectValue placeholder="Select an online club" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {onlineClubs && onlineClubs.length > 0 ? (
+                                    onlineClubs.map(club => (
+                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No online clubs found.
+                                    </div>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>

@@ -78,7 +78,7 @@ export async function addProfitLoss(accountId: string, amount: number, notes: st
 }
 
 
-export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, paymentMode: string, date?: string): Promise<void> {
+export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, paymentMode: string, date: string, onlineClubName: string): Promise<void> {
     const transactionAmount = type === 'deposit' ? amount : -amount;
 
     let transactionDate: Date;
@@ -96,6 +96,7 @@ export async function recordTransaction(accountId: string, type: 'deposit' | 'wi
         amount: transactionAmount,
         date: transactionDate.toISOString(),
         notes: paymentMode,
+        onlineClubName,
         runningBalance: 0, // Placeholder, will be fixed by recalculation
     };
     
@@ -140,7 +141,8 @@ export async function updateTransaction(
   entryId: string,
   newAmount: number,
   newPaymentMode: string,
-  newDate: string
+  newDate: string,
+  newOnlineClubName: string
 ): Promise<void> {
   const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
   const entryDoc = await getDoc(entryRef);
@@ -163,6 +165,7 @@ export async function updateTransaction(
     amount: transactionAmount,
     notes: newPaymentMode,
     date: updatedDate.toISOString(),
+    onlineClubName: newOnlineClubName,
   }, { merge: true });
 
   await recalculateAccountBalance(accountId);
