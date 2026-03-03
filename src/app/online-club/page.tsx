@@ -228,7 +228,7 @@ const OnlineClubPage: FC = () => {
                 format(parseISO(entry.date), 'dd/MM/yyyy p'),
                 entry.type.toUpperCase(),
                 entry.onlineClubName || '-',
-                `${accountCurrency}${entry.amount.toFixed(0)}`,
+                `${entry.amount >= 0 ? '+' : '-'}${accountCurrency}${Math.abs(entry.amount).toFixed(0)}`,
                 `${accountCurrency}${entry.runningBalance.toFixed(0)}`,
             ]);
 
@@ -421,7 +421,7 @@ const OnlineClubPage: FC = () => {
                                             <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                             <TableCell>{entry.notes}</TableCell>
                                             <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(0)}
+                                                {entry.amount >= 0 ? `+${accountCurrency}` : `-${accountCurrency}`}{Math.abs(entry.amount).toFixed(0)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
                                             <TableCell className="text-right">
@@ -435,7 +435,7 @@ const OnlineClubPage: FC = () => {
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
+                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
