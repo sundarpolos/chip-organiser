@@ -28,6 +28,8 @@ import { getClub } from '@/services/club-service';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -46,6 +48,16 @@ const OnlineClubPage: FC = () => {
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
+
+    const badgeColors = [
+        "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+        "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+        "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+        "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+        "bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300",
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+    ];
 
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -351,31 +363,6 @@ const OnlineClubPage: FC = () => {
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Balances by Online Club</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {balanceByClub.map(clubBalance => (
-                        <Card key={clubBalance.name} className="flex flex-col">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{clubBalance.name}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className={`text-2xl font-bold ${clubBalance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {clubBalance.currency}{clubBalance.balance.toFixed(0)}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                    {balanceByClub.length === 0 && (
-                        <p className="text-muted-foreground col-span-full text-center">
-                            No transactions with an assigned online club found.
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-
             <SubmitPlCard 
                 isSubmitting={isSubmitting} 
                 onSubmit={handlePlSubmit} 
@@ -384,15 +371,17 @@ const OnlineClubPage: FC = () => {
 
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <CardTitle>Recent Transactions</CardTitle>
-                             <CardDescription>
-                                Current Balance: 
-                                <span className={`font-bold ml-2 ${totalBalanceForTab >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                    {currencyForTab}{totalBalanceForTab.toFixed(0)}
-                                </span>
-                            </CardDescription>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {balanceByClub.map((clubBalance, index) => (
+                                     <Badge key={clubBalance.name} className={cn('font-semibold', badgeColors[index % badgeColors.length])}>
+                                        {clubBalance.name}: {clubBalance.currency}{clubBalance.balance.toFixed(0)}
+                                    </Badge>
+                                ))}
+                                {balanceByClub.length === 0 && <p className="text-sm text-muted-foreground">No balances to display.</p>}
+                            </div>
                         </div>
                         <Button onClick={handleExportPdf} disabled={isExporting || ledger.length === 0}>
                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
