@@ -305,7 +305,7 @@ const OnlineClubPage: FC = () => {
                     doc.setTextColor(textMuted);
                     doc.text(label, x, cardY);
                     doc.setFontSize(14);
-                    doc.setFont('helvetica', 'bold');
+                    doc.setFont('courier', 'bold');
                     doc.setTextColor(color);
                     doc.text(value, x, cardY + 8);
                 }
@@ -354,7 +354,13 @@ const OnlineClubPage: FC = () => {
                     theme: 'plain',
                     headStyles: { textColor: textMuted, fontStyle: 'bold', fontSize: 9 },
                     styles: { font: 'helvetica', textColor: textPrimary, fontSize: 10 },
-                    columnStyles: { 3: { halign: 'right' } },
+                    columnStyles: { 
+                        3: { 
+                            halign: 'right',
+                            font: 'courier', // Using a monospaced font
+                            fontStyle: 'bold'
+                        } 
+                    },
                     willDrawCell: (data: any) => {
                         doc.setTextColor(textPrimary);
                         if (data.column.index === 3 && data.section === 'body') {
