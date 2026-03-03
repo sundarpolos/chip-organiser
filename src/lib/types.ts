@@ -113,6 +113,7 @@ export interface OnlineClub {
   id: string;
   name: string;
   clubId: string; // The main club it belongs to
+  currency?: string;
 }
 
 export interface OnlinePlayerAccount {

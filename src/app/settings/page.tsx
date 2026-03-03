@@ -42,7 +42,7 @@ import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { assignGroupIdToSmartClub } from '@/services/migration-service';
 import { Separator } from '@/components/ui/separator';
-import { createOnlineClub, getOnlineClubs, deleteOnlineClub } from '@/services/online-club-service';
+import { createOnlineClub, getOnlineClubs, deleteOnlineClub, updateOnlineClub } from '@/services/online-club-service';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -1876,6 +1876,80 @@ const SendGameAnnouncementDialog: FC<{
     );
 };
 
+const CreateEditOnlineClubDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    club: Club | null;
+    onSave: () => Promise<void>;
+    onlineClubToEdit?: OnlineClub | null;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, club, onSave, onlineClubToEdit, toast }) => {
+    const [name, setName] = useState('');
+    const [currency, setCurrency] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            if (onlineClubToEdit) {
+                setName(onlineClubToEdit.name);
+                setCurrency(onlineClubToEdit.currency || 'INR');
+            } else {
+                setName('');
+                setCurrency('INR');
+            }
+        }
+    }, [onlineClubToEdit, isOpen]);
+
+    const handleSave = async () => {
+        if (!name.trim() || !club) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Online club name is required.' });
+            return;
+        }
+        setIsSaving(true);
+        try {
+            if (onlineClubToEdit) {
+                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR' });
+                toast({ title: 'Success', description: `Online club "${name.trim()}" updated.` });
+            } else {
+                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR');
+                toast({ title: 'Success', description: `Online club "${name.trim()}" created.` });
+            }
+            await onSave();
+            onOpenChange(false);
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to save online club.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{onlineClubToEdit ? 'Edit' : 'Create'} Online Club for {club?.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="online-club-name">Online Club Name</Label>
+                        <Input id="online-club-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., PokerBaazi" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="online-club-currency">Currency</Label>
+                        <Input id="online-club-currency" value={currency} onChange={e => setCurrency(e.target.value)} placeholder="e.g., INR" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="animate-spin" /> : 'Save'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const OnlineClubManagement: FC<{
     clubs: Club[];
     toast: ReturnType<typeof useToast>['toast'];
@@ -1884,25 +1958,23 @@ const OnlineClubManagement: FC<{
 }> = ({ clubs, toast, isSuperAdmin, activeClub }) => {
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isCreateOpen, setCreateOpen] = useState(false);
-    const [newClubName, setNewClubName] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
-    const [clubForCreation, setClubForCreation] = useState<Club | null>(null);
+    const [isModalOpen, setModalOpen] = useState(false);
+    const [clubForModal, setClubForModal] = useState<Club | null>(null);
+    const [onlineClubToEdit, setOnlineClubToEdit] = useState<OnlineClub | null>(null);
 
     const refreshOnlineClubs = useCallback(async () => {
-        setIsLoading(true);
+        // No need to set loading to true here, to avoid flicker
         try {
             const onlineClubs = await getOnlineClubs(); // Get all
             setAllOnlineClubs(onlineClubs);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch online clubs.' });
-        } finally {
-            setIsLoading(false);
         }
     }, [toast]);
 
     useEffect(() => {
-        refreshOnlineClubs();
+        setIsLoading(true);
+        refreshOnlineClubs().finally(() => setIsLoading(false));
     }, [refreshOnlineClubs]);
 
     const onlineClubsByClub = useMemo(() => {
@@ -1917,25 +1989,6 @@ const OnlineClubManagement: FC<{
         return grouped;
     }, [allOnlineClubs]);
 
-    const handleCreate = async () => {
-        if (!newClubName.trim() || !clubForCreation) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Online club name and main club are required.' });
-            return;
-        }
-        setIsSaving(true);
-        try {
-            await createOnlineClub(newClubName.trim(), clubForCreation.id);
-            toast({ title: 'Success', description: `Online club "${newClubName.trim()}" created.` });
-            setCreateOpen(false);
-            setNewClubName('');
-            await refreshOnlineClubs();
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create online club.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-    
     const handleDelete = async (onlineClubId: string) => {
         try {
             await deleteOnlineClub(onlineClubId);
@@ -1945,12 +1998,18 @@ const OnlineClubManagement: FC<{
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete online club.' });
         }
     };
-
+    
     const openCreateDialog = (club: Club) => {
-        setClubForCreation(club);
-        setNewClubName('');
-        setCreateOpen(true);
-    }
+        setClubForModal(club);
+        setOnlineClubToEdit(null);
+        setModalOpen(true);
+    };
+
+    const openEditDialog = (club: Club, onlineClub: OnlineClub) => {
+        setClubForModal(club);
+        setOnlineClubToEdit(onlineClub);
+        setModalOpen(true);
+    };
     
     const ManageTable: FC<{club: Club}> = ({club}) => {
         const clubsForTable = onlineClubsByClub.get(club.id) || [];
@@ -1963,6 +2022,7 @@ const OnlineClubManagement: FC<{
                     <TableHeader>
                         <TableRow>
                             <TableHead>Name</TableHead>
+                            <TableHead>Currency</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -1970,7 +2030,11 @@ const OnlineClubManagement: FC<{
                         {clubsForTable.map(oc => (
                             <TableRow key={oc.id}>
                                 <TableCell>{oc.name}</TableCell>
-                                <TableCell className="text-right">
+                                <TableCell>{oc.currency || 'INR'}</TableCell>
+                                <TableCell className="text-right space-x-1">
+                                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(club, oc)}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
@@ -1991,7 +2055,7 @@ const OnlineClubManagement: FC<{
                         ))}
                         {clubsForTable.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={2} className="text-center">No online clubs created yet for this club.</TableCell>
+                                <TableCell colSpan={3} className="text-center">No online clubs created yet for this club.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -2036,25 +2100,14 @@ const OnlineClubManagement: FC<{
                 </CardContent>
             </Card>
             
-             <Dialog open={isCreateOpen} onOpenChange={setCreateOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Create Online Club for {clubForCreation?.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="online-club-name">Online Club Name</Label>
-                            <Input id="online-club-name" value={newClubName} onChange={e => setNewClubName(e.target.value)} placeholder="e.g., PokerBaazi" />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button onClick={handleCreate} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="animate-spin" /> : 'Create'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+             <CreateEditOnlineClubDialog
+                isOpen={isModalOpen}
+                onOpenChange={setModalOpen}
+                club={clubForModal}
+                onSave={refreshOnlineClubs}
+                onlineClubToEdit={onlineClubToEdit}
+                toast={toast}
+            />
         </>
     );
 };
