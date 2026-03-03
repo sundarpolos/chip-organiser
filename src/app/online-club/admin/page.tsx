@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Minus, Landmark, Search, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -40,6 +40,8 @@ const AdminOnlineClubPage: FC = () => {
     const [playerLedger, setPlayerLedger] = useState<OnlineLedgerEntry[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isDeletingPlayer, setIsDeletingPlayer] = useState(false);
+    const [isEditTransactionModalOpen, setEditTransactionModalOpen] = useState(false);
+    const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -113,6 +115,27 @@ const AdminOnlineClubPage: FC = () => {
             setLedgerModalOpen(true);
         } catch (error) {
              toast({ variant: 'destructive', title: 'Error', description: 'Failed to load player ledger.' });
+        }
+    };
+    
+    const handleOpenEditTransaction = (entry: OnlineLedgerEntry) => {
+        setEntryToEdit(entry);
+        setEditTransactionModalOpen(true);
+        setLedgerModalOpen(false); // Close ledger while editing
+    };
+
+    const handleDeleteTransaction = async (accountId: string, entryId: string) => {
+        try {
+            await deleteTransaction(accountId, entryId);
+            toast({ title: 'Transaction Deleted' });
+            // Refresh ledger
+            const ledger = await getOnlineLedgerEntries(accountId);
+            setPlayerLedger(ledger);
+            // also refresh main accounts view
+            await refreshData();
+        } catch (e) {
+            const error = e as Error;
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: error.message });
         }
     };
 
@@ -294,7 +317,28 @@ const AdminOnlineClubPage: FC = () => {
                         onOpenChange={setLedgerModalOpen}
                         account={selectedAccount}
                         ledger={playerLedger}
+                        onEditTransaction={handleOpenEditTransaction}
+                        onDeleteTransaction={handleDeleteTransaction}
                     />
+                    {entryToEdit && (
+                        <EditTransactionDialog
+                            isOpen={isEditTransactionModalOpen}
+                            onOpenChange={(open) => {
+                                setEditTransactionModalOpen(open);
+                                if (!open) {
+                                    setEntryToEdit(null);
+                                    setLedgerModalOpen(true);
+                                }
+                            }}
+                            entry={entryToEdit}
+                            onSuccess={async () => {
+                                await refreshData();
+                                const ledger = await getOnlineLedgerEntries(selectedAccount.id);
+                                setPlayerLedger(ledger);
+                                setLedgerModalOpen(true);
+                            }}
+                        />
+                    )}
                 </>
             )}
         </div>
@@ -394,7 +438,9 @@ const LedgerDialog: FC<{
     onOpenChange: (open: boolean) => void;
     account: OnlinePlayerAccount;
     ledger: OnlineLedgerEntry[];
-}> = ({ isOpen, onOpenChange, account, ledger }) => {
+    onEditTransaction: (entry: OnlineLedgerEntry) => void;
+    onDeleteTransaction: (accountId: string, entryId: string) => void;
+}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction }) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl">
@@ -412,6 +458,7 @@ const LedgerDialog: FC<{
                                 <TableHead>Payment Mode / Notes</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -425,9 +472,31 @@ const LedgerDialog: FC<{
                                         {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right">
+                                        {entry.type !== 'p/l' && (
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => onEditTransaction(entry)}><Edit className="h-4 w-4"/></Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                            <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => onDeleteTransaction(account.id, entry.id)}>Delete</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                             ))}
-                             {ledger.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">No transactions.</TableCell></TableRow>}
+                             {ledger.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No transactions.</TableCell></TableRow>}
                         </TableBody>
                     </Table>
                 </ScrollArea>
@@ -438,5 +507,92 @@ const LedgerDialog: FC<{
         </Dialog>
     );
 }
+
+const EditTransactionDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    entry: OnlineLedgerEntry;
+    onSuccess: () => void;
+}> = ({ isOpen, onOpenChange, entry, onSuccess }) => {
+    const { toast } = useToast();
+    const [amount, setAmount] = useState('');
+    const [paymentMode, setPaymentMode] = useState('');
+    const [date, setDate] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    useEffect(() => {
+        if (isOpen && entry) {
+            setAmount(String(Math.abs(entry.amount)));
+            setPaymentMode(entry.notes);
+            setDate(format(parseISO(entry.date), 'yyyy-MM-dd'));
+        }
+    }, [isOpen, entry]);
+
+    const handleSubmit = async () => {
+        const numAmount = parseFloat(amount);
+        if (isNaN(numAmount) || numAmount <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Amount' });
+            return;
+        }
+        if (!paymentMode) {
+            toast({ variant: 'destructive', title: 'Payment Mode Required' });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            await updateTransaction(entry.accountId, entry.id, numAmount, paymentMode, date);
+            toast({ title: 'Success', description: `Transaction updated.` });
+            onSuccess();
+            onOpenChange(false);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : `Could not update transaction.`;
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="capitalize">Edit {entry.type}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-tx-amount">Amount</Label>
+                        <Input id="edit-tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="edit-tx-date">Date</Label>
+                        <Input id="edit-tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-tx-payment-mode">Payment Mode</Label>
+                        <Select value={paymentMode} onValueChange={setPaymentMode}>
+                            <SelectTrigger id="edit-tx-payment-mode">
+                                <SelectValue placeholder="Select a payment mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Google Pay">Google Pay</SelectItem>
+                                <SelectItem value="Net Banking">Net Banking</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+                        Save Changes
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 export default AdminOnlineClubPage;

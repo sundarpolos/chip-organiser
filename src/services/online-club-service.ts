@@ -135,6 +135,54 @@ export async function deleteProfitLoss(accountId: string, entryId: string): Prom
     await recalculateAccountBalance(accountId);
 }
 
+export async function updateTransaction(
+  accountId: string,
+  entryId: string,
+  newAmount: number,
+  newPaymentMode: string,
+  newDate: string
+): Promise<void> {
+  const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+  const entryDoc = await getDoc(entryRef);
+
+  if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
+    throw new Error("Ledger entry not found or permission denied.");
+  }
+  const entryData = entryDoc.data();
+  if (entryData.type === 'p/l') {
+    throw new Error("This function cannot be used to edit P/L entries.");
+  }
+
+  const transactionType = entryData.type as 'deposit' | 'withdrawal';
+  const transactionAmount = transactionType === 'deposit' ? Math.abs(newAmount) : -Math.abs(newAmount);
+
+  const updatedDate = new Date(newDate);
+  updatedDate.setHours(12, 0, 0, 0);
+
+  await setDoc(entryRef, {
+    amount: transactionAmount,
+    notes: newPaymentMode,
+    date: updatedDate.toISOString(),
+  }, { merge: true });
+
+  await recalculateAccountBalance(accountId);
+}
+
+export async function deleteTransaction(accountId: string, entryId: string): Promise<void> {
+  const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+  const entryDoc = await getDoc(entryRef);
+  if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
+    throw new Error("Ledger entry not found or permission denied.");
+  }
+  if (entryDoc.data().type === 'p/l') {
+      throw new Error("This function cannot be used to delete P/L entries.");
+  }
+
+  await deleteDoc(entryRef);
+
+  await recalculateAccountBalance(accountId);
+}
+
 async function recalculateAccountBalance(accountId: string): Promise<void> {
     const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId));
     const querySnapshot = await getDocs(q);
