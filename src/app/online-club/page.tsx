@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo, type FC, useCallback } from 'react';
+import { useState, useEffect, useMemo, type FC, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -19,13 +18,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { getClub } from '@/services/club-service';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -41,6 +42,8 @@ const OnlineClubPage: FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const ledgerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -154,6 +157,46 @@ const OnlineClubPage: FC = () => {
         }
     };
 
+    const handleExportPdf = async () => {
+        if (!ledgerRef.current || !account) {
+            toast({
+                variant: "destructive",
+                title: "Export Error",
+                description: "There is no ledger content to export.",
+            });
+            return;
+        }
+
+        setIsExporting(true);
+        try {
+            const canvas = await html2canvas(ledgerRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: null,
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.7);
+
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+            
+            const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+
+            pdf.save(filename);
+            toast({ title: "Success", description: "Ledger has been exported as a PDF." });
+        } catch (error) {
+            console.error("Could not export PDF:", error);
+            toast({ variant: "destructive", title: "Export Failed", description: "An error occurred while generating the PDF." });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
 
     if (isLoading) {
         return (
@@ -195,63 +238,71 @@ const OnlineClubPage: FC = () => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Recent Transactions</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Recent Transactions</CardTitle>
+                        <Button onClick={handleExportPdf} disabled={isExporting || ledger.length === 0}>
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                            Export PDF
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Online Club</TableHead>
-                                <TableHead>Notes</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {ledger.map(entry => (
-                                <TableRow key={entry.id}>
-                                    <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell className="capitalize">{entry.type}</TableCell>
-                                    <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                    <TableCell>{entry.notes}</TableCell>
-                                    <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">
-                                      {entry.type === 'p/l' && (
-                                        <div className="flex justify-end gap-2">
-                                           <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                           <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                        <AlertDialogDescription>This will permanently delete this P/L entry of ₹{entry.amount.toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                           </AlertDialog>
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {ledger.length === 0 && (
+                    <div ref={ledgerRef}>
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center h-24">No transactions yet.</TableCell>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Online Club</TableHead>
+                                    <TableHead>Notes</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {ledger.map(entry => (
+                                    <TableRow key={entry.id}>
+                                        <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell className="capitalize">{entry.type}</TableCell>
+                                        <TableCell>{entry.onlineClubName || '-'}</TableCell>
+                                        <TableCell>{entry.notes}</TableCell>
+                                        <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">
+                                        {entry.type === 'p/l' && (
+                                            <div className="flex justify-end gap-2">
+                                            <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                            <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                            <AlertDialogDescription>This will permanently delete this P/L entry of ₹{entry.amount.toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                            </AlertDialog>
+                                            </div>
+                                        )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {ledger.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center h-24">No transactions yet.</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
             
