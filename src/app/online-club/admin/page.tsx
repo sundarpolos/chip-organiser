@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club, OnlineClub } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ const AdminOnlineClubPage: FC = () => {
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [allLedgerEntries, setAllLedgerEntries] = useState<OnlineLedgerEntry[]>([]);
     
     // Filtering and Dialog states
     const [selectedClubId, setSelectedClubId] = useState<string>('');
@@ -75,14 +76,16 @@ const AdminOnlineClubPage: FC = () => {
         if (!currentUser) return;
         setIsLoading(true);
         try {
-            const [playerAccounts, clubs, onlineClubs] = await Promise.all([
+            const [playerAccounts, clubs, onlineClubs, allEntries] = await Promise.all([
                 getOnlinePlayerAccounts(),
                 isSuperAdmin ? getClubs() : Promise.resolve([]),
                 getOnlineClubs(),
+                getAllOnlineLedgerEntries(),
             ]);
             setAccounts(playerAccounts);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
+            setAllLedgerEntries(allEntries);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -96,8 +99,31 @@ const AdminOnlineClubPage: FC = () => {
         }
     }, [currentUser]);
 
+    const accountsWithClubBalances = useMemo(() => {
+        if (!accounts.length) return [];
+        
+        return accounts.map(account => {
+            const playerEntries = allLedgerEntries.filter(e => e.accountId === account.id);
+            const clubBalances: Record<string, number> = {};
+    
+            playerEntries.forEach(entry => {
+                if (entry.onlineClubName) {
+                    if (!clubBalances[entry.onlineClubName]) {
+                        clubBalances[entry.onlineClubName] = 0;
+                    }
+                    clubBalances[entry.onlineClubName] += entry.amount;
+                }
+            });
+    
+            return {
+                ...account,
+                clubBalances,
+            };
+        });
+    }, [accounts, allLedgerEntries]);
+
     const filteredAccounts = useMemo(() => {
-        return accounts
+        return accountsWithClubBalances
             .filter(acc => {
                 if (isSuperAdmin) {
                     return selectedClubId === 'all' || acc.clubId === selectedClubId;
@@ -106,7 +132,7 @@ const AdminOnlineClubPage: FC = () => {
                 return acc.clubId === currentUser?.clubId;
             })
             .filter(acc => acc.playerName.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [accounts, selectedClubId, searchTerm, isSuperAdmin, currentUser]);
+    }, [accountsWithClubBalances, selectedClubId, searchTerm, isSuperAdmin, currentUser]);
 
     const handleOpenTransaction = (account: OnlinePlayerAccount, type: 'deposit' | 'withdrawal') => {
         setSelectedAccount(account);
@@ -212,8 +238,20 @@ const AdminOnlineClubPage: FC = () => {
                                 <TableRow key={account.id}>
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
                                     {isSuperAdmin && <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>}
-                                    <TableCell className={`text-right font-mono font-semibold ${account.balance >= 0 ? '' : 'text-red-500'}`}>
-                                        ₹{account.balance.toFixed(0)}
+                                    <TableCell className="text-right">
+                                        <div className={`font-mono font-semibold text-lg mb-1 ${account.balance >= 0 ? '' : 'text-red-500'}`}>
+                                            ₹{account.balance.toFixed(0)}
+                                        </div>
+                                        <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+                                            {Object.entries(account.clubBalances).map(([clubName, balance]) => (
+                                                <div key={clubName} className="text-xs text-muted-foreground">
+                                                    <span className="font-semibold">{clubName}:</span>
+                                                    <span className={`font-mono ml-1 ${balance >= 0 ? '' : 'text-red-500'}`}>
+                                                        ₹{balance.toFixed(0)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
