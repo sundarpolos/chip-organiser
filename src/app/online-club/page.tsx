@@ -47,14 +47,6 @@ const OnlineClubPage: FC = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
 
-    const accountCurrency = useMemo(() => {
-        if (onlineClubs && onlineClubs.length > 0) {
-            const clubWithCurrency = onlineClubs.find(c => c.currency);
-            return clubWithCurrency?.currency || '₹';
-        }
-        return '₹';
-    }, [onlineClubs]);
-
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
         onlineClubs.forEach(club => {
@@ -164,6 +156,22 @@ const OnlineClubPage: FC = () => {
         return ledger.filter(entry => entry.onlineClubName === activeTab);
     }, [ledger, activeTab]);
 
+    const totalBalanceForTab = useMemo(() => {
+        if (activeTab === 'all') {
+            return account?.balance || 0;
+        }
+        const clubBalance = balanceByClub.find(cb => cb.name === activeTab);
+        return clubBalance?.balance || 0;
+    }, [activeTab, balanceByClub, account]);
+
+    const currencyForTab = useMemo(() => {
+        if (activeTab === 'all') {
+            return onlineClubCurrencyMap.values().next().value || '₹'; // Default currency
+        }
+        return onlineClubCurrencyMap.get(activeTab) || '₹';
+    }, [activeTab, onlineClubCurrencyMap]);
+
+
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
@@ -242,7 +250,7 @@ const OnlineClubPage: FC = () => {
                     entry.type.toUpperCase(),
                     entry.onlineClubName || '-',
                     `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
-                    `${accountCurrency}${entry.runningBalance.toFixed(0)}`,
+                    `${currencyForTab}${entry.runningBalance.toFixed(0)}`,
                 ]
             });
 
@@ -298,7 +306,7 @@ const OnlineClubPage: FC = () => {
                     doc.setFont('helvetica', 'bold');
                     doc.text(account.playerName, 20, 48);
 
-                    const balanceText = `${accountCurrency}${account.balance.toFixed(0)}`;
+                    const balanceText = `${currencyForTab}${account.balance.toFixed(0)}`;
                     const balanceColor = account.balance >= 0 ? positiveColor : negativeColor;
                     doc.setFontSize(10);
                     doc.setTextColor(mutedText);
@@ -377,7 +385,15 @@ const OnlineClubPage: FC = () => {
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle>Recent Transactions</CardTitle>
+                        <div>
+                            <CardTitle>Recent Transactions</CardTitle>
+                             <CardDescription>
+                                Current Balance: 
+                                <span className={`font-bold ml-2 ${totalBalanceForTab >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                    {currencyForTab}{totalBalanceForTab.toFixed(0)}
+                                </span>
+                            </CardDescription>
+                        </div>
                         <Button onClick={handleExportPdf} disabled={isExporting || ledger.length === 0}>
                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                             Export PDF
@@ -401,7 +417,6 @@ const OnlineClubPage: FC = () => {
                                         <TableHead>Online Club</TableHead>
                                         <TableHead>Payment Mode / Notes</TableHead>
                                         <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -415,7 +430,6 @@ const OnlineClubPage: FC = () => {
                                             <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {entry.amount >= 0 ? `+` : `-`}{(entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
                                             <TableCell className="text-right">
                                             {entry.type === 'p/l' && (
                                                 <div className="flex justify-end gap-2">
@@ -427,7 +441,7 @@ const OnlineClubPage: FC = () => {
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
+                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {currencyForTab}{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -442,7 +456,7 @@ const OnlineClubPage: FC = () => {
                                     ))}
                                     {filteredLedger.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center h-24">No transactions for this view.</TableCell>
+                                            <TableCell colSpan={6} className="text-center h-24">No transactions for this view.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
