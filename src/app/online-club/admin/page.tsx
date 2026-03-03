@@ -4,17 +4,18 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Minus, Landmark, Search } from 'lucide-react';
+import { Loader2, Plus, Minus, Landmark, Search, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,20 +30,29 @@ const AdminOnlineClubPage: FC = () => {
     const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     
     // Filtering and Dialog states
-    const [selectedClubId, setSelectedClubId] = useState<string>('all');
+    const [selectedClubId, setSelectedClubId] = useState<string>('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
     const [isLedgerModalOpen, setLedgerModalOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<OnlinePlayerAccount | null>(null);
     const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [playerLedger, setPlayerLedger] = useState<OnlineLedgerEntry[]>([]);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
         if (userStr) {
             const user = JSON.parse(userStr);
             setCurrentUser(user);
-            setIsSuperAdmin(user.whatsappNumber === '919843350000');
+            const isSuper = user.whatsappNumber === '919843350000';
+            setIsSuperAdmin(isSuper);
+            
+            if (isSuper) {
+                setSelectedClubId('all');
+            } else if (user.clubId) {
+                setSelectedClubId(user.clubId);
+            }
+
             if (!user.isAdmin) {
                 toast({ variant: 'destructive', title: 'Access Denied' });
                 router.push('/dashboard');
@@ -54,6 +64,7 @@ const AdminOnlineClubPage: FC = () => {
     
     const refreshData = async () => {
         if (!currentUser) return;
+        setIsLoading(true);
         try {
             const [playerAccounts, clubs] = await Promise.all([
                 getOnlinePlayerAccounts(),
@@ -76,9 +87,15 @@ const AdminOnlineClubPage: FC = () => {
 
     const filteredAccounts = useMemo(() => {
         return accounts
-            .filter(acc => (selectedClubId === 'all' || acc.clubId === selectedClubId))
+            .filter(acc => {
+                if (isSuperAdmin) {
+                    return selectedClubId === 'all' || acc.clubId === selectedClubId;
+                }
+                // For regular admins, they should only see their club's accounts
+                return acc.clubId === currentUser?.clubId;
+            })
             .filter(acc => acc.playerName.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [accounts, selectedClubId, searchTerm]);
+    }, [accounts, selectedClubId, searchTerm, isSuperAdmin, currentUser]);
 
     const handleOpenTransaction = (account: OnlinePlayerAccount, type: 'deposit' | 'withdrawal') => {
         setSelectedAccount(account);
@@ -97,6 +114,33 @@ const AdminOnlineClubPage: FC = () => {
         }
     };
 
+    const handleDeleteClubData = async () => {
+        if (selectedClubId === 'all') {
+            toast({
+                variant: 'destructive',
+                title: 'Action Not Allowed',
+                description: 'For safety, please select a specific club to delete its data. Deleting all clubs at once is not permitted.'
+            });
+            return;
+        }
+        if (!selectedClubId) {
+            toast({ variant: 'destructive', title: 'No Club Selected', description: 'Please select a club.' });
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            await deleteAllOnlineDataForClub(selectedClubId);
+            toast({ title: 'Success', description: 'All online account and ledger data for the selected club has been deleted.' });
+            await refreshData(); // Refresh data to show empty state
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'An unknown error occurred.';
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: msg });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     if (isLoading) {
         return <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin" /></div>;
     }
@@ -105,8 +149,35 @@ const AdminOnlineClubPage: FC = () => {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Admin</CardTitle>
-                    <CardDescription>View balances and manage deposits/withdrawals for all players.</CardDescription>
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Admin</CardTitle>
+                            <CardDescription>View balances and manage deposits/withdrawals for all players.</CardDescription>
+                        </div>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" disabled={selectedClubId === 'all' || isDeleting}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Club Data
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete all online accounts, ledger entries, and transaction history for the selected club.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleDeleteClubData} disabled={isDeleting}>
+                                        {isDeleting && <Loader2 className="animate-spin mr-2" />}
+                                        I understand, delete the data
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">

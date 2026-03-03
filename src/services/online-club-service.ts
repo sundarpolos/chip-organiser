@@ -3,7 +3,7 @@
 
 import { db } from "@/lib/firebase";
 import { OnlinePlayerAccount, OnlineLedgerEntry, MasterPlayer, OnlineClub } from "@/lib/types";
-import { collection, getDocs, doc, setDoc, addDoc, query, where, getDoc, runTransaction, orderBy, deleteDoc, limit } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, addDoc, query, where, getDoc, runTransaction, orderBy, deleteDoc, limit, writeBatch } from "firebase/firestore";
 import { getActiveStakingAgreementForPlayer } from "./staking-service";
 
 const ONLINE_ACCOUNTS_COLLECTION = "onlinePlayerAccounts";
@@ -286,4 +286,35 @@ export async function getOnlineClubs(clubId?: string): Promise<OnlineClub[]> {
 
 export async function deleteOnlineClub(onlineClubId: string): Promise<void> {
     await deleteDoc(doc(db, ONLINE_CLUBS_COLLECTION, onlineClubId));
+}
+
+
+// ====== ADMIN DESTRUCTIVE ACTIONS ======
+
+export async function deleteAllOnlineDataForClub(clubId: string): Promise<void> {
+    const batch = writeBatch(db);
+
+    // Find all accounts for the given club
+    const accountsQuery = query(collection(db, ONLINE_ACCOUNTS_COLLECTION), where("clubId", "==", clubId));
+    const accountsSnapshot = await getDocs(accountsQuery);
+    
+    // For each account, find and delete all its ledger entries
+    for (const accountDoc of accountsSnapshot.docs) {
+        const ledgerQuery = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountDoc.id));
+        const ledgerSnapshot = await getDocs(ledgerQuery);
+        ledgerSnapshot.forEach(ledgerDoc => {
+            batch.delete(ledgerDoc.ref);
+        });
+        // Also delete the account document itself
+        batch.delete(accountDoc.ref);
+    }
+    
+    // Also delete the Online Club names associated with this club
+    const onlineClubsQuery = query(collection(db, ONLINE_CLUBS_COLLECTION), where("clubId", "==", clubId));
+    const onlineClubsSnapshot = await getDocs(onlineClubsQuery);
+    onlineClubsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+
+    await batch.commit();
 }
