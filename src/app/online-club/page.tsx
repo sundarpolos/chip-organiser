@@ -325,8 +325,8 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="pl-notes">Notes</Label>
-                        <Textarea id="pl-notes" placeholder="e.g. PokerBaazi session, 2 tables" value={notes} onChange={e => setNotes(e.target.value)} required />
+                        <Label htmlFor="pl-notes">Notes (Optional)</Label>
+                        <Textarea id="pl-notes" placeholder="e.g. PokerBaazi session, 2 tables" value={notes} onChange={e => setNotes(e.target.value)} />
                     </div>
                 </CardContent>
                 <CardFooter>
@@ -364,8 +364,8 @@ const EditPlDialog: FC<{
 
     const handleSubmit = () => {
         const numAmount = parseFloat(amount);
-        if (isNaN(numAmount) || !notes || !onlineClubName) {
-            alert('Please enter a valid amount, notes, and select an online club.');
+        if (isNaN(numAmount) || !onlineClubName) {
+            alert('Please enter a valid amount and select an online club.');
             return;
         }
         onSubmit(entry.id, numAmount, notes, date, onlineClubName);
@@ -406,8 +406,8 @@ const EditPlDialog: FC<{
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="edit-pl-notes">Notes</Label>
-                        <Textarea id="edit-pl-notes" value={notes} onChange={e => setNotes(e.target.value)} required />
+                        <Label htmlFor="edit-pl-notes">Notes (Optional)</Label>
+                        <Textarea id="edit-pl-notes" value={notes} onChange={e => setNotes(e.target.value)} />
                     </div>
                 </div>
                 <DialogFooter>
