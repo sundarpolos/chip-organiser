@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, type FC } from 'react';
+import { useState, useEffect, useMemo, type FC, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -57,13 +57,20 @@ const OnlineClubPage: FC = () => {
         }
     }, [router]);
 
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         if (!currentUser) return;
         try {
+            const activeClubId = localStorage.getItem('chip-maestro-clubId');
+            if (!activeClubId) {
+                toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
+                setIsLoading(false);
+                return;
+            }
+
             const [playerAccount, playerLedger, clubs, allPlayers, agreementStakingMe, agreementsIAmStaker] = await Promise.all([
                 getOnlinePlayerAccount(currentUser.id),
                 getOnlineLedgerEntries(currentUser.id),
-                getOnlineClubs(currentUser.clubId),
+                getOnlineClubs(activeClubId),
                 getMasterPlayers(),
                 getActiveStakingAgreementForPlayer(currentUser.id),
                 getAgreementsByPlayer(currentUser.id, 'staker'),
@@ -71,21 +78,22 @@ const OnlineClubPage: FC = () => {
             setAccount(playerAccount);
             setLedger(playerLedger);
             setOnlineClubs(clubs);
-            setClubPlayers(allPlayers.filter(p => p.clubId === currentUser.clubId && p.id !== currentUser.id));
+            setClubPlayers(allPlayers.filter(p => p.clubId === activeClubId && p.id !== currentUser.id));
             setAgreementStakingMe(agreementStakingMe);
             setAgreementsWhereIAmStaker(agreementsIAmStaker);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load online account data.' });
+            const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [currentUser, toast]);
 
     useEffect(() => {
         if (currentUser) {
             refreshData();
         }
-    }, [currentUser]);
+    }, [currentUser, refreshData]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -134,11 +142,15 @@ const OnlineClubPage: FC = () => {
     const handleCreateStakingAgreement = async (stakedPlayerId: string, percentage: number) => {
         if (!currentUser) return;
         try {
+            const activeClubId = localStorage.getItem('chip-maestro-clubId');
+            if (!activeClubId) {
+                throw new Error("No active club selected. Cannot create staking agreement.");
+            }
             await createStakingAgreement({
                 stakerId: currentUser.id,
                 stakedPlayerId,
                 percentage,
-                clubId: currentUser.clubId,
+                clubId: activeClubId,
             });
             toast({ title: 'Staking Started!', description: `You are now staking the selected player.`});
             await refreshData();
