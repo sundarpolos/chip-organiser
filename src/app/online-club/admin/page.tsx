@@ -647,7 +647,6 @@ const LedgerDialog: FC<{
                                         <TableHead>Online Club</TableHead>
                                         <TableHead>Payment Mode / Notes</TableHead>
                                         <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -661,7 +660,6 @@ const LedgerDialog: FC<{
                                             <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                 {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(0)}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(0)}</TableCell>
                                             <TableCell className="text-right">
                                                 {entry.type !== 'p/l' && (
                                                     <div className="flex justify-end gap-2">
@@ -686,7 +684,7 @@ const LedgerDialog: FC<{
                                             </TableCell>
                                         </TableRow>
                                     ))}
-                                    {filteredLedger.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No transactions for this view.</TableCell></TableRow>}
+                                    {filteredLedger.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">No transactions for this view.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </ScrollArea>
