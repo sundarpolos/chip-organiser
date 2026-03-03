@@ -229,7 +229,7 @@ const AdminOnlineClubPage: FC = () => {
                             <TableRow>
                                 <TableHead>Player</TableHead>
                                 {isSuperAdmin && <TableHead>Club</TableHead>}
-                                <TableHead className="text-right">Balance</TableHead>
+                                <TableHead className="text-right">Club Balances</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -239,9 +239,6 @@ const AdminOnlineClubPage: FC = () => {
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
                                     {isSuperAdmin && <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>}
                                     <TableCell className="text-right">
-                                        <div className={`font-mono font-semibold text-lg mb-1 ${account.balance >= 0 ? '' : 'text-red-500'}`}>
-                                            ₹{account.balance.toFixed(0)}
-                                        </div>
                                         <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
                                             {Object.entries(account.clubBalances).map(([clubName, balance]) => (
                                                 <div key={clubName} className="text-xs text-muted-foreground">
