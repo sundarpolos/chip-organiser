@@ -422,37 +422,6 @@ const OnlineClubPage: FC = () => {
                                         </TableRow>
                                     )}
                                 </TableBody>
-                                {filteredLedger.length > 0 && (
-                                    <TableFooter>
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="font-semibold">Profit/Loss</TableCell>
-                                            <TableCell className={`text-right font-mono font-semibold ${totals.pl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {accountCurrency}{totals.pl.toFixed(0)}
-                                            </TableCell>
-                                            <TableCell colSpan={2}></TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="font-semibold">Deposits</TableCell>
-                                            <TableCell className="text-right font-mono font-semibold text-green-600">
-                                                {accountCurrency}{totals.deposits.toFixed(0)}
-                                            </TableCell>
-                                            <TableCell colSpan={2}></TableCell>
-                                        </TableRow>
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="font-semibold">Withdrawals</TableCell>
-                                            <TableCell className="text-right font-mono font-semibold text-red-600">
-                                                {accountCurrency}{Math.abs(totals.withdrawals).toFixed(0)}
-                                            </TableCell>
-                                            <TableCell colSpan={2}></TableCell>
-                                        </TableRow>
-                                        <TableRow className="font-bold text-lg bg-muted">
-                                            <TableCell colSpan={4}>Final Balance</TableCell>
-                                            <TableCell colSpan={3} className={`text-right font-mono ${account?.balance ?? 0 >= 0 ? '' : 'text-red-500'}`}>
-                                                {accountCurrency}{account?.balance.toFixed(0) ?? '0'}
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                )}
                             </Table>
                         </TabsContent>
                     </Tabs>
