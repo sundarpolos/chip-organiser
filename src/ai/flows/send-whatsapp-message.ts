@@ -42,10 +42,10 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     outputSchema: SendWhatsappMessageOutputSchema,
   },
   async ({ to, message, isGroup = false, apiUrl, apiToken, senderMobile }) => {
-    // Prefer credentials passed in, but fall back to environment variables
-    const finalApiUrl = apiUrl || process.env.WHATSAPP_API_URL;
-    const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
-    const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
+    // Prioritize environment variables, falling back to passed-in credentials.
+    const finalApiUrl = process.env.WHATSAPP_API_URL || apiUrl;
+    const finalApiToken = process.env.WHATSAPP_API_TOKEN || apiToken;
+    const finalSenderMobile = process.env.WHATSAPP_SENDER_MOBILE || senderMobile;
 
     console.log('--- WhatsApp API Settings Used ---');
     console.log('URL:', finalApiUrl);
