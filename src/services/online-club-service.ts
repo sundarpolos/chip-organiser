@@ -118,79 +118,83 @@ export async function recordTransaction(accountId: string, type: 'deposit' | 'wi
     });
 }
 
-async function recalculateLedger(transaction: any, accountId: string, fromDate?: string) {
-    const entriesQuery = fromDate
-        ? query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), where("date", ">=", fromDate), orderBy("date", "asc"))
-        : query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
-    
-    const entriesSnapshot = await transaction.get(entriesQuery);
-
-    let previousBalance = 0;
-    if (fromDate) {
-        const previousEntryQuery = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), where("date", "<", fromDate), orderBy("date", "desc"), limit(1));
-        const previousEntrySnapshot = await transaction.get(previousEntryQuery);
-        if (!previousEntrySnapshot.empty) {
-            previousBalance = previousEntrySnapshot.docs[0].data().runningBalance;
-        }
-    }
-
-    let currentBalance = previousBalance;
-    for (const doc of entriesSnapshot.docs) {
-        currentBalance += doc.data().amount;
-        transaction.update(doc.ref, { runningBalance: currentBalance });
-    }
-
-    return currentBalance;
-}
-
 export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newNotes: string, newDate: string, newOnlineClubName: string): Promise<void> {
-    await runTransaction(db, async (transaction) => {
-        const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
-        const entryDoc = await transaction.get(entryRef);
+    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+    const entryDoc = await getDoc(entryRef);
+    if (!entryDoc.exists() || entryDoc.data().accountId !== accountId || entryDoc.data().type !== 'p/l') {
+        throw new Error("Ledger entry not found, is not a P/L entry, or permission denied.");
+    }
+    
+    // 1. Update the single document
+    await setDoc(entryRef, {
+        amount: newAmount,
+        notes: newNotes,
+        date: newDate,
+        onlineClubName: newOnlineClubName,
+    }, { merge: true });
 
-        if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
-            throw new Error("Ledger entry not found or permission denied.");
-        }
-         if (entryDoc.data().type !== 'p/l') {
-            throw new Error("Only P/L entries can be edited this way.");
-        }
-        
-        transaction.update(entryRef, {
-            amount: newAmount,
-            notes: newNotes,
-            date: newDate,
-            onlineClubName: newOnlineClubName,
-        });
-        
-        const earliestDate = entryDoc.data().date < newDate ? entryDoc.data().date : newDate;
-        const newBalance = await recalculateLedger(transaction, accountId, earliestDate);
-
-        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-        transaction.update(accountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
+    // 2. Refetch all entries for the account, sorted by date
+    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
+    const querySnapshot = await getDocs(q);
+    const entries: OnlineLedgerEntry[] = [];
+    querySnapshot.forEach(doc => {
+        entries.push({ id: doc.id, ...doc.data() } as OnlineLedgerEntry);
     });
+
+    // 3. Recalculate running balances for all entries
+    const batch = writeBatch(db);
+    let currentBalance = 0;
+    for (const entry of entries) {
+        currentBalance += entry.amount;
+        const entryRefToUpdate = doc(db, ONLINE_LEDGER_COLLECTION, entry.id);
+        if (entry.runningBalance !== currentBalance) { // Only update if it changed
+            batch.update(entryRefToUpdate, { runningBalance: currentBalance });
+        }
+    }
+
+    // 4. Update the main account balance
+    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+    batch.update(accountRef, { balance: currentBalance, lastUpdated: new Date().toISOString() });
+    
+    // 5. Commit all changes
+    await batch.commit();
 }
 
 export async function deleteProfitLoss(accountId: string, entryId: string): Promise<void> {
-    await runTransaction(db, async (transaction) => {
-        const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
-        const entryDoc = await transaction.get(entryRef);
-        
-        if (!entryDoc.exists() || entryDoc.data().accountId !== accountId) {
-            throw new Error("Ledger entry not found or permission denied.");
-        }
-        if (entryDoc.data().type !== 'p/l') {
-            throw new Error("Only P/L entries can be deleted this way.");
-        }
-        
-        const deletedEntryDate = entryDoc.data().date;
-        transaction.delete(entryRef);
+    const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
+    const entryDoc = await getDoc(entryRef);
+    if (!entryDoc.exists() || entryDoc.data().accountId !== accountId || entryDoc.data().type !== 'p/l') {
+        throw new Error("Ledger entry not found, is not a P/L entry, or permission denied.");
+    }
 
-        const newBalance = await recalculateLedger(transaction, accountId, deletedEntryDate);
-        
-        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-        transaction.update(accountRef, { balance: newBalance, lastUpdated: new Date().toISOString() });
+    // 1. Delete the doc
+    await deleteDoc(entryRef);
+
+    // 2. Refetch all entries for the account, sorted by date
+    const q = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId), orderBy("date", "asc"));
+    const querySnapshot = await getDocs(q);
+    const entries: OnlineLedgerEntry[] = [];
+    querySnapshot.forEach(doc => {
+        entries.push({ id: doc.id, ...doc.data() } as OnlineLedgerEntry);
     });
+
+    // 3. Recalculate running balances for all entries
+    const batch = writeBatch(db);
+    let currentBalance = 0;
+    for (const entry of entries) {
+        currentBalance += entry.amount;
+        const entryRefToUpdate = doc(db, ONLINE_LEDGER_COLLECTION, entry.id);
+        batch.update(entryRefToUpdate, { runningBalance: currentBalance });
+    }
+
+    // 4. Update the main account balance
+    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+    batch.update(accountRef, { balance: currentBalance, lastUpdated: new Date().toISOString() });
+
+    // 5. Commit all changes
+    await batch.commit();
 }
+
 
 // ====== ONLINE CLUB MANAGEMENT ======
 
