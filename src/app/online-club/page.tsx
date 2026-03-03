@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +27,8 @@ import Link from 'next/link';
 import { getClub } from '@/services/club-service';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -43,6 +45,7 @@ const OnlineClubPage: FC = () => {
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [activeTab, setActiveTab] = useState('all');
 
     const accountCurrency = useMemo(() => {
         if (onlineClubs && onlineClubs.length > 0) {
@@ -119,6 +122,29 @@ const OnlineClubPage: FC = () => {
             window.removeEventListener('storage', handleStorageChange);
         };
     }, [currentUser, refreshData]);
+    
+    const filteredLedger = useMemo(() => {
+        if (activeTab === 'all') {
+            return ledger;
+        }
+        return ledger.filter(entry => entry.onlineClubName === activeTab);
+    }, [ledger, activeTab]);
+
+    const totals = useMemo(() => {
+        return filteredLedger.reduce(
+            (acc, entry) => {
+                if (entry.type === 'p/l') {
+                    acc.pl += entry.amount;
+                } else if (entry.type === 'deposit') {
+                    acc.deposits += entry.amount;
+                } else if (entry.type === 'withdrawal') {
+                    acc.withdrawals += entry.amount;
+                }
+                return acc;
+            },
+            { pl: 0, deposits: 0, withdrawals: 0 }
+        );
+    }, [filteredLedger]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -335,62 +361,101 @@ const OnlineClubPage: FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Online Club</TableHead>
-                                    <TableHead>Payment Mode / Notes</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead className="text-right">Balance</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {ledger.map(entry => (
-                                    <TableRow key={entry.id}>
-                                        <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell className="capitalize">{entry.type}</TableCell>
-                                        <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                        <TableCell>{entry.notes}</TableCell>
-                                        <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(0)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
-                                        <TableCell className="text-right">
-                                        {entry.type === 'p/l' && (
-                                            <div className="flex justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                            <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                            </AlertDialog>
-                                            </div>
-                                        )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {ledger.length === 0 && (
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList>
+                            <TabsTrigger value="all">All</TabsTrigger>
+                            {onlineClubs.map(club => (
+                                <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
+                            ))}
+                        </TabsList>
+                        <TabsContent value={activeTab} className="mt-4">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center h-24">No transactions yet.</TableCell>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Online Club</TableHead>
+                                        <TableHead>Payment Mode / Notes</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">Balance</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredLedger.map(entry => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell className="capitalize">{entry.type}</TableCell>
+                                            <TableCell>{entry.onlineClubName || '-'}</TableCell>
+                                            <TableCell>{entry.notes}</TableCell>
+                                            <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(0)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
+                                            <TableCell className="text-right">
+                                            {entry.type === 'p/l' && (
+                                                <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                </AlertDialog>
+                                                </div>
+                                            )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {filteredLedger.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center h-24">No transactions for this view.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                                {filteredLedger.length > 0 && (
+                                    <TableFooter>
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="font-semibold">Profit/Loss</TableCell>
+                                            <TableCell className={`text-right font-mono font-semibold ${totals.pl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {accountCurrency}{totals.pl.toFixed(0)}
+                                            </TableCell>
+                                            <TableCell colSpan={2}></TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="font-semibold">Deposits</TableCell>
+                                            <TableCell className="text-right font-mono font-semibold text-green-600">
+                                                {accountCurrency}{totals.deposits.toFixed(0)}
+                                            </TableCell>
+                                            <TableCell colSpan={2}></TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="font-semibold">Withdrawals</TableCell>
+                                            <TableCell className="text-right font-mono font-semibold text-red-600">
+                                                {accountCurrency}{Math.abs(totals.withdrawals).toFixed(0)}
+                                            </TableCell>
+                                            <TableCell colSpan={2}></TableCell>
+                                        </TableRow>
+                                        <TableRow className="font-bold text-lg bg-muted">
+                                            <TableCell colSpan={4}>Final Balance</TableCell>
+                                            <TableCell colSpan={3} className={`text-right font-mono ${account?.balance ?? 0 >= 0 ? '' : 'text-red-500'}`}>
+                                                {accountCurrency}{account?.balance.toFixed(0) ?? '0'}
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </Table>
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
             
