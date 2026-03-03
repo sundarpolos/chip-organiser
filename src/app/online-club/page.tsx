@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Link from 'next/link';
 import { getClub } from '@/services/club-service';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import 'jspdf-autotable';
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -43,7 +43,6 @@ const OnlineClubPage: FC = () => {
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
     const [isExporting, setIsExporting] = useState(false);
-    const ledgerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -77,7 +76,7 @@ const OnlineClubPage: FC = () => {
             ]);
 
             setAccount(playerAccount);
-            setLedger(playerLedger.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            setLedger(playerLedger);
             setOnlineClubs(clubs);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
@@ -157,38 +156,73 @@ const OnlineClubPage: FC = () => {
         }
     };
 
-    const handleExportPdf = async () => {
-        if (!ledgerRef.current || !account) {
+    const handleExportPdf = () => {
+        if (!account) {
             toast({
                 variant: "destructive",
                 title: "Export Error",
-                description: "There is no ledger content to export.",
+                description: "There is no account data to export.",
             });
             return;
         }
 
         setIsExporting(true);
         try {
-            const canvas = await html2canvas(ledgerRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: null,
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // Title
+            doc.setFontSize(20);
+            doc.text("Transaction Ledger", pageWidth / 2, 20, { align: "center" });
+            doc.setFontSize(12);
+            doc.text(`Player: ${account.playerName}`, pageWidth / 2, 28, { align: "center" });
+            doc.setFontSize(10);
+            doc.text(`Final Balance: ₹${account.balance.toFixed(2)}`, pageWidth / 2, 34, { align: "center" });
+
+            const tableColumn = ["Date", "Type", "Online Club", "Notes", "Amount", "Balance"];
+            const tableRows: (string | number)[][] = [];
+
+            ledger.forEach(entry => {
+                const ticketData = [
+                    format(parseISO(entry.date), 'dd/MM/yyyy'),
+                    entry.type.toUpperCase(),
+                    entry.onlineClubName || '-',
+                    entry.notes || '-',
+                    `₹${entry.amount.toFixed(2)}`,
+                    `₹${entry.runningBalance.toFixed(2)}`,
+                ];
+                tableRows.push(ticketData);
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.7);
-
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
+            (doc as any).autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                startY: 40,
+                theme: 'grid',
+                headStyles: { fillColor: [63, 81, 181] }, // A deep indigo
+                columnStyles: {
+                    4: { halign: 'right' },
+                    5: { halign: 'right' }
+                },
+                didDrawCell: (data: any) => {
+                    if (data.section === 'body' && data.column.index === 4) { // Amount column
+                        const rawValue = ledger[data.row.index].amount;
+                        if (rawValue >= 0) {
+                             doc.setTextColor(34, 197, 94); // Green
+                        } else {
+                            doc.setTextColor(239, 68, 68); // Red
+                        }
+                    }
+                },
+                willDrawCell: (data: any) => {
+                    // Reset text color for every cell
+                    doc.setTextColor(40, 40, 40);
+                }
             });
-            
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
-            
+
             const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+            doc.save(filename);
 
-            pdf.save(filename);
-            toast({ title: "Success", description: "Ledger has been exported as a PDF." });
         } catch (error) {
             console.error("Could not export PDF:", error);
             toast({ variant: "destructive", title: "Export Failed", description: "An error occurred while generating the PDF." });
@@ -247,7 +281,7 @@ const OnlineClubPage: FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div ref={ledgerRef}>
+                    <div>
                         <Table>
                             <TableHeader>
                                 <TableRow>
