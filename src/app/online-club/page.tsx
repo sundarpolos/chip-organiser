@@ -340,7 +340,7 @@ const OnlineClubPage: FC = () => {
                     doc.setFontSize(12);
                     doc.setFont('courier', 'bold');
                     doc.setTextColor(color);
-                    doc.text(value.split('').join(' '), x, cardStartY + 8);
+                    doc.text(value, x, cardStartY + 8);
                 };
 
                 drawClubCard(20, 'PROFIT', `${currency} ${clubProfit.toFixed(0)}`, profitColor);
@@ -356,7 +356,7 @@ const OnlineClubPage: FC = () => {
                         format(parseISO(entry.date), 'dd/MM/yyyy p'),
                         entry.type.toUpperCase(),
                         entry.notes || '-',
-                        `${entry.amount >= 0 ? '+' : '-'}${currency} ${Math.abs(entry.amount).toFixed(0).split('').join(' ')}`,
+                        `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
                     ];
                 });
 
