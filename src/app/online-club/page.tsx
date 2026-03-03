@@ -122,6 +122,29 @@ const OnlineClubPage: FC = () => {
             window.removeEventListener('storage', handleStorageChange);
         };
     }, [currentUser, refreshData]);
+
+    const balanceByClub = useMemo(() => {
+        if (!ledger || !onlineClubs) return [];
+    
+        const balances: { [key: string]: number } = {};
+    
+        onlineClubs.forEach(club => {
+            if(club.name) {
+                balances[club.name] = 0;
+            }
+        });
+    
+        ledger.forEach(entry => {
+            if (entry.onlineClubName) {
+                if (balances[entry.onlineClubName] === undefined) {
+                    balances[entry.onlineClubName] = 0;
+                }
+                balances[entry.onlineClubName] += entry.amount;
+            }
+        });
+    
+        return Object.entries(balances).map(([name, balance]) => ({ name, balance })).sort((a,b) => a.name.localeCompare(b.name));
+    }, [ledger, onlineClubs]);
     
     const filteredLedger = useMemo(() => {
         if (activeTab === 'all') {
@@ -129,22 +152,6 @@ const OnlineClubPage: FC = () => {
         }
         return ledger.filter(entry => entry.onlineClubName === activeTab);
     }, [ledger, activeTab]);
-
-    const totals = useMemo(() => {
-        return filteredLedger.reduce(
-            (acc, entry) => {
-                if (entry.type === 'p/l') {
-                    acc.pl += entry.amount;
-                } else if (entry.type === 'deposit') {
-                    acc.deposits += entry.amount;
-                } else if (entry.type === 'withdrawal') {
-                    acc.withdrawals += entry.amount;
-                }
-                return acc;
-            },
-            { pl: 0, deposits: 0, withdrawals: 0 }
-        );
-    }, [filteredLedger]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -341,6 +348,31 @@ const OnlineClubPage: FC = () => {
                         Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>{accountCurrency}{account?.balance.toFixed(0) ?? '0'}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">Last updated: {account ? format(parseISO(account.lastUpdated), 'PPP p') : 'N/A'}</p>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Balances by Online Club</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {balanceByClub.map(clubBalance => (
+                        <Card key={clubBalance.name} className="flex flex-col">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">{clubBalance.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className={`text-2xl font-bold ${clubBalance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {accountCurrency}{clubBalance.balance.toFixed(0)}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                    {balanceByClub.length === 0 && (
+                        <p className="text-muted-foreground col-span-full text-center">
+                            No transactions with an assigned online club found.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
