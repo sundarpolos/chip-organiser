@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
+import { getClub } from '@/services/club-service';
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
 
@@ -57,7 +58,6 @@ const OnlineClubPage: FC = () => {
         }
         try {
             const activeClubId = localStorage.getItem('chip-maestro-clubId');
-
             if (!activeClubId) {
                 if (isInitialLoad) {
                     toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
@@ -78,7 +78,9 @@ const OnlineClubPage: FC = () => {
             setOnlineClubs(clubs);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
-            toast({ variant: 'destructive', title: 'Error', description: msg });
+            if (isInitialLoad) {
+                toast({ variant: 'destructive', title: 'Error', description: msg });
+            }
         } finally {
             if (isInitialLoad) {
                 setIsLoading(false);
@@ -86,22 +88,21 @@ const OnlineClubPage: FC = () => {
         }
     }, [currentUser, toast]);
 
+
     useEffect(() => {
         if (currentUser) {
             refreshData(true);
         }
 
         const handleFocus = () => refreshData(false);
-        // This listener will react to club changes in other tabs
         const handleStorageChange = (event: StorageEvent) => {
             if (event.key === 'chip-maestro-clubId') {
-                refreshData(false);
+                refreshData(true);
             }
         };
 
         window.addEventListener('focus', handleFocus);
         window.addEventListener('storage', handleStorageChange);
-
 
         return () => {
             window.removeEventListener('focus', handleFocus);
@@ -109,11 +110,11 @@ const OnlineClubPage: FC = () => {
         };
     }, [currentUser, refreshData]);
 
-    const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
+    const handlePlSubmit = async (amount: number, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            await addProfitLoss(currentUser.id, amount, notes, date, onlineClubName);
+            await addProfitLoss(currentUser.id, amount, "", date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L has been recorded.' });
             await refreshData(false);
         } catch (error) {
@@ -268,22 +269,20 @@ const OnlineClubPage: FC = () => {
     );
 };
 
-const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
+const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
-    const [notes, setNotes] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [onlineClubName, setOnlineClubName] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const numAmount = parseFloat(amount);
-        if (isNaN(numAmount) || !notes || !onlineClubName) {
-            alert('Please enter a valid amount, notes, and select an online club.');
+        if (isNaN(numAmount) || !onlineClubName) {
+            alert('Please enter a valid amount and select an online club.');
             return;
         }
-        onSubmit(numAmount, notes, date, onlineClubName);
+        onSubmit(numAmount, date, onlineClubName);
         setAmount('');
-        setNotes('');
         setOnlineClubName('');
     };
 
@@ -322,10 +321,6 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                                 )}
                             </SelectContent>
                         </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="pl-notes">Notes</Label>
-                        <Textarea id="pl-notes" placeholder="e.g. PokerBaazi session, 2 tables" value={notes} onChange={e => setNotes(e.target.value)} required />
                     </div>
                 </CardContent>
                 <CardFooter>
