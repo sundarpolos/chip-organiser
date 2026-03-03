@@ -55,6 +55,16 @@ const OnlineClubPage: FC = () => {
         return '₹';
     }, [onlineClubs]);
 
+    const onlineClubCurrencyMap = useMemo(() => {
+        const map = new Map<string, string>();
+        onlineClubs.forEach(club => {
+            if (club.name) {
+                map.set(club.name, club.currency || '₹');
+            }
+        });
+        return map;
+    }, [onlineClubs]);
+
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
         if (userStr) {
@@ -126,25 +136,26 @@ const OnlineClubPage: FC = () => {
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
-        const balances: { [key: string]: number } = {};
+        const balances: { [key: string]: { balance: number; currency: string; } } = {};
     
         onlineClubs.forEach(club => {
             if(club.name) {
-                balances[club.name] = 0;
+                balances[club.name] = { balance: 0, currency: club.currency || '₹' };
             }
         });
     
         ledger.forEach(entry => {
             if (entry.onlineClubName) {
                 if (balances[entry.onlineClubName] === undefined) {
-                    balances[entry.onlineClubName] = 0;
+                    // This can happen if a transaction exists for an online club that was deleted.
+                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubCurrencyMap.get(entry.onlineClubName) || '₹' };
                 }
-                balances[entry.onlineClubName] += entry.amount;
+                balances[entry.onlineClubName].balance += entry.amount;
             }
         });
     
-        return Object.entries(balances).map(([name, balance]) => ({ name, balance })).sort((a,b) => a.name.localeCompare(b.name));
-    }, [ledger, onlineClubs]);
+        return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
+    }, [ledger, onlineClubs, onlineClubCurrencyMap]);
     
     const filteredLedger = useMemo(() => {
         if (activeTab === 'all') {
@@ -224,13 +235,16 @@ const OnlineClubPage: FC = () => {
             const borderColor = '#e0e0e0';
 
             const tableColumn = ["Date", "Type", "Online Club", "Amount", "Balance"];
-            const tableRows = ledger.map(entry => [
-                format(parseISO(entry.date), 'dd/MM/yyyy p'),
-                entry.type.toUpperCase(),
-                entry.onlineClubName || '-',
-                `${entry.amount >= 0 ? '+' : '-'}${accountCurrency}${Math.abs(entry.amount).toFixed(0)}`,
-                `${accountCurrency}${entry.runningBalance.toFixed(0)}`,
-            ]);
+            const tableRows = ledger.map(entry => {
+                const currency = (entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹';
+                return [
+                    format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                    entry.type.toUpperCase(),
+                    entry.onlineClubName || '-',
+                    `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
+                    `${accountCurrency}${entry.runningBalance.toFixed(0)}`,
+                ]
+            });
 
             (doc as any).autoTable({
                 head: [tableColumn],
@@ -357,7 +371,7 @@ const OnlineClubPage: FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <div className={`text-2xl font-bold ${clubBalance.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {accountCurrency}{clubBalance.balance.toFixed(0)}
+                                    {clubBalance.currency}{clubBalance.balance.toFixed(0)}
                                 </div>
                             </CardContent>
                         </Card>
@@ -415,7 +429,7 @@ const OnlineClubPage: FC = () => {
                                             <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                             <TableCell>{entry.notes}</TableCell>
                                             <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {entry.amount >= 0 ? `+${accountCurrency}` : `-${accountCurrency}`}{Math.abs(entry.amount).toFixed(0)}
+                                                {entry.amount >= 0 ? `+` : `-`}{(entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
                                             <TableCell className="text-right">
