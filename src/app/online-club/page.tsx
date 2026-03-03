@@ -50,59 +50,30 @@ const OnlineClubPage: FC = () => {
         }
     }, [router]);
 
-    useEffect(() => {
-        const refreshData = async () => {
-            if (!currentUser) return;
-            setIsLoading(true);
-            try {
-                const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
-                const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
-
-                if (!activeClubId) {
-                    toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
-                    setIsLoading(false);
-                    return;
-                }
-
-                const [playerAccount, playerLedger, clubs] = await Promise.all([
-                    getOnlinePlayerAccount(currentUser.id),
-                    getOnlineLedgerEntries(currentUser.id),
-                    getOnlineClubs(activeClubId),
-                ]);
-                setAccount(playerAccount);
-                setLedger(playerLedger);
-                setOnlineClubs(clubs);
-            } catch (error) {
-                const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
-                toast({ variant: 'destructive', title: 'Error', description: msg });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (currentUser) {
-            refreshData();
-        }
-    }, [currentUser, toast]);
-
-    const refreshData = useCallback(async () => {
+    const refreshData = useCallback(async (isInitialLoad = false) => {
         if (!currentUser) return;
-        setIsLoading(true);
+        if (isInitialLoad) {
+            setIsLoading(true);
+        }
         try {
             const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
             const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
 
             if (!activeClubId) {
-                toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
-                setIsLoading(false);
+                if (isInitialLoad) {
+                    toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
+                }
+                setOnlineClubs([]);
                 return;
             }
 
+            // Fetch all data in parallel
             const [playerAccount, playerLedger, clubs] = await Promise.all([
                 getOnlinePlayerAccount(currentUser.id),
                 getOnlineLedgerEntries(currentUser.id),
                 getOnlineClubs(activeClubId),
             ]);
+
             setAccount(playerAccount);
             setLedger(playerLedger);
             setOnlineClubs(clubs);
@@ -110,9 +81,24 @@ const OnlineClubPage: FC = () => {
             const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
         } finally {
-            setIsLoading(false);
+            if (isInitialLoad) {
+                setIsLoading(false);
+            }
         }
     }, [currentUser, toast]);
+
+    useEffect(() => {
+        if (currentUser) {
+            refreshData(true);
+        }
+
+        const handleFocus = () => refreshData(false);
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [currentUser, refreshData]);
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -120,7 +106,7 @@ const OnlineClubPage: FC = () => {
         try {
             await addProfitLoss(currentUser.id, amount, notes, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L has been recorded.' });
-            await refreshData();
+            await refreshData(false);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Could not save P/L.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
@@ -135,7 +121,7 @@ const OnlineClubPage: FC = () => {
         try {
             await updateProfitLoss(currentUser.id, entryId, amount, notes, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L entry has been updated.' });
-            await refreshData();
+            await refreshData(false);
             setEditModalOpen(false);
             setEntryToEdit(null);
         } catch (error) {
@@ -151,7 +137,7 @@ const OnlineClubPage: FC = () => {
         try {
             await deleteProfitLoss(currentUser.id, entryId);
             toast({ title: 'Entry Deleted', description: 'The ledger entry has been removed.' });
-            await refreshData();
+            await refreshData(false);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Could not delete entry.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
