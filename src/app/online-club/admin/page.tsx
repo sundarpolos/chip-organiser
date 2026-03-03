@@ -310,12 +310,14 @@ const TransactionDialog: FC<{
     const { toast } = useToast();
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     useEffect(() => {
         if (isOpen) {
             setAmount('');
             setNotes('');
+            setDate(format(new Date(), 'yyyy-MM-dd'));
         }
     }, [isOpen]);
 
@@ -327,7 +329,7 @@ const TransactionDialog: FC<{
         }
         setIsSubmitting(true);
         try {
-            await recordTransaction(account.id, type, numAmount, notes);
+            await recordTransaction(account.id, type, numAmount, notes, date);
             toast({ title: 'Success', description: `Transaction recorded for ${account.playerName}.` });
             onSuccess();
             onOpenChange(false);
@@ -350,6 +352,10 @@ const TransactionDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="tx-amount">Amount</Label>
                         <Input id="tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="tx-date">Date</Label>
+                        <Input id="tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="tx-notes">Notes (Optional)</Label>
