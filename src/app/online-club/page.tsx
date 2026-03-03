@@ -56,8 +56,7 @@ const OnlineClubPage: FC = () => {
             setIsLoading(true);
         }
         try {
-            const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
-            const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
+            const activeClubId = localStorage.getItem('chip-maestro-clubId');
 
             if (!activeClubId) {
                 if (isInitialLoad) {
