@@ -454,9 +454,15 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {onlineClubs.map(club => (
-                                    <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
-                                ))}
+                                {onlineClubs && onlineClubs.filter(c => c.name).length > 0 ? (
+                                    onlineClubs.filter(c => c.name).map(club => (
+                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No online clubs found. An admin must create them in Settings.
+                                    </div>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
@@ -529,9 +535,15 @@ const EditPlDialog: FC<{
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {onlineClubs.map(club => (
-                                    <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
-                                ))}
+                                {onlineClubs && onlineClubs.filter(c => c.name).length > 0 ? (
+                                    onlineClubs.filter(c => c.name).map(club => (
+                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        No online clubs found. An admin must create them in Settings.
+                                    </div>
+                                )}
                             </SelectContent>
                         </Select>
                     </div>
