@@ -39,7 +39,6 @@ const AdminOnlineClubPage: FC = () => {
     const [selectedAccount, setSelectedAccount] = useState<OnlinePlayerAccount | null>(null);
     const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [playerLedger, setPlayerLedger] = useState<OnlineLedgerEntry[]>([]);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [isDeletingPlayer, setIsDeletingPlayer] = useState(false);
     const [isEditTransactionModalOpen, setEditTransactionModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
@@ -141,42 +140,6 @@ const AdminOnlineClubPage: FC = () => {
             toast({ variant: 'destructive', title: 'Deletion Failed', description: error.message });
         }
     };
-
-    const handleDeleteClubData = async () => {
-        if (selectedClubId === 'all' && isSuperAdmin) {
-            setIsDeleting(true);
-            try {
-                for (const club of allClubs) {
-                    await deleteAllOnlineDataForClub(club.id);
-                }
-                toast({ title: 'Success', description: 'All online data for ALL clubs has been deleted.' });
-                await refreshData();
-            } catch (error) {
-                const msg = error instanceof Error ? error.message : 'An unknown error occurred.';
-                toast({ variant: 'destructive', title: 'Global Deletion Failed', description: msg });
-            } finally {
-                setIsDeleting(false);
-            }
-            return;
-        }
-
-        if (!selectedClubId) {
-            toast({ variant: 'destructive', title: 'No Club Selected', description: 'Please select a club.' });
-            return;
-        }
-
-        setIsDeleting(true);
-        try {
-            await deleteAllOnlineDataForClub(selectedClubId);
-            toast({ title: 'Success', description: 'All online account and ledger data for the selected club has been deleted.' });
-            await refreshData(); // Refresh data to show empty state
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : 'An unknown error occurred.';
-            toast({ variant: 'destructive', title: 'Deletion Failed', description: msg });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
     
     const handleDeletePlayerAccount = async (accountId: string, playerName: string) => {
         setIsDeletingPlayer(true);
@@ -205,32 +168,6 @@ const AdminOnlineClubPage: FC = () => {
                             <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Admin</CardTitle>
                             <CardDescription>View balances and manage deposits/withdrawals for all players.</CardDescription>
                         </div>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" disabled={isDeleting}>
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Club Data
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        {selectedClubId === 'all' && isSuperAdmin
-                                            ? "This action is irreversible. It will permanently delete ALL online data for every club in the system."
-                                            : "This action cannot be undone. This will permanently delete all online accounts, ledger entries, and transaction history for the selected club."
-                                        }
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDeleteClubData} disabled={isDeleting}>
-                                        {isDeleting && <Loader2 className="animate-spin mr-2" />}
-                                        I understand, delete the data
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
                     </div>
                 </CardHeader>
                 <CardContent>
