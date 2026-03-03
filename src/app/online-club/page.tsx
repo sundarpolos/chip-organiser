@@ -93,10 +93,20 @@ const OnlineClubPage: FC = () => {
         }
 
         const handleFocus = () => refreshData(false);
+        // This listener will react to club changes in other tabs
+        const handleStorageChange = (event: StorageEvent) => {
+            if (event.key === 'chip-maestro-clubId') {
+                refreshData(false);
+            }
+        };
+
         window.addEventListener('focus', handleFocus);
+        window.addEventListener('storage', handleStorageChange);
+
 
         return () => {
             window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('storage', handleStorageChange);
         };
     }, [currentUser, refreshData]);
 
@@ -298,7 +308,7 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                      <div className="space-y-2">
                         <Label htmlFor="online-club">Online Club</Label>
                         <Select value={onlineClubName} onValueChange={setOnlineClubName}>
-                            <SelectTrigger id="online-club">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -379,7 +389,7 @@ const EditPlDialog: FC<{
                      <div className="space-y-2">
                         <Label htmlFor="edit-online-club">Online Club</Label>
                         <Select value={onlineClubName} onValueChange={setOnlineClubName}>
-                            <SelectTrigger id="edit-online-club">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
                             <SelectContent>
