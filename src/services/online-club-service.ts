@@ -291,6 +291,21 @@ export async function deleteOnlineClub(onlineClubId: string): Promise<void> {
 
 // ====== ADMIN DESTRUCTIVE ACTIONS ======
 
+export async function deleteOnlinePlayerAccount(accountId: string): Promise<void> {
+    const batch = writeBatch(db);
+
+    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+    batch.delete(accountRef);
+
+    const ledgerQuery = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId));
+    const ledgerSnapshot = await getDocs(ledgerQuery);
+    ledgerSnapshot.forEach(ledgerDoc => {
+        batch.delete(ledgerDoc.ref);
+    });
+
+    await batch.commit();
+}
+
 export async function deleteAllOnlineDataForClub(clubId: string): Promise<void> {
     const batch = writeBatch(db);
 

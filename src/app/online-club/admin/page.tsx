@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,7 @@ const AdminOnlineClubPage: FC = () => {
     const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [playerLedger, setPlayerLedger] = useState<OnlineLedgerEntry[]>([]);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isDeletingPlayer, setIsDeletingPlayer] = useState(false);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -140,6 +141,20 @@ const AdminOnlineClubPage: FC = () => {
             setIsDeleting(false);
         }
     };
+    
+    const handleDeletePlayerAccount = async (accountId: string, playerName: string) => {
+        setIsDeletingPlayer(true);
+        try {
+            await deleteOnlinePlayerAccount(accountId);
+            toast({ title: "Account Deleted", description: `The account for ${playerName} has been deleted.` });
+            await refreshData();
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Could not delete player account.";
+            toast({ variant: 'destructive', title: 'Deletion Failed', description: msg });
+        } finally {
+            setIsDeletingPlayer(false);
+        }
+    };
 
     if (isLoading) {
         return <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin" /></div>;
@@ -223,6 +238,27 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button size="icon" variant="destructive" disabled={isDeletingPlayer}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete {account.playerName}'s Account?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This will permanently delete the online account for {account.playerName} and all associated transaction history. This action cannot be undone.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeletePlayerAccount(account.id, account.playerName)}>
+                                                        Delete Account
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </TableCell>
                                 </TableRow>
                             ))}
