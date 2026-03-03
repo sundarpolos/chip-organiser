@@ -20,6 +20,7 @@ import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save } from 'luci
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { sendDeleteOnlineAccountOtp } from '@/ai/flows/send-delete-online-account-otp';
 
 const AdminOnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -42,6 +43,9 @@ const AdminOnlineClubPage: FC = () => {
     const [isDeletingPlayer, setIsDeletingPlayer] = useState(false);
     const [isEditTransactionModalOpen, setEditTransactionModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
+
+    const [playerToDelete, setPlayerToDelete] = useState<OnlinePlayerAccount | null>(null);
+    const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -214,27 +218,12 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button size="icon" variant="destructive" disabled={isDeletingPlayer}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent>
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Delete {account.playerName}'s Account?</AlertDialogTitle>
-                                                    <AlertDialogDescription>
-                                                        This will permanently delete the online account for {account.playerName} and all associated transaction history. This action cannot be undone.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => handleDeletePlayerAccount(account.id, account.playerName)}>
-                                                        Delete Account
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
+                                        <Button size="icon" variant="destructive" onClick={() => {
+                                            setPlayerToDelete(account);
+                                            setDeleteModalOpen(true);
+                                        }}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -283,9 +272,127 @@ const AdminOnlineClubPage: FC = () => {
                     )}
                 </>
             )}
+
+            {playerToDelete && (
+                <DeleteAccountDialog
+                    isOpen={isDeleteModalOpen}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setPlayerToDelete(null);
+                        }
+                        setDeleteModalOpen(open);
+                    }}
+                    account={playerToDelete}
+                    clubName={allClubs.find(c => c.id === playerToDelete.clubId)?.name || 'N/A'}
+                    onConfirmDelete={handleDeletePlayerAccount}
+                    toast={toast}
+                />
+            )}
         </div>
     );
 };
+
+const DeleteAccountDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    account: OnlinePlayerAccount;
+    clubName: string;
+    onConfirmDelete: (accountId: string, playerName: string) => void;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset state on close
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSending(false);
+            setIsDeleting(false);
+        }
+    }, [isOpen]);
+
+    const handleSendOtp = async () => {
+        setIsSending(true);
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: account.playerName,
+                clubName: clubName,
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: "OTP Sent", description: "An OTP has been sent to the Super Admin's WhatsApp." });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleDelete = () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The entered code is incorrect.' });
+            return;
+        }
+        setIsDeleting(true);
+        onConfirmDelete(account.id, account.playerName);
+        setIsDeleting(false);
+        onOpenChange(false);
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete {account.playerName}'s Online Account?</DialogTitle>
+                    <DialogDescription>
+                        {isOtpSent 
+                            ? "Enter the OTP sent to the Super Admin to confirm deletion."
+                            : "This will permanently delete the online account and all associated transaction history. An OTP will be sent to the Super Admin to confirm this critical action."
+                        }
+                    </DialogDescription>
+                </DialogHeader>
+
+                {isOtpSent ? (
+                    <div className="py-4 space-y-2">
+                        <Label htmlFor="delete-otp">Super Admin OTP</Label>
+                        <Input
+                            id="delete-otp"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            placeholder="4-digit code"
+                        />
+                    </div>
+                ) : null}
+
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    {!isOtpSent ? (
+                        <Button variant="destructive" onClick={handleSendOtp} disabled={isSending}>
+                            {isSending ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send Deletion OTP
+                        </Button>
+                    ) : (
+                         <Button variant="destructive" onClick={handleDelete} disabled={isDeleting || !otp}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete Account
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 const TransactionDialog: FC<{
     isOpen: boolean;
