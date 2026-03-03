@@ -21,6 +21,7 @@ import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { sendDeleteOnlineAccountOtp } from '@/ai/flows/send-delete-online-account-otp';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const AdminOnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -518,6 +519,8 @@ const LedgerDialog: FC<{
     onDeleteTransaction: (accountId: string, entryId: string) => void;
     onlineClubs: OnlineClub[];
 }> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs }) => {
+    const [activeTab, setActiveTab] = useState('all');
+
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
@@ -540,6 +543,13 @@ const LedgerDialog: FC<{
     
         return Object.entries(balances).map(([name, balance]) => ({ name, balance })).sort((a,b) => a.name.localeCompare(b.name));
     }, [ledger, onlineClubs]);
+
+    const filteredLedger = useMemo(() => {
+        if (activeTab === 'all') {
+            return ledger;
+        }
+        return ledger.filter(entry => entry.onlineClubName === activeTab);
+    }, [ledger, activeTab]);
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -566,58 +576,68 @@ const LedgerDialog: FC<{
                         )}
                     </CardContent>
                 </Card>
-                <ScrollArea className="h-80 border rounded-md">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Online Club</TableHead>
-                                <TableHead>Payment Mode / Notes</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {ledger.map(entry => (
-                                <TableRow key={entry.id}>
-                                    <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell className="capitalize">{entry.type}</TableCell>
-                                    <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                    <TableCell>{entry.notes}</TableCell>
-                                    <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(0)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(0)}</TableCell>
-                                    <TableCell className="text-right">
-                                        {entry.type !== 'p/l' && (
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => onEditTransaction(entry)}><Edit className="h-4 w-4"/></Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => onDeleteTransaction(account.id, entry.id)}>Delete</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                             {ledger.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No transactions.</TableCell></TableRow>}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList>
+                        <TabsTrigger value="all">All</TabsTrigger>
+                        {onlineClubs.map(club => (
+                            <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
+                        ))}
+                    </TabsList>
+                    <TabsContent value={activeTab} className="mt-4">
+                        <ScrollArea className="h-80 border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Online Club</TableHead>
+                                        <TableHead>Payment Mode / Notes</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">Balance</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredLedger.map(entry => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell className="capitalize">{entry.type}</TableCell>
+                                            <TableCell>{entry.onlineClubName || '-'}</TableCell>
+                                            <TableCell>{entry.notes}</TableCell>
+                                            <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(0)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(0)}</TableCell>
+                                            <TableCell className="text-right">
+                                                {entry.type !== 'p/l' && (
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button variant="ghost" size="icon" onClick={() => onEditTransaction(entry)}><Edit className="h-4 w-4"/></Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => onDeleteTransaction(account.id, entry.id)}>Delete</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {filteredLedger.length === 0 && <TableRow><TableCell colSpan={7} className="text-center h-24">No transactions for this view.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </TabsContent>
+                </Tabs>
                 <DialogFooter>
                     <DialogClose asChild><Button>Close</Button></DialogClose>
                 </DialogFooter>
