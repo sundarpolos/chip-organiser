@@ -236,120 +236,148 @@ const OnlineClubPage: FC = () => {
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            // New Design System Colors (Light Mode)
+            // Design tokens
             const textPrimary = '#0F172A';
             const textMuted = '#94A3B8';
-            const profitColor = '#10B981'; // Emerald
-            const lossColor = '#F43F5E'; // Rose
-            const tableHeadBg = '#F8FAFC';
-            const borderColor = '#F1F5F9';
+            const profitColor = '#10B981';
+            const lossColor = '#F43F5E';
+            const badgeColors = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FEE2E2", "#E0E7FF", "#DBEAFE", "#E0E7FF"];
+            const badgeTextColors = ["#1E40AF", "#065F46", "#92400E", "#991B1B", "#3730A3", "#1E40AF", "#5B21B6"];
 
-            const tableColumn = ["Date", "Type", "Online Club", "Amount"];
-            const tableRows = ledger.map(entry => {
-                const currency = (entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹';
-                return [
-                    format(parseISO(entry.date), 'dd/MM/yyyy p'),
-                    entry.type.toUpperCase(),
-                    entry.onlineClubName || '-',
-                    `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
-                ]
-            });
-            
+            // Data processing
             const totalProfit = ledger.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
             const totalLoss = ledger.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
             const totalDeposits = ledger.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
             const totalWithdrawals = ledger.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+            
+            // Group entries by club
+            const entriesByClub = ledger.reduce((acc, entry) => {
+                const clubName = entry.onlineClubName || 'Unassigned';
+                if (!acc[clubName]) {
+                    acc[clubName] = [];
+                }
+                acc[clubName].push(entry);
+                return acc;
+            }, {} as Record<string, OnlineLedgerEntry[]>);
 
-            (doc as any).autoTable({
-                head: [tableColumn],
-                body: tableRows,
-                startY: 110,
-                theme: 'plain',
-                headStyles: {
-                    fillColor: tableHeadBg,
-                    textColor: textMuted,
-                    fontStyle: 'bold',
-                    fontSize: 9,
-                },
-                styles: {
-                    font: 'helvetica',
-                    textColor: textPrimary,
-                    fontSize: 10,
-                },
-                columnStyles: {
-                    3: { halign: 'right' }
-                },
-                willDrawCell: (data: any) => {
-                    doc.setTextColor(textPrimary);
-                    if (data.column.index === 3 && data.section === 'body') {
-                        const rawValue = ledger[data.row.index].amount;
-                        doc.setTextColor(rawValue >= 0 ? profitColor : lossColor);
+
+            const drawHeader = () => {
+                doc.setFontSize(36);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(textPrimary);
+                doc.text('SETTLEMENT LEDGER', 20, 30);
+                
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(textMuted);
+                doc.text('PLAYER', 20, 50);
+                
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(textPrimary);
+                doc.text(account.playerName, 20, 58);
+                
+                // Balance Badges
+                let currentX = pageWidth - 20;
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                balanceByClub.slice().reverse().forEach((clubBalance, index) => {
+                    const text = `${clubBalance.name}: ${clubBalance.currency}${clubBalance.balance.toFixed(0)}`;
+                    const textWidth = doc.getTextWidth(text) + 12; // with padding
+                    
+                    if (currentX - textWidth < 20) { 
+                        currentX = pageWidth - 20;
                     }
-                },
-                didDrawCell: (data: any) => {
-                    if (data.row.section === 'body' || data.row.section === 'head') {
-                        if (data.row.index === data.table.body.length - 1 || data.row.section === 'head') {
-                             doc.setDrawColor(borderColor);
-                             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
-                        }
-                    }
-                },
-                didDrawPage: (data: any) => {
-                    // Main Header
-                    doc.setFontSize(36);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textPrimary);
-                    doc.text('SETTLEMENT LEDGER', 20, 30);
                     
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textMuted);
-                    doc.text('PLAYER', 20, 50);
-                    
-                    doc.setFontSize(16);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textPrimary);
-                    doc.text(account.playerName, 20, 58);
-                    
-                    doc.setFontSize(10);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textMuted);
-                    doc.text('CURRENT BALANCE', pageWidth - 20, 50, { align: 'right' });
-                    
-                    const balanceText = `${currencyForTab}${account.balance.toFixed(0)}`;
-                    const balanceColor = account.balance >= 0 ? profitColor : lossColor;
-                    doc.setFontSize(28);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(balanceColor);
-                    doc.text(balanceText, pageWidth - 20, 62, { align: 'right'});
+                    doc.setFillColor(badgeColors[index % badgeColors.length]);
+                    doc.setTextColor(badgeTextColors[index % badgeTextColors.length]);
+                    doc.roundedRect(currentX - textWidth, 50, textWidth, 10, 3, 3, 'F');
+                    doc.text(text, currentX - textWidth + 6, 56.5, {baseline: 'middle'});
+                    currentX -= (textWidth + 5);
+                });
 
-                    // Summary Cards
-                    const cardY = 75;
-                    const cardWidth = (pageWidth - 40 - 30) / 4;
-                    
-                    const drawCard = (x: number, label: string, value: string, color: string) => {
-                        doc.setFontSize(8);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(textMuted);
-                        doc.text(label, x, cardY);
-                        doc.setFontSize(14);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(color);
-                        doc.text(value, x, cardY + 8);
-                    }
-
-                    drawCard(20, 'PROFIT', `${currencyForTab}${totalProfit.toFixed(0)}`, profitColor);
-                    drawCard(20 + cardWidth + 10, 'LOSS', `${currencyForTab}${Math.abs(totalLoss).toFixed(0)}`, lossColor);
-                    drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${currencyForTab}${totalDeposits.toFixed(0)}`, textPrimary);
-                    drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${currencyForTab}${Math.abs(totalWithdrawals).toFixed(0)}`, textPrimary);
-
-                    // Footer
+                // Summary Cards
+                const cardY = 75;
+                const cardWidth = (pageWidth - 40 - 30) / 4;
+                const drawCard = (x: number, label: string, value: string, color: string) => {
                     doc.setFontSize(8);
+                    doc.setFont('helvetica', 'bold');
                     doc.setTextColor(textMuted);
-                    doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 20, pageHeight - 10);
-                    doc.text(`Chip Maestro Report`, pageWidth - 20, pageHeight - 10, { align: 'right'});
-                },
-            });
+                    doc.text(label, x, cardY);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(color);
+                    doc.text(value, x, cardY + 8);
+                }
+                const summaryCurrency = '₹';
+                drawCard(20, 'PROFIT', `${summaryCurrency}${totalProfit.toFixed(0)}`, profitColor);
+                drawCard(20 + cardWidth + 10, 'LOSS', `${summaryCurrency}${Math.abs(totalLoss).toFixed(0)}`, lossColor);
+                drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${summaryCurrency}${totalDeposits.toFixed(0)}`, textPrimary);
+                drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${summaryCurrency}${Math.abs(totalWithdrawals).toFixed(0)}`, textPrimary);
+            };
+
+            const drawFooter = (page: number, totalPages: number) => {
+                doc.setFontSize(8);
+                doc.setTextColor(textMuted);
+                doc.text(`Page ${page} of ${totalPages}`, pageWidth - 20, pageHeight - 10, { align: 'right' });
+                doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 20, pageHeight - 10);
+            };
+            
+            drawHeader();
+            let lastY = 110;
+
+            const sortedClubNames = Object.keys(entriesByClub).sort();
+
+            for (const clubName of sortedClubNames) {
+                const clubEntries = entriesByClub[clubName];
+                const clubBalance = balanceByClub.find(b => b.name === clubName);
+
+                const tableColumn = ["Date", "Type", "Notes", "Amount"];
+                const tableRows = clubEntries.map(entry => [
+                    format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                    entry.type.toUpperCase(),
+                    entry.notes || '-',
+                    `${entry.amount >= 0 ? '+' : '-'}${clubBalance?.currency || '₹'}${Math.abs(entry.amount).toFixed(0)}`,
+                ]);
+
+                // Add a header for the club section
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(textPrimary);
+                doc.text(`${clubName}`, 20, lastY);
+                lastY += 8;
+
+                (doc as any).autoTable({
+                    head: [tableColumn],
+                    body: tableRows,
+                    startY: lastY,
+                    theme: 'plain',
+                    headStyles: { textColor: textMuted, fontStyle: 'bold', fontSize: 9 },
+                    styles: { font: 'helvetica', textColor: textPrimary, fontSize: 10 },
+                    columnStyles: { 3: { halign: 'right' } },
+                    willDrawCell: (data: any) => {
+                        doc.setTextColor(textPrimary);
+                        if (data.column.index === 3 && data.section === 'body') {
+                            const rawValue = clubEntries[data.row.index].amount;
+                            doc.setTextColor(rawValue >= 0 ? profitColor : lossColor);
+                        }
+                    },
+                });
+
+                lastY = (doc as any).lastAutoTable.finalY + 15;
+
+                if (lastY > pageHeight - 40) {
+                    doc.addPage();
+                    lastY = 20;
+                }
+            }
+
+            // Draw footer on all pages
+            const pageCount = (doc as any).internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                drawFooter(i, pageCount);
+            }
 
             const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
             doc.save(filename);
@@ -363,6 +391,7 @@ const OnlineClubPage: FC = () => {
             setIsExporting(false);
         }
     };
+
 
     if (isLoading) {
         return (
