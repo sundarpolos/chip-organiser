@@ -342,7 +342,7 @@ const OnlineClubPage: FC = () => {
                                     <TableHead>Date</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Online Club</TableHead>
-                                    <TableHead>Notes</TableHead>
+                                    <TableHead>Payment Mode / Notes</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
                                     <TableHead className="text-right">Balance</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>

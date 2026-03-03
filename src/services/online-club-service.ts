@@ -78,7 +78,7 @@ export async function addProfitLoss(accountId: string, amount: number, notes: st
 }
 
 
-export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, notes: string, date?: string): Promise<void> {
+export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, paymentMode: string, date?: string): Promise<void> {
     const transactionAmount = type === 'deposit' ? amount : -amount;
 
     let transactionDate: Date;
@@ -95,7 +95,7 @@ export async function recordTransaction(accountId: string, type: 'deposit' | 'wi
         type,
         amount: transactionAmount,
         date: transactionDate.toISOString(),
-        notes,
+        notes: paymentMode,
         runningBalance: 0, // Placeholder, will be fixed by recalculation
     };
     

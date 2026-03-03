@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, type FC } from 'react';
@@ -309,14 +310,14 @@ const TransactionDialog: FC<{
 }> = ({ isOpen, onOpenChange, account, type, onSuccess }) => {
     const { toast } = useToast();
     const [amount, setAmount] = useState('');
-    const [notes, setNotes] = useState('');
+    const [paymentMode, setPaymentMode] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     useEffect(() => {
         if (isOpen) {
             setAmount('');
-            setNotes('');
+            setPaymentMode('');
             setDate(format(new Date(), 'yyyy-MM-dd'));
         }
     }, [isOpen]);
@@ -327,9 +328,13 @@ const TransactionDialog: FC<{
             toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid positive amount.' });
             return;
         }
+        if (!paymentMode) {
+            toast({ variant: 'destructive', title: 'Payment Mode Required', description: 'Please select a payment mode.' });
+            return;
+        }
         setIsSubmitting(true);
         try {
-            await recordTransaction(account.id, type, numAmount, notes, date);
+            await recordTransaction(account.id, type, numAmount, paymentMode, date);
             toast({ title: 'Success', description: `Transaction recorded for ${account.playerName}.` });
             onSuccess();
             onOpenChange(false);
@@ -358,8 +363,18 @@ const TransactionDialog: FC<{
                         <Input id="tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="tx-notes">Notes (Optional)</Label>
-                        <Textarea id="tx-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Bank Transfer, GPay" />
+                        <Label htmlFor="tx-payment-mode">Payment Mode</Label>
+                        <Select value={paymentMode} onValueChange={setPaymentMode}>
+                            <SelectTrigger id="tx-payment-mode">
+                                <SelectValue placeholder="Select a payment mode" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Google Pay">Google Pay</SelectItem>
+                                <SelectItem value="Net Banking">Net Banking</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
                 <DialogFooter>
@@ -394,7 +409,7 @@ const LedgerDialog: FC<{
                                 <TableHead>Date</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Online Club</TableHead>
-                                <TableHead>Notes</TableHead>
+                                <TableHead>Payment Mode / Notes</TableHead>
                                 <TableHead className="text-right">Amount</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
                             </TableRow>
