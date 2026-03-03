@@ -212,7 +212,7 @@ const AdminOnlineClubPage: FC = () => {
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
                                     {isSuperAdmin && <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>}
                                     <TableCell className={`text-right font-mono font-semibold ${account.balance >= 0 ? '' : 'text-red-500'}`}>
-                                        ₹{account.balance.toFixed(2)}
+                                        ₹{account.balance.toFixed(0)}
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
@@ -249,6 +249,7 @@ const AdminOnlineClubPage: FC = () => {
                         ledger={playerLedger}
                         onEditTransaction={handleOpenEditTransaction}
                         onDeleteTransaction={handleDeleteTransaction}
+                        onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
                     />
                     {entryToEdit && (
                         <EditTransactionDialog
@@ -451,12 +452,12 @@ const TransactionDialog: FC<{
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="capitalize">{type} for {account.playerName}</DialogTitle>
-                    <DialogDescription>Current Balance: ₹{account.balance.toFixed(2)}</DialogDescription>
+                    <DialogDescription>Current Balance: ₹{account.balance.toFixed(0)}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="tx-amount">Amount</Label>
-                        <Input id="tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                        <Input id="tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="tx-date">Date</Label>
@@ -515,15 +516,57 @@ const LedgerDialog: FC<{
     ledger: OnlineLedgerEntry[];
     onEditTransaction: (entry: OnlineLedgerEntry) => void;
     onDeleteTransaction: (accountId: string, entryId: string) => void;
-}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction }) => {
+    onlineClubs: OnlineClub[];
+}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs }) => {
+    const balanceByClub = useMemo(() => {
+        if (!ledger || !onlineClubs) return [];
+    
+        const balances: { [key: string]: number } = {};
+    
+        onlineClubs.forEach(club => {
+            if(club.name) {
+                balances[club.name] = 0;
+            }
+        });
+    
+        ledger.forEach(entry => {
+            if (entry.onlineClubName) {
+                if (balances[entry.onlineClubName] === undefined) {
+                    balances[entry.onlineClubName] = 0;
+                }
+                balances[entry.onlineClubName] += entry.amount;
+            }
+        });
+    
+        return Object.entries(balances).map(([name, balance]) => ({ name, balance })).sort((a,b) => a.name.localeCompare(b.name));
+    }, [ledger, onlineClubs]);
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Transaction Ledger for {account.playerName}</DialogTitle>
-                    <DialogDescription>Complete history of all account transactions.</DialogDescription>
+                    <DialogDescription>Balances by online club and complete transaction history.</DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="h-96">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Balances by Online Club</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-2 grid-cols-2 md:grid-cols-3">
+                        {balanceByClub.map(clubBalance => (
+                            <div key={clubBalance.name} className="p-2 rounded-lg border">
+                                <p className="text-xs text-muted-foreground">{clubBalance.name}</p>
+                                <p className={`text-lg font-bold ${clubBalance.balance >= 0 ? '' : 'text-red-500'}`}>
+                                    ₹{clubBalance.balance.toFixed(0)}
+                                </p>
+                            </div>
+                        ))}
+                        {balanceByClub.length === 0 && (
+                            <p className="text-muted-foreground col-span-full text-center py-4 text-sm">No balances to show.</p>
+                        )}
+                    </CardContent>
+                </Card>
+                <ScrollArea className="h-80 border rounded-md">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -544,9 +587,9 @@ const LedgerDialog: FC<{
                                     <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                     <TableCell>{entry.notes}</TableCell>
                                     <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
+                                        {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(0)}
                                     </TableCell>
-                                    <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(0)}</TableCell>
                                     <TableCell className="text-right">
                                         {entry.type !== 'p/l' && (
                                             <div className="flex justify-end gap-2">
@@ -558,7 +601,7 @@ const LedgerDialog: FC<{
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
+                                                            <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -643,7 +686,7 @@ const EditTransactionDialog: FC<{
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="edit-tx-amount">Amount</Label>
-                        <Input id="edit-tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />
+                        <Input id="edit-tx-amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="edit-tx-date">Date</Label>
