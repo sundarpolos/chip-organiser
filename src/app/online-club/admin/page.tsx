@@ -22,6 +22,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { sendDeleteOnlineAccountOtp } from '@/ai/flows/send-delete-online-account-otp';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const AdminOnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -48,6 +50,24 @@ const AdminOnlineClubPage: FC = () => {
 
     const [playerToDelete, setPlayerToDelete] = useState<OnlinePlayerAccount | null>(null);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+
+    const badgeColors = [
+        "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
+        "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+        "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+        "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+        "bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300",
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300",
+    ];
+
+    const onlineClubCurrencyMap = useMemo(() => {
+        const map = new Map<string, string>();
+        allOnlineClubs.forEach(club => {
+            map.set(club.name, club.currency || '₹');
+        });
+        return map;
+    }, [allOnlineClubs]);
 
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
@@ -239,15 +259,15 @@ const AdminOnlineClubPage: FC = () => {
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
                                     {isSuperAdmin && <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>}
                                     <TableCell className="text-right">
-                                        <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
-                                            {Object.entries(account.clubBalances).map(([clubName, balance]) => (
-                                                <div key={clubName} className="text-xs text-muted-foreground">
-                                                    <span className="font-semibold">{clubName}:</span>
-                                                    <span className={`font-mono ml-1 ${balance >= 0 ? '' : 'text-red-500'}`}>
-                                                        ₹{balance.toFixed(0)}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                        <div className="flex flex-wrap justify-end gap-1">
+                                            {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
+                                                const currency = onlineClubCurrencyMap.get(clubName) || '₹';
+                                                return (
+                                                    <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
+                                                        {clubName}: {currency}{balance.toFixed(0)}
+                                                    </Badge>
+                                                )
+                                            })}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -488,7 +508,6 @@ const TransactionDialog: FC<{
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="capitalize">{type} for {account.playerName}</DialogTitle>
-                    <DialogDescription>Current Balance: ₹{account.balance.toFixed(0)}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
