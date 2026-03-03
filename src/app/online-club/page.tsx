@@ -168,14 +168,6 @@ const OnlineClubPage: FC = () => {
         return ledger.filter(entry => entry.onlineClubName === activeTab);
     }, [ledger, activeTab]);
 
-    const totalBalanceForTab = useMemo(() => {
-        if (activeTab === 'all') {
-            return account?.balance || 0;
-        }
-        const clubBalance = balanceByClub.find(cb => cb.name === activeTab);
-        return clubBalance?.balance || 0;
-    }, [activeTab, balanceByClub, account]);
-
     const currencyForTab = useMemo(() => {
         if (activeTab === 'all') {
             return onlineClubCurrencyMap.values().next().value || '₹'; // Default currency
@@ -244,17 +236,15 @@ const OnlineClubPage: FC = () => {
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            // Colors from template
-            const headerBg = '#1C2836';
-            const footerBg = '#1C2836';
-            const headerText = '#FFFFFF';
-            const bodyText = '#333333';
-            const mutedText = '#888888';
-            const positiveColor = '#22c55e'; // green-500 from Tailwind
-            const negativeColor = '#ef4444'; // red-500 from Tailwind
-            const borderColor = '#e0e0e0';
+            // New Design System Colors (Light Mode)
+            const textPrimary = '#0F172A';
+            const textMuted = '#94A3B8';
+            const profitColor = '#10B981'; // Emerald
+            const lossColor = '#F43F5E'; // Rose
+            const tableHeadBg = '#F8FAFC';
+            const borderColor = '#F1F5F9';
 
-            const tableColumn = ["Date", "Type", "Online Club", "Amount", "Balance"];
+            const tableColumn = ["Date", "Type", "Online Club", "Amount"];
             const tableRows = ledger.map(entry => {
                 const currency = (entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹';
                 return [
@@ -262,80 +252,102 @@ const OnlineClubPage: FC = () => {
                     entry.type.toUpperCase(),
                     entry.onlineClubName || '-',
                     `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
-                    `${currencyForTab}${entry.runningBalance.toFixed(0)}`,
                 ]
             });
+            
+            const totalProfit = ledger.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+            const totalLoss = ledger.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+            const totalDeposits = ledger.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+            const totalWithdrawals = ledger.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
 
             (doc as any).autoTable({
                 head: [tableColumn],
                 body: tableRows,
+                startY: 110,
                 theme: 'plain',
-                startY: 85,
                 headStyles: {
-                    textColor: mutedText,
+                    fillColor: tableHeadBg,
+                    textColor: textMuted,
                     fontStyle: 'bold',
-                    fontSize: 10,
+                    fontSize: 9,
                 },
                 styles: {
-                    textColor: bodyText,
                     font: 'helvetica',
+                    textColor: textPrimary,
+                    fontSize: 10,
                 },
                 columnStyles: {
-                    3: { halign: 'right' },
-                    4: { halign: 'right' }
+                    3: { halign: 'right' }
                 },
                 willDrawCell: (data: any) => {
-                    doc.setTextColor(bodyText); // Reset text color
+                    doc.setTextColor(textPrimary);
                     if (data.column.index === 3 && data.section === 'body') {
                         const rawValue = ledger[data.row.index].amount;
-                        doc.setTextColor(rawValue >= 0 ? positiveColor : negativeColor);
+                        doc.setTextColor(rawValue >= 0 ? profitColor : lossColor);
                     }
                 },
                 didDrawCell: (data: any) => {
                     if (data.row.section === 'body' || data.row.section === 'head') {
-                        doc.setDrawColor(borderColor);
-                        doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+                        if (data.row.index === data.table.body.length - 1 || data.row.section === 'head') {
+                             doc.setDrawColor(borderColor);
+                             doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+                        }
                     }
                 },
                 didDrawPage: (data: any) => {
-                    // Header
-                    doc.setFillColor(headerBg);
-                    doc.rect(0, 0, pageWidth, 25, 'F');
-                    doc.setTextColor(headerText);
-                    doc.setFontSize(14);
+                    // Main Header
+                    doc.setFontSize(36);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('PLAYER LEDGER REPORT', pageWidth / 2, 15, { align: 'center' });
-                    doc.setFontSize(8);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text('VERIFIED SETTLEMENT LEDGER', pageWidth / 2, 20, { align: 'center' });
-
-                    // Summary Info
+                    doc.setTextColor(textPrimary);
+                    doc.text('SETTLEMENT LEDGER', 20, 30);
+                    
                     doc.setFontSize(10);
-                    doc.setTextColor(mutedText);
-                    doc.text('PLAYER', 20, 40);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(textMuted);
+                    doc.text('PLAYER', 20, 50);
+                    
                     doc.setFontSize(16);
-                    doc.setTextColor(bodyText);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(account.playerName, 20, 48);
-
-                    const balanceText = `${currencyForTab}${account.balance.toFixed(0)}`;
-                    const balanceColor = account.balance >= 0 ? positiveColor : negativeColor;
+                    doc.setTextColor(textPrimary);
+                    doc.text(account.playerName, 20, 58);
+                    
                     doc.setFontSize(10);
-                    doc.setTextColor(mutedText);
-                    doc.text('CURRENT BALANCE', pageWidth - 20, 40, { align: 'right' });
-                    doc.setFontSize(22);
-                    doc.setTextColor(balanceColor);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(balanceText, pageWidth - 20, 52, { align: 'right' });
+                    doc.setTextColor(textMuted);
+                    doc.text('CURRENT BALANCE', pageWidth - 20, 50, { align: 'right' });
+                    
+                    const balanceText = `${currencyForTab}${account.balance.toFixed(0)}`;
+                    const balanceColor = account.balance >= 0 ? profitColor : lossColor;
+                    doc.setFontSize(28);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(balanceColor);
+                    doc.text(balanceText, pageWidth - 20, 62, { align: 'right'});
+
+                    // Summary Cards
+                    const cardY = 75;
+                    const cardWidth = (pageWidth - 40 - 30) / 4;
+                    
+                    const drawCard = (x: number, label: string, value: string, color: string) => {
+                        doc.setFontSize(8);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(textMuted);
+                        doc.text(label, x, cardY);
+                        doc.setFontSize(14);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(color);
+                        doc.text(value, x, cardY + 8);
+                    }
+
+                    drawCard(20, 'PROFIT', `${currencyForTab}${totalProfit.toFixed(0)}`, profitColor);
+                    drawCard(20 + cardWidth + 10, 'LOSS', `${currencyForTab}${Math.abs(totalLoss).toFixed(0)}`, lossColor);
+                    drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${currencyForTab}${totalDeposits.toFixed(0)}`, textPrimary);
+                    drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${currencyForTab}${Math.abs(totalWithdrawals).toFixed(0)}`, textPrimary);
 
                     // Footer
-                    doc.setFillColor(footerBg);
-                    doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
                     doc.setFontSize(8);
-                    doc.setTextColor(headerText);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(`Certified settlement record for ${account.playerName}.`, 20, pageHeight - 8);
-                    doc.text(`EXPORTED: ${format(new Date(), 'dd/MM/yyyy p')}`, pageWidth - 20, pageHeight - 8, { align: 'right'});
+                    doc.setTextColor(textMuted);
+                    doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 20, pageHeight - 10);
+                    doc.text(`Chip Maestro Report`, pageWidth - 20, pageHeight - 10, { align: 'right'});
                 },
             });
 
@@ -351,7 +363,6 @@ const OnlineClubPage: FC = () => {
             setIsExporting(false);
         }
     };
-
 
     if (isLoading) {
         return (
@@ -373,15 +384,17 @@ const OnlineClubPage: FC = () => {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle>Recent Transactions</CardTitle>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {balanceByClub.map((clubBalance, index) => (
-                                     <Badge key={clubBalance.name} className={cn('font-semibold', badgeColors[index % badgeColors.length])}>
-                                        {clubBalance.name}: {clubBalance.currency}{clubBalance.balance.toFixed(0)}
-                                    </Badge>
-                                ))}
-                                {balanceByClub.length === 0 && <p className="text-sm text-muted-foreground">No balances to display.</p>}
-                            </div>
+                             <CardTitle>Recent Transactions</CardTitle>
+                             <CardDescription>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {balanceByClub.map((clubBalance, index) => (
+                                        <Badge key={clubBalance.name} className={cn('font-semibold', badgeColors[index % badgeColors.length])}>
+                                            {clubBalance.name}: {clubBalance.currency}{clubBalance.balance.toFixed(0)}
+                                        </Badge>
+                                    ))}
+                                    {balanceByClub.length === 0 && <p className="text-sm text-muted-foreground">No balances to display.</p>}
+                                </div>
+                            </CardDescription>
                         </div>
                         <Button onClick={handleExportPdf} disabled={isExporting || ledger.length === 0}>
                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
