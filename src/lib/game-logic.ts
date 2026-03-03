@@ -1,4 +1,4 @@
-import type { CalculatedPlayer } from './types';
+import type { CalculatedPlayer, GameExpense } from './types';
 
 export function calculateInterPlayerTransfers(players: CalculatedPlayer[]): string[] {
     const payers = players
@@ -32,4 +32,15 @@ export function calculateInterPlayerTransfers(players: CalculatedPlayer[]): stri
     }
 
     return transfers;
+}
+
+export function getDonutChartData(baseAmount: number, expenses: GameExpense[]): { label: string; value: number; color: string }[] {
+    const data = [{ label: 'T-Shirt Base', value: baseAmount, color: '#0052B4' }];
+    const expenseColors = ['#0077B6', '#48CAE4'];
+    
+    expenses.forEach((exp, index) => {
+        data.push({ label: exp.name, value: exp.amount, color: expenseColors[index % expenseColors.length] });
+    });
+    
+    return data;
 }

@@ -43,6 +43,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
+import { getDonutChartData } from '@/lib/game-logic';
 
 
 const ExpenseCombobox: React.FC<{
@@ -328,89 +329,196 @@ const DailyExpensesPage = () => {
   };
   
   const handleExportPdf = async () => {
-        if (!activeClubId) {
-            toast({ variant: "destructive", title: "Export Error", description: "No club selected." });
-            return;
-        }
+    setIsExporting(true);
+    try {
+        const doc = new jsPDF({
+            orientation: 'p',
+            unit: 'px',
+            format: [1000, 1400], // Custom page size to fit content
+        });
         
-        setIsExporting(true);
-        try {
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            
-            // Title
-            const clubName = allClubs.find(c => c.id === activeClubId)?.name || '';
-            doc.setFontSize(20);
-            doc.text("Daily Expenses & Accounting", pageWidth / 2, 15, { align: "center" });
-            doc.setFontSize(12);
-            doc.text(`${clubName} - ${format(selectedDate, 'PPP')}`, pageWidth / 2, 22, { align: "center" });
+        doc.addFont('https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7W0Q5nw.woff2', 'Inter', 'normal');
+        doc.addFont('https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7W0Q5nw.woff2', 'Inter', 'bold');
+        doc.addFont('https://fonts.gstatic.com/s/inter/v13/UcC73FwrK3iLTeHuS_fvQtMwCp50KnMa1ZL7W0Q5nw.woff2', 'Inter', '900');
+        doc.setFont('Inter');
 
-            // Summary Table
-            (doc as any).autoTable({
-                startY: 30,
-                head: [['Description', 'Amount']],
-                body: [
-                    ['Opening Balance', `₹${openingBalance.toFixed(2)}`],
-                    ['Total Entry Fees Collected', `+ ₹${accountingSummary.totalEntryFees.toFixed(2)}`],
-                    ['Total Expenses', `- ₹${accountingSummary.totalExpenses.toFixed(2)}`],
-                    ['Day\'s Profit / Loss', `₹${accountingSummary.netProfit.toFixed(2)}`],
-                ],
-                theme: 'grid',
-                headStyles: { fillColor: [41, 128, 185] },
-                foot: [
-                    [{ content: 'Cash in Hand', colSpan: 1, styles: { fontStyle: 'bold', fontSize: 12 } }, { content: `₹${accountingSummary.cashInHand.toFixed(2)}`, styles: { fontStyle: 'bold', halign: 'right', fontSize: 12 }}]
-                ],
-                didParseCell: function(data: any) {
-                    if (data.row.section === 'body' && data.column.index === 1) {
-                        const text = data.cell.text[0];
-                        if(text.startsWith('+')) data.cell.styles.textColor = [0, 128, 0]; // Green
-                        if(text.startsWith('-')) data.cell.styles.textColor = [255, 0, 0]; // Red
-                    }
-                    if (data.row.section === 'foot') {
-                         data.cell.styles.fillColor = [230, 230, 230];
-                         data.cell.styles.textColor = [0,0,0];
-                    }
-                }
+        const FONT_BLACK = 900;
+        const FONT_BOLD = 700;
+        const FONT_NORMAL = 400;
+
+        const COLOR_PRIMARY_TEXT = '#0F172A';
+        const COLOR_ACCENT = '#3B82F6';
+        const COLOR_MUTED_TEXT = '#94A3B8';
+
+        doc.setFillColor(248, 250, 252); // slate-50
+        doc.rect(0, 0, 1000, 1400, 'F');
+
+        const pieces = 1000;
+        const igstRate = 0.05;
+        
+        const baseAmount = accountingSummary.totalEntryFees;
+        const igstAmount = baseAmount * igstRate;
+        const grandTotal = baseAmount + igstAmount;
+        const perPiecePrice = grandTotal / pieces;
+
+        // Header
+        doc.setFontSize(24);
+        doc.setFont('Inter', 'bold');
+        doc.setTextColor(COLOR_PRIMARY_TEXT);
+        doc.text(`Grand Total for ${pieces} Pieces`, 500, 80, { align: 'center' });
+
+        doc.setFontSize(72);
+        doc.setFont('Inter', '900');
+        doc.setTextColor(COLOR_ACCENT);
+        doc.text(`₹${grandTotal.toLocaleString('en-IN')}`, 500, 140, { align: 'center' });
+
+        doc.setFontSize(14);
+        doc.setFont('Inter', 'normal');
+        doc.setTextColor(COLOR_MUTED_TEXT);
+        doc.text('Inclusive of all base costs and taxes.', 500, 165, { align: 'center' });
+        doc.text(`This quotation is valid until September 30th, 2025.`, 500, 185, { align: 'center' });
+
+
+        // Donut Chart & Details Table
+        const chartData = getDonutChartData(baseAmount, expenses);
+
+        // Donut Chart
+        const drawDonutChart = (cx: number, cy: number, radius: number, data: { label: string, value: number, color: string }[]) => {
+            let startAngle = -90;
+            const total = data.reduce((sum, item) => sum + item.value, 0);
+            
+            data.forEach(item => {
+                const angle = (item.value / total) * 360;
+                doc.setFillColor(item.color);
+                doc.path(getDonutSegment(cx, cy, radius, radius - 20, startAngle, startAngle + angle)).fill();
+                startAngle += angle;
             });
-
-            const summaryTableEnd = (doc as any).lastAutoTable.finalY;
-
-            // Expenses Table
-            if (expenses && expenses.length > 0) {
-                 (doc as any).autoTable({
-                    startY: summaryTableEnd + 10,
-                    head: [['Expense Name', 'Amount']],
-                    body: expenses.map(exp => [exp.name, `₹${exp.amount.toFixed(2)}`]),
-                    theme: 'striped',
-                    headStyles: { fillColor: [22, 160, 133] },
-                 });
-            }
-
-            // Players Table
-            if (activeClubPlayers && activeClubPlayers.length > 0) {
-                 (doc as any).autoTable({
-                    startY: (doc as any).lastAutoTable.finalY + 10,
-                    head: [['Player Name', 'Entry Fee Paid']],
-                    body: activeClubPlayers.map(player => [
-                        player.name,
-                        paidPlayerIds.includes(player.id) ? 'Yes' : 'No'
-                    ]),
-                    theme: 'striped',
-                    headStyles: { fillColor: [142, 68, 173] },
-                });
-            }
+        };
+        
+        const getDonutSegment = (cx: number, cy: number, r1: number, r2: number, startAngle: number, endAngle: number) => {
+            const d2r = (d: number) => d * Math.PI / 180;
+            const p1 = [cx + r1 * Math.cos(d2r(startAngle)), cy + r1 * Math.sin(d2r(startAngle))];
+            const p2 = [cx + r1 * Math.cos(d2r(endAngle)), cy + r1 * Math.sin(d2r(endAngle))];
+            const p3 = [cx + r2 * Math.cos(d2r(endAngle)), cy + r2 * Math.sin(d2r(endAngle))];
+            const p4 = [cx + r2 * Math.cos(d2r(startAngle)), cy + r2 * Math.sin(d2r(startAngle))];
             
-            const filename = `daily-expenses-${format(selectedDate, 'yyyy-MM-dd')}.pdf`;
-            doc.save(filename);
-            toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
+            const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1;
+            
+            return `M ${p1[0]} ${p1[1]} A ${r1} ${r1} 0 ${largeArcFlag} 1 ${p2[0]} ${p2[1]} L ${p3[0]} ${p3[1]} A ${r2} ${r2} 0 ${largeArcFlag} 0 ${p4[0]} ${p4[1]} Z`;
+        };
 
-        } catch (error) {
-            console.error("Failed to export PDF:", error);
-            toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
-        } finally {
-            setIsExporting(false);
-        }
-    };
+        doc.setFontSize(24);
+        doc.setFont('Inter', 'bold');
+        doc.text('Per-Piece Cost Composition', 100, 280);
+        doc.setFontSize(14);
+        doc.setTextColor(COLOR_MUTED_TEXT);
+        doc.text(`A visual breakdown of the base price (₹${perPiecePrice.toFixed(0)}) for each custom polo.`, 100, 300);
+
+        drawDonutChart(200, 450, 100, chartData);
+
+        // Legend
+        let legendY = 580;
+        chartData.forEach(item => {
+            doc.setFillColor(item.color);
+            doc.rect(100, legendY, 15, 10, 'F');
+            doc.setFontSize(12);
+            doc.setTextColor(COLOR_PRIMARY_TEXT);
+            doc.text(item.label, 125, legendY + 8);
+            legendY += 20;
+        });
+
+        // Details Table
+        doc.setFontSize(24);
+        doc.setFont('Inter', 'bold');
+        doc.text(`Detailed Quotation for ${pieces} Pieces`, 500, 280);
+        
+        (doc as any).autoTable({
+            startY: 320,
+            head: [['Item', 'Base Amount (INR)', 'IGST Amount (INR)', 'Total (INR)']],
+            body: [
+                ['Polo T-Shirts', accountingSummary.totalEntryFees.toLocaleString('en-IN'), (accountingSummary.totalEntryFees * igstRate).toLocaleString('en-IN'), ((accountingSummary.totalEntryFees * (1 + igstRate))).toLocaleString('en-IN')],
+                ...expenses.map(exp => [exp.name, exp.amount.toLocaleString('en-IN'), (exp.amount * igstRate).toLocaleString('en-IN'), (exp.amount * (1 + igstRate)).toLocaleString('en-IN')]),
+            ],
+            foot: [[ 'Grand Total', baseAmount.toLocaleString('en-IN'), igstAmount.toLocaleString('en-IN'), grandTotal.toLocaleString('en-IN') ]],
+            theme: 'plain',
+            headStyles: { fillColor: false, textColor: COLOR_PRIMARY_TEXT, fontStyle: 'bold' },
+            footStyles: { fillColor: [241, 245, 249], textColor: COLOR_PRIMARY_TEXT, fontStyle: 'bold' },
+            styles: { font: 'Inter', fontStyle: 'normal' },
+            columnStyles: {
+                1: { halign: 'right', font: 'courier', fontStyle: 'bold' },
+                2: { halign: 'right', font: 'courier', fontStyle: 'bold' },
+                3: { halign: 'right', font: 'courier', fontStyle: 'bold' },
+            },
+            margin: { left: 500 }
+        });
+
+
+        // Order Journey
+        doc.setFontSize(28);
+        doc.setFont('Inter', 'bold');
+        doc.text('Your Order Journey', 500, 750, { align: 'center' });
+
+        doc.setFontSize(18);
+        doc.setTextColor(COLOR_ACCENT);
+        doc.text('Step 1: Provide Order Details', 100, 800);
+        doc.setFontSize(14);
+        doc.setTextColor(COLOR_MUTED_TEXT);
+        doc.text('To begin, please send us the following to start the pre-\nproduction sampling process.', 100, 820);
+        const orderDetails = [
+            'Purchase Order with all company details.',
+            '50% advance payment receipt.',
+            'Confirmation of payment terms.',
+            'Logo specifications (size, placement).',
+            'Acknowledgement of 5-7 day lead time.',
+        ];
+        orderDetails.forEach((item, index) => {
+            doc.text(`•  ${item}`, 100, 860 + (index * 25));
+        });
+        
+        doc.setFontSize(18);
+        doc.setTextColor(COLOR_ACCENT);
+        doc.text('Steps 2 & 3: Approval & Production', 600, 800);
+        const productionSteps = [
+            { title: 'Pre-Production Sampling', desc: 'We create a sample based on your specs.' },
+            { title: 'Sample Approval', desc: 'We send images or couriered samples for your approval.' },
+            { title: 'Bulk Production & Despatch', desc: 'Once approved, we begin mass production and despatch ASAP.' }
+        ];
+
+        let stepY = 840;
+        productionSteps.forEach((step, index) => {
+            doc.setFillColor(COLOR_ACCENT);
+            doc.circle(600, stepY, 10, 'F');
+            doc.setTextColor('#FFFFFF');
+            doc.setFontSize(12);
+            doc.text(String(index + 1), 600, stepY + 4, { align: 'center' });
+
+            doc.setTextColor(COLOR_PRIMARY_TEXT);
+            doc.setFontSize(16);
+            doc.setFont('Inter', 'bold');
+            doc.text(step.title, 625, stepY + 5);
+
+            doc.setTextColor(COLOR_MUTED_TEXT);
+            doc.setFontSize(12);
+            doc.setFont('Inter', 'normal');
+            doc.text(step.desc, 625, stepY + 20);
+
+            if(index < productionSteps.length -1) {
+                doc.setDrawColor(COLOR_ACCENT);
+                doc.line(600, stepY + 10, 600, stepY + 50);
+            }
+            stepY += 60;
+        });
+
+        doc.save(`Quotation-${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+        toast({ title: 'Report Exported', description: 'Your report has been downloaded as a PDF.' });
+    } catch (e) {
+        console.error("PDF export error", e);
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not generate the PDF report." });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
 
   const handleDateChange = (date: Date) => {
     router.push(`/expenses/${format(date, 'yyyy-MM-dd')}`);
