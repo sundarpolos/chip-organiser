@@ -343,12 +343,6 @@ const OnlineClubPage: FC = () => {
                         )}
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-4xl font-bold">
-                        Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>{accountCurrency}{account?.balance.toFixed(0) ?? '0'}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Last updated: {account ? format(parseISO(account.lastUpdated), 'PPP p') : 'N/A'}</p>
-                </CardContent>
             </Card>
 
             <Card>
