@@ -164,7 +164,7 @@ const OnlineClubPage: FC = () => {
         }
     };
 
-    const handleExportPdf = () => {
+    const handleExportPdf = async () => {
         if (!account) {
             toast({
                 variant: "destructive",
@@ -178,58 +178,104 @@ const OnlineClubPage: FC = () => {
         try {
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
 
-            // Title
-            doc.setFontSize(20);
-            doc.text("Transaction Ledger", pageWidth / 2, 20, { align: "center" });
-            doc.setFontSize(12);
-            doc.text(`Player: ${account.playerName}`, pageWidth / 2, 28, { align: "center" });
-            doc.setFontSize(10);
-            doc.text(`Final Balance: ${accountCurrency}${account.balance.toFixed(2)}`, pageWidth / 2, 34, { align: "center" });
+            // Colors from template
+            const headerBg = '#1C2836';
+            const footerBg = '#1C2836';
+            const headerText = '#FFFFFF';
+            const bodyText = '#333333';
+            const mutedText = '#888888';
+            const positiveColor = '#22c55e'; // green-500 from Tailwind
+            const negativeColor = '#ef4444'; // red-500 from Tailwind
+            const borderColor = '#e0e0e0';
 
-            const tableColumn = ["Date", "Type", "Online Club", "Notes", "Amount", "Balance"];
-            const tableRows: (string | number)[][] = [];
-
-            ledger.forEach(entry => {
-                const ticketData = [
-                    format(parseISO(entry.date), 'dd/MM/yyyy'),
-                    entry.type.toUpperCase(),
-                    entry.onlineClubName || '-',
-                    entry.notes || '-',
-                    `${accountCurrency}${entry.amount.toFixed(2)}`,
-                    `${accountCurrency}${entry.runningBalance.toFixed(2)}`,
-                ];
-                tableRows.push(ticketData);
-            });
+            const tableColumn = ["Date", "Type", "Online Club", "Amount", "Balance"];
+            const tableRows = ledger.map(entry => [
+                format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                entry.type.toUpperCase(),
+                entry.onlineClubName || '-',
+                `${accountCurrency}${entry.amount.toFixed(2)}`,
+                `${accountCurrency}${entry.runningBalance.toFixed(2)}`,
+            ]);
 
             (doc as any).autoTable({
                 head: [tableColumn],
                 body: tableRows,
-                startY: 40,
-                theme: 'grid',
-                headStyles: { fillColor: [63, 81, 181] }, // A deep indigo
-                columnStyles: {
-                    4: { halign: 'right' },
-                    5: { halign: 'right' }
+                theme: 'plain',
+                startY: 85,
+                headStyles: {
+                    textColor: mutedText,
+                    fontStyle: 'bold',
+                    fontSize: 10,
                 },
-                didDrawCell: (data: any) => {
-                    if (data.section === 'body' && data.column.index === 4) { // Amount column
-                        const rawValue = ledger[data.row.index].amount;
-                        if (rawValue >= 0) {
-                             doc.setTextColor(34, 197, 94); // Green
-                        } else {
-                            doc.setTextColor(239, 68, 68); // Red
-                        }
-                    }
+                styles: {
+                    textColor: bodyText,
+                    font: 'helvetica',
+                },
+                columnStyles: {
+                    3: { halign: 'right' },
+                    4: { halign: 'right' }
                 },
                 willDrawCell: (data: any) => {
-                    // Reset text color for every cell
-                    doc.setTextColor(40, 40, 40);
-                }
+                    doc.setTextColor(bodyText); // Reset text color
+                    if (data.column.index === 3 && data.section === 'body') {
+                        const rawValue = ledger[data.row.index].amount;
+                        doc.setTextColor(rawValue >= 0 ? positiveColor : negativeColor);
+                    }
+                },
+                didDrawCell: (data: any) => {
+                    if (data.row.section === 'body' || data.row.section === 'head') {
+                        doc.setDrawColor(borderColor);
+                        doc.line(data.cell.x, data.cell.y + data.cell.height, data.cell.x + data.cell.width, data.cell.y + data.cell.height);
+                    }
+                },
+                didDrawPage: (data: any) => {
+                    // Header
+                    doc.setFillColor(headerBg);
+                    doc.rect(0, 0, pageWidth, 25, 'F');
+                    doc.setTextColor(headerText);
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('PLAYER LEDGER REPORT', pageWidth / 2, 15, { align: 'center' });
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('VERIFIED SETTLEMENT LEDGER', pageWidth / 2, 20, { align: 'center' });
+
+                    // Summary Info
+                    doc.setFontSize(10);
+                    doc.setTextColor(mutedText);
+                    doc.text('PLAYER', 20, 40);
+                    doc.setFontSize(16);
+                    doc.setTextColor(bodyText);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(account.playerName, 20, 48);
+
+                    const balanceText = `${accountCurrency}${account.balance.toFixed(2)}`;
+                    const balanceColor = account.balance >= 0 ? positiveColor : negativeColor;
+                    doc.setFontSize(10);
+                    doc.setTextColor(mutedText);
+                    doc.text('CURRENT BALANCE', pageWidth - 20, 40, { align: 'right' });
+                    doc.setFontSize(22);
+                    doc.setTextColor(balanceColor);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(balanceText, pageWidth - 20, 52, { align: 'right' });
+
+                    // Footer
+                    doc.setFillColor(footerBg);
+                    doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+                    doc.setFontSize(8);
+                    doc.setTextColor(headerText);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Certified settlement record for ${account.playerName}.`, 20, pageHeight - 8);
+                    doc.text(`EXPORTED: ${format(new Date(), 'dd/MM/yyyy p')}`, pageWidth - 20, pageHeight - 8, { align: 'right'});
+                },
             });
 
             const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
             doc.save(filename);
+
+            toast({ title: 'PDF Exported', description: 'Your ledger has been downloaded.' });
 
         } catch (error) {
             console.error("Could not export PDF:", error);
