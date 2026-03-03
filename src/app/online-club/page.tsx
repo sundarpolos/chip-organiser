@@ -345,22 +345,6 @@ const OnlineClubPage: FC = () => {
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Dashboard</CardTitle>
-                            <CardDescription>Welcome, {currentUser?.name}. Here you can manage your online play finances.</CardDescription>
-                        </div>
-                         {currentUser?.isAdmin && (
-                            <Button asChild variant="outline">
-                                <Link href="/online-club/admin">Admin Dashboard</Link>
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-            </Card>
-
-            <Card>
-                <CardHeader>
                     <CardTitle>Balances by Online Club</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
