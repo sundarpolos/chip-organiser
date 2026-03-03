@@ -310,10 +310,10 @@ const OnlineClubPage: FC = () => {
                     doc.text(value, x, cardY + 8);
                 }
                 const summaryCurrency = '₹';
-                drawCard(20, 'PROFIT', `${summaryCurrency}${totalProfit.toFixed(0)}`, profitColor);
-                drawCard(20 + cardWidth + 10, 'LOSS', `${summaryCurrency}${Math.abs(totalLoss).toFixed(0)}`, lossColor);
-                drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${summaryCurrency}${totalDeposits.toFixed(0)}`, textPrimary);
-                drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${summaryCurrency}${Math.abs(totalWithdrawals).toFixed(0)}`, textPrimary);
+                drawCard(20, 'PROFIT', `${summaryCurrency} ${totalProfit.toFixed(0).split('').join(' ')}`, profitColor);
+                drawCard(20 + cardWidth + 10, 'LOSS', `${summaryCurrency} ${Math.abs(totalLoss).toFixed(0).split('').join(' ')}`, lossColor);
+                drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${summaryCurrency} ${totalDeposits.toFixed(0).split('').join(' ')}`, textPrimary);
+                drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${summaryCurrency} ${Math.abs(totalWithdrawals).toFixed(0).split('').join(' ')}`, textPrimary);
             };
 
             const drawFooter = (page: number, totalPages: number) => {
@@ -337,7 +337,7 @@ const OnlineClubPage: FC = () => {
                     format(parseISO(entry.date), 'dd/MM/yyyy p'),
                     entry.type.toUpperCase(),
                     entry.notes || '-',
-                    `${entry.amount >= 0 ? '+' : '-'}${clubBalance?.currency || '₹'}${Math.abs(entry.amount).toFixed(0)}`,
+                    `${entry.amount >= 0 ? '+' : '-'}${clubBalance?.currency || '₹'} ${Math.abs(entry.amount).toFixed(0).split('').join(' ')}`,
                 ]);
 
                 // Add a header for the club section
