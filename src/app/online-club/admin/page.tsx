@@ -116,14 +116,23 @@ const AdminOnlineClubPage: FC = () => {
     };
 
     const handleDeleteClubData = async () => {
-        if (selectedClubId === 'all') {
-            toast({
-                variant: 'destructive',
-                title: 'Action Not Allowed',
-                description: 'For safety, please select a specific club to delete its data. Deleting all clubs at once is not permitted.'
-            });
+        if (selectedClubId === 'all' && isSuperAdmin) {
+            setIsDeleting(true);
+            try {
+                for (const club of allClubs) {
+                    await deleteAllOnlineDataForClub(club.id);
+                }
+                toast({ title: 'Success', description: 'All online data for ALL clubs has been deleted.' });
+                await refreshData();
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : 'An unknown error occurred.';
+                toast({ variant: 'destructive', title: 'Global Deletion Failed', description: msg });
+            } finally {
+                setIsDeleting(false);
+            }
             return;
         }
+
         if (!selectedClubId) {
             toast({ variant: 'destructive', title: 'No Club Selected', description: 'Please select a club.' });
             return;
@@ -171,7 +180,7 @@ const AdminOnlineClubPage: FC = () => {
                         </div>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="destructive" disabled={selectedClubId === 'all' || isDeleting}>
+                                <Button variant="destructive" disabled={isDeleting}>
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete Club Data
                                 </Button>
@@ -180,7 +189,10 @@ const AdminOnlineClubPage: FC = () => {
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This action cannot be undone. This will permanently delete all online accounts, ledger entries, and transaction history for the selected club.
+                                        {selectedClubId === 'all' && isSuperAdmin
+                                            ? "This action is irreversible. It will permanently delete ALL online data for every club in the system."
+                                            : "This action cannot be undone. This will permanently delete all online accounts, ledger entries, and transaction history for the selected club."
+                                        }
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
