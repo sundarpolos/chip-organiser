@@ -44,6 +44,14 @@ const OnlineClubPage: FC = () => {
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
     const [isExporting, setIsExporting] = useState(false);
 
+    const accountCurrency = useMemo(() => {
+        if (onlineClubs && onlineClubs.length > 0) {
+            const clubWithCurrency = onlineClubs.find(c => c.currency);
+            return clubWithCurrency?.currency || '₹';
+        }
+        return '₹';
+    }, [onlineClubs]);
+
     useEffect(() => {
         const userStr = localStorage.getItem('chip-maestro-user');
         if (userStr) {
@@ -177,7 +185,7 @@ const OnlineClubPage: FC = () => {
             doc.setFontSize(12);
             doc.text(`Player: ${account.playerName}`, pageWidth / 2, 28, { align: "center" });
             doc.setFontSize(10);
-            doc.text(`Final Balance: ₹${account.balance.toFixed(2)}`, pageWidth / 2, 34, { align: "center" });
+            doc.text(`Final Balance: ${accountCurrency}${account.balance.toFixed(2)}`, pageWidth / 2, 34, { align: "center" });
 
             const tableColumn = ["Date", "Type", "Online Club", "Notes", "Amount", "Balance"];
             const tableRows: (string | number)[][] = [];
@@ -188,8 +196,8 @@ const OnlineClubPage: FC = () => {
                     entry.type.toUpperCase(),
                     entry.onlineClubName || '-',
                     entry.notes || '-',
-                    `₹${entry.amount.toFixed(2)}`,
-                    `₹${entry.runningBalance.toFixed(2)}`,
+                    `${accountCurrency}${entry.amount.toFixed(2)}`,
+                    `${accountCurrency}${entry.runningBalance.toFixed(2)}`,
                 ];
                 tableRows.push(ticketData);
             });
@@ -258,7 +266,7 @@ const OnlineClubPage: FC = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="text-4xl font-bold">
-                        Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>₹{account?.balance.toFixed(2) ?? '0.00'}</span>
+                        Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>{accountCurrency}{account?.balance.toFixed(2) ?? '0.00'}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">Last updated: {account ? format(parseISO(account.lastUpdated), 'PPP p') : 'N/A'}</p>
                 </CardContent>
@@ -302,9 +310,9 @@ const OnlineClubPage: FC = () => {
                                         <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                         <TableCell>{entry.notes}</TableCell>
                                         <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(2)}
+                                            {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(2)}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono">₹{entry.runningBalance.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">
                                         {entry.type === 'p/l' && (
                                             <div className="flex justify-end gap-2">
@@ -316,7 +324,7 @@ const OnlineClubPage: FC = () => {
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will permanently delete this P/L entry of ₹{entry.amount.toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
+                                                            <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
