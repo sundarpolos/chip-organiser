@@ -243,12 +243,6 @@ const OnlineClubPage: FC = () => {
             const lossColor = '#F43F5E';
             const badgeColors = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FEE2E2", "#E0E7FF", "#DBEAFE", "#E0E7FF"];
             const badgeTextColors = ["#1E40AF", "#065F46", "#92400E", "#991B1B", "#3730A3", "#1E40AF", "#5B21B6"];
-
-            // Data processing
-            const totalProfit = ledger.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
-            const totalLoss = ledger.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
-            const totalDeposits = ledger.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
-            const totalWithdrawals = ledger.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
             
             // Group entries by club
             const entriesByClub = ledger.reduce((acc, entry) => {
@@ -296,25 +290,6 @@ const OnlineClubPage: FC = () => {
                     doc.text(text, currentX - textWidth + 6, 56.5, {baseline: 'middle'});
                     currentX -= (textWidth + 5);
                 });
-
-                // Summary Cards
-                const cardY = 75;
-                const cardWidth = (pageWidth - 40 - 30) / 4;
-                const drawCard = (x: number, label: string, value: string, color: string) => {
-                    doc.setFontSize(8);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textMuted);
-                    doc.text(label, x, cardY);
-                    doc.setFontSize(14);
-                    doc.setFont('courier', 'bold');
-                    doc.setTextColor(color);
-                    doc.text(value, x, cardY + 8);
-                }
-                const summaryCurrency = '₹';
-                drawCard(20, 'PROFIT', `${summaryCurrency} ${totalProfit.toFixed(0).split('').join(' ')}`, profitColor);
-                drawCard(20 + cardWidth + 10, 'LOSS', `${summaryCurrency} ${Math.abs(totalLoss).toFixed(0).split('').join(' ')}`, lossColor);
-                drawCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${summaryCurrency} ${totalDeposits.toFixed(0).split('').join(' ')}`, textPrimary);
-                drawCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${summaryCurrency} ${Math.abs(totalWithdrawals).toFixed(0).split('').join(' ')}`, textPrimary);
             };
 
             const drawFooter = (page: number, totalPages: number) => {
@@ -325,7 +300,7 @@ const OnlineClubPage: FC = () => {
             };
             
             drawHeader();
-            let lastY = 110;
+            let lastY = 75;
 
             const sortedClubNames = Object.keys(entriesByClub).sort();
 
@@ -333,9 +308,50 @@ const OnlineClubPage: FC = () => {
                 const clubEntries = entriesByClub[clubName];
                 const clubBalance = balanceByClub.find(b => b.name === clubName);
 
+                // Calculate club-wise stats
+                const clubProfit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+                const clubLoss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+                const clubDeposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+                const clubWithdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+                const currency = clubName === 'Phoenix' ? 'Rs.' : (clubBalance?.currency || '₹');
+
+
+                if (lastY + 80 > pageHeight - 40) { // Check for page break
+                    doc.addPage();
+                    drawHeader();
+                    lastY = 75;
+                }
+
+                // Add a header for the club section
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(textPrimary);
+                doc.text(`${clubName}`, 20, lastY);
+                lastY += 15;
+
+                // Draw summary cards for the club
+                const cardStartY = lastY;
+                const cardWidth = (pageWidth - 40 - 30) / 4;
+                const drawClubCard = (x: number, label: string, value: string, color: string) => {
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(textMuted);
+                    doc.text(label, x, cardStartY);
+                    doc.setFontSize(12);
+                    doc.setFont('courier', 'bold');
+                    doc.setTextColor(color);
+                    doc.text(value.split('').join(' '), x, cardStartY + 8);
+                };
+
+                drawClubCard(20, 'PROFIT', `${currency} ${clubProfit.toFixed(0)}`, profitColor);
+                drawClubCard(20 + cardWidth + 10, 'LOSS', `${currency} ${Math.abs(clubLoss).toFixed(0)}`, lossColor);
+                drawClubCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${currency} ${clubDeposits.toFixed(0)}`, textPrimary);
+                drawClubCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${currency} ${Math.abs(clubWithdrawals).toFixed(0)}`, textPrimary);
+                
+                lastY += 25;
+
                 const tableColumn = ["Date", "Type", "Notes", "Amount"];
                 const tableRows = clubEntries.map(entry => {
-                    const currency = clubName === 'Phoenix' ? 'Rs.' : (clubBalance?.currency || '₹');
                     return [
                         format(parseISO(entry.date), 'dd/MM/yyyy p'),
                         entry.type.toUpperCase(),
@@ -343,13 +359,6 @@ const OnlineClubPage: FC = () => {
                         `${entry.amount >= 0 ? '+' : '-'}${currency} ${Math.abs(entry.amount).toFixed(0).split('').join(' ')}`,
                     ];
                 });
-
-                // Add a header for the club section
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(textPrimary);
-                doc.text(`${clubName}`, 20, lastY);
-                lastY += 8;
 
                 (doc as any).autoTable({
                     head: [tableColumn],
@@ -375,11 +384,6 @@ const OnlineClubPage: FC = () => {
                 });
 
                 lastY = (doc as any).lastAutoTable.finalY + 15;
-
-                if (lastY > pageHeight - 40) {
-                    doc.addPage();
-                    lastY = 20;
-                }
             }
 
             // Draw footer on all pages
