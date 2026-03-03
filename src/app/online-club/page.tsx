@@ -26,6 +26,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 
+const SUPER_ADMIN_WHATSAPP = '919843350000';
 
 const OnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -52,7 +53,9 @@ const OnlineClubPage: FC = () => {
     const refreshData = useCallback(async () => {
         if (!currentUser) return;
         try {
-            const activeClubId = localStorage.getItem('chip-maestro-clubId');
+            const isSuperAdmin = currentUser.whatsappNumber === SUPER_ADMIN_WHATSAPP;
+            const activeClubId = isSuperAdmin ? localStorage.getItem('chip-maestro-clubId') : currentUser.clubId;
+
             if (!activeClubId) {
                 toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
                 setIsLoading(false);
@@ -278,7 +281,7 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="online-club">Online Club</Label>
-                        <Select value={onlineClubName} onValueChange={setOnlineClubName} required>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName}>
                             <SelectTrigger id="online-club">
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
@@ -359,7 +362,7 @@ const EditPlDialog: FC<{
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="edit-online-club">Online Club</Label>
-                        <Select value={onlineClubName} onValueChange={setOnlineClubName} required>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName}>
                             <SelectTrigger id="edit-online-club">
                                 <SelectValue placeholder="Select an online club..." />
                             </SelectTrigger>
