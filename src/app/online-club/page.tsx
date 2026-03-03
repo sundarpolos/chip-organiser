@@ -195,8 +195,8 @@ const OnlineClubPage: FC = () => {
                 format(parseISO(entry.date), 'dd/MM/yyyy p'),
                 entry.type.toUpperCase(),
                 entry.onlineClubName || '-',
-                `${accountCurrency}${entry.amount.toFixed(2)}`,
-                `${accountCurrency}${entry.runningBalance.toFixed(2)}`,
+                `${accountCurrency}${entry.amount.toFixed(0)}`,
+                `${accountCurrency}${entry.runningBalance.toFixed(0)}`,
             ]);
 
             (doc as any).autoTable({
@@ -251,7 +251,7 @@ const OnlineClubPage: FC = () => {
                     doc.setFont('helvetica', 'bold');
                     doc.text(account.playerName, 20, 48);
 
-                    const balanceText = `${accountCurrency}${account.balance.toFixed(2)}`;
+                    const balanceText = `${accountCurrency}${account.balance.toFixed(0)}`;
                     const balanceColor = account.balance >= 0 ? positiveColor : negativeColor;
                     doc.setFontSize(10);
                     doc.setTextColor(mutedText);
@@ -312,7 +312,7 @@ const OnlineClubPage: FC = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="text-4xl font-bold">
-                        Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>{accountCurrency}{account?.balance.toFixed(2) ?? '0.00'}</span>
+                        Balance: <span className={account?.balance ?? 0 >= 0 ? 'text-green-600' : 'text-red-600'}>{accountCurrency}{account?.balance.toFixed(0) ?? '0'}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">Last updated: {account ? format(parseISO(account.lastUpdated), 'PPP p') : 'N/A'}</p>
                 </CardContent>
@@ -356,9 +356,9 @@ const OnlineClubPage: FC = () => {
                                         <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                         <TableCell>{entry.notes}</TableCell>
                                         <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                            {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(2)}
+                                            {entry.amount >= 0 ? '+' : ''}{accountCurrency}{entry.amount.toFixed(0)}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-mono">{accountCurrency}{entry.runningBalance.toFixed(0)}</TableCell>
                                         <TableCell className="text-right">
                                         {entry.type === 'p/l' && (
                                             <div className="flex justify-end gap-2">
@@ -370,7 +370,7 @@ const OnlineClubPage: FC = () => {
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                            <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(2)}. This action cannot be undone.</AlertDialogDescription>
+                                                            <AlertDialogDescription>This will permanently delete this P/L entry of {accountCurrency}{entry.amount.toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
