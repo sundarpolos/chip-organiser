@@ -434,28 +434,32 @@ const OnlineClubPage: FC = () => {
         };
     }, [currentUser, refreshData]);
 
+    const eligibleOnlineClubs = useMemo(() => {
+        if (!currentUser || !onlineClubs.length) return [];
+        return onlineClubs.filter(oc => 
+            !oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0 || oc.eligiblePlayerIds.includes(currentUser.id)
+        );
+    }, [onlineClubs, currentUser]);
+
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
         const balances: { [key: string]: { balance: number; currency: string; } } = {};
     
-        onlineClubs.forEach(club => {
+        eligibleOnlineClubs.forEach(club => {
             if(club.name) {
                 balances[club.name] = { balance: 0, currency: club.currency || '₹' };
             }
         });
     
         ledger.forEach(entry => {
-            if (entry.onlineClubName) {
-                if (balances[entry.onlineClubName] === undefined) {
-                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubCurrencyMap.get(entry.onlineClubName) || '₹' };
-                }
+            if (entry.onlineClubName && balances.hasOwnProperty(entry.onlineClubName)) {
                 balances[entry.onlineClubName].balance += entry.amount;
             }
         });
     
         return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
-    }, [ledger, onlineClubs, onlineClubCurrencyMap]);
+    }, [ledger, onlineClubs, eligibleOnlineClubs]);
 
     const weeklyData = useMemo(() => {
         const entriesForTab = activeTab === 'all' ? ledger : ledger.filter(e => e.onlineClubName === activeTab);
@@ -758,12 +762,27 @@ const OnlineClubPage: FC = () => {
         );
     }
 
+    if (!isLoading && eligibleOnlineClubs.length === 0) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Landmark /> Online Accounts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-center text-muted-foreground py-8">
+                        You are not authorized to access any online club accounts. Please contact your club admin.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <SubmitPlCard 
                 isSubmitting={isSubmitting} 
                 onSubmit={handlePlSubmit} 
-                onlineClubs={onlineClubs} 
+                onlineClubs={eligibleOnlineClubs} 
             />
 
             <Card>
@@ -792,7 +811,7 @@ const OnlineClubPage: FC = () => {
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                         <TabsList>
                             <TabsTrigger value="all">All</TabsTrigger>
-                            {onlineClubs.map(club => (
+                            {eligibleOnlineClubs.map(club => (
                                 <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
                             ))}
                         </TabsList>
@@ -996,6 +1015,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 

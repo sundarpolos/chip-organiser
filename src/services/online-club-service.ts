@@ -224,13 +224,13 @@ async function recalculateAccountBalance(accountId: string): Promise<void> {
 
 // ====== ONLINE CLUB MANAGEMENT ======
 
-export async function createOnlineClub(name: string, clubId: string, currency?: string, whatsappGroupId?: string): Promise<OnlineClub> {
-    const newOnlineClub: Omit<OnlineClub, 'id'> = { name, clubId, currency: currency || 'INR', whatsappGroupId: whatsappGroupId || '' };
+export async function createOnlineClub(name: string, clubId: string, currency?: string, whatsappGroupId?: string, eligiblePlayerIds?: string[]): Promise<OnlineClub> {
+    const newOnlineClub: Omit<OnlineClub, 'id'> = { name, clubId, currency: currency || 'INR', whatsappGroupId: whatsappGroupId || '', eligiblePlayerIds: eligiblePlayerIds || [] };
     const docRef = await addDoc(collection(db, ONLINE_CLUBS_COLLECTION), newOnlineClub);
     return { id: docRef.id, ...newOnlineClub };
 }
 
-export async function updateOnlineClub(onlineClubId: string, updates: Partial<Pick<OnlineClub, 'name' | 'currency' | 'whatsappGroupId'>>): Promise<void> {
+export async function updateOnlineClub(onlineClubId: string, updates: Partial<Pick<OnlineClub, 'name' | 'currency' | 'whatsappGroupId' | 'eligiblePlayerIds'>>): Promise<void> {
     const docRef = doc(db, ONLINE_CLUBS_COLLECTION, onlineClubId);
     await setDoc(docRef, updates, { merge: true });
 }

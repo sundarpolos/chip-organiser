@@ -115,6 +115,7 @@ export interface OnlineClub {
   clubId: string; // The main club it belongs to
   currency?: string;
   whatsappGroupId?: string;
+  eligiblePlayerIds?: string[];
 }
 
 export interface OnlinePlayerAccount {

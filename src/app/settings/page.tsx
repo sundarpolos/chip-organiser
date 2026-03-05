@@ -1895,13 +1895,15 @@ const CreateEditOnlineClubDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     club: Club | null;
+    players: MasterPlayer[];
     onSave: () => Promise<void>;
     onlineClubToEdit?: OnlineClub | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, club, onSave, onlineClubToEdit, toast }) => {
+}> = ({ isOpen, onOpenChange, club, players, onSave, onlineClubToEdit, toast }) => {
     const [name, setName] = useState('');
     const [currency, setCurrency] = useState('');
     const [whatsappGroupId, setWhatsappGroupId] = useState('');
+    const [eligiblePlayerIds, setEligiblePlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isGroupTesting, setIsGroupTesting] = useState(false);
 
@@ -1911,10 +1913,12 @@ const CreateEditOnlineClubDialog: FC<{
                 setName(onlineClubToEdit.name);
                 setCurrency(onlineClubToEdit.currency || 'INR');
                 setWhatsappGroupId(onlineClubToEdit.whatsappGroupId || '');
+                setEligiblePlayerIds(onlineClubToEdit.eligiblePlayerIds || []);
             } else {
                 setName('');
                 setCurrency('INR');
                 setWhatsappGroupId('');
+                setEligiblePlayerIds([]);
             }
         }
     }, [onlineClubToEdit, isOpen]);
@@ -1927,10 +1931,10 @@ const CreateEditOnlineClubDialog: FC<{
         setIsSaving(true);
         try {
             if (onlineClubToEdit) {
-                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim() });
+                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim(), eligiblePlayerIds });
                 toast({ title: 'Success', description: `Online club "${name.trim()}" updated.` });
             } else {
-                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR', whatsappGroupId.trim());
+                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR', whatsappGroupId.trim(), eligiblePlayerIds);
                 toast({ title: 'Success', description: `Online club "${name.trim()}" created.` });
             }
             await onSave();
@@ -1949,7 +1953,7 @@ const CreateEditOnlineClubDialog: FC<{
         }
         setIsGroupTesting(true);
         try {
-            const config = club?.whatsappConfig || {};
+            const config = club.whatsappConfig || {};
             const result = await sendWhatsappMessage({
                 to: whatsappGroupId,
                 message: `This is a test message for the online club group "${name || 'New Club'}" from Chip Maestro.`,
@@ -1973,30 +1977,60 @@ const CreateEditOnlineClubDialog: FC<{
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{onlineClubToEdit ? 'Edit' : 'Create'} Online Club for {club?.name}</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="online-club-name">Online Club Name</Label>
-                        <Input id="online-club-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., PokerBaazi" />
+                <ScrollArea className="max-h-[70vh] py-4 pr-4">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="online-club-name">Online Club Name</Label>
+                            <Input id="online-club-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., PokerBaazi" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="online-club-currency">Currency</Label>
+                            <Input id="online-club-currency" value={currency} onChange={e => setCurrency(e.target.value)} placeholder="e.g., INR" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="online-club-group-id">WhatsApp Group ID (Optional)</Label>
+                            <Input id="online-club-group-id" value={whatsappGroupId} onChange={e => setWhatsappGroupId(e.target.value)} placeholder="e.g., 12036302...g.us" />
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <Button variant="secondary" onClick={handleTestGroupWhatsapp} disabled={isGroupTesting || !whatsappGroupId}>
+                                {isGroupTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                                Test Group
+                            </Button>
+                        </div>
+                         <Separator />
+                        <div className="space-y-2">
+                            <Label>Eligible Players</Label>
+                            <p className="text-sm text-muted-foreground">Select which players can use this online club account. If none are selected, all players in the club will have access.</p>
+                            <ScrollArea className="h-48 border rounded-md p-2">
+                                <div className="flex items-center space-x-2 border-b pb-2">
+                                    <Checkbox
+                                        id="online-club-select-all"
+                                        onCheckedChange={(checked) => setEligiblePlayerIds(checked ? players.map(p => p.id) : [])}
+                                        checked={players.length > 0 && eligiblePlayerIds.length === players.length}
+                                    />
+                                    <Label htmlFor="online-club-select-all" className="font-medium">Select All</Label>
+                                </div>
+                                {players.map(player => (
+                                    <div key={player.id} className="flex items-center space-x-3 p-1">
+                                        <Checkbox
+                                            id={`online-club-player-${player.id}`}
+                                            checked={eligiblePlayerIds.includes(player.id)}
+                                            onCheckedChange={checked => {
+                                                setEligiblePlayerIds(prev => checked ? [...prev, player.id] : prev.filter(id => id !== player.id))
+                                            }}
+                                        />
+                                        <Label htmlFor={`online-club-player-${player.id}`}>{player.name}</Label>
+                                    </div>
+                                ))}
+                                {players.length === 0 && <p className="text-center text-muted-foreground p-4">No players in this club.</p>}
+                            </ScrollArea>
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="online-club-currency">Currency</Label>
-                        <Input id="online-club-currency" value={currency} onChange={e => setCurrency(e.target.value)} placeholder="e.g., INR" />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="online-club-group-id">WhatsApp Group ID (Optional)</Label>
-                        <Input id="online-club-group-id" value={whatsappGroupId} onChange={e => setWhatsappGroupId(e.target.value)} placeholder="e.g., 12036302...g.us" />
-                    </div>
-                    <div className="flex justify-end pt-2">
-                        <Button variant="secondary" onClick={handleTestGroupWhatsapp} disabled={isGroupTesting || !whatsappGroupId}>
-                            {isGroupTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                            Test Group
-                        </Button>
-                    </div>
-                </div>
+                </ScrollArea>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSave} disabled={isSaving}>
@@ -2010,10 +2044,11 @@ const CreateEditOnlineClubDialog: FC<{
 
 const OnlineClubManagement: FC<{
     clubs: Club[];
+    players: MasterPlayer[];
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
     activeClub: Club | null;
-}> = ({ clubs, toast, isSuperAdmin, activeClub }) => {
+}> = ({ clubs, players, toast, isSuperAdmin, activeClub }) => {
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
@@ -2081,6 +2116,7 @@ const OnlineClubManagement: FC<{
                         <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>Currency</TableHead>
+                            <TableHead>Players</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -2089,6 +2125,7 @@ const OnlineClubManagement: FC<{
                             <TableRow key={oc.id}>
                                 <TableCell>{oc.name}</TableCell>
                                 <TableCell>{oc.currency || 'INR'}</TableCell>
+                                <TableCell>{oc.eligiblePlayerIds?.length || 'All'}</TableCell>
                                 <TableCell className="text-right space-x-1">
                                     <Button variant="ghost" size="icon" onClick={() => openEditDialog(club, oc)}>
                                         <Pencil className="h-4 w-4" />
@@ -2113,7 +2150,7 @@ const OnlineClubManagement: FC<{
                         ))}
                         {clubsForTable.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={3} className="text-center">No online clubs created yet for this club.</TableCell>
+                                <TableCell colSpan={4} className="text-center">No online clubs created yet for this club.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -2162,6 +2199,7 @@ const OnlineClubManagement: FC<{
                 isOpen={isModalOpen}
                 onOpenChange={setModalOpen}
                 club={clubForModal}
+                players={players.filter(p => p.clubId === clubForModal?.id)}
                 onSave={refreshOnlineClubs}
                 onlineClubToEdit={onlineClubToEdit}
                 toast={toast}
@@ -2273,6 +2311,7 @@ export default function SettingsPage() {
        {(isAdmin) && (
           <OnlineClubManagement
             clubs={filteredClubs}
+            players={filteredPlayers}
             toast={toast}
             isSuperAdmin={isSuperAdmin}
             activeClub={activeClub}
