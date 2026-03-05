@@ -1903,6 +1903,7 @@ const CreateEditOnlineClubDialog: FC<{
     const [currency, setCurrency] = useState('');
     const [whatsappGroupId, setWhatsappGroupId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [isGroupTesting, setIsGroupTesting] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -1940,6 +1941,34 @@ const CreateEditOnlineClubDialog: FC<{
             setIsSaving(false);
         }
     };
+    
+    const handleTestGroupWhatsapp = async () => {
+        if (!club?.whatsappConfig?.apiUrl || !club?.whatsappConfig?.apiToken || !whatsappGroupId) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: "Main club API settings and this Online Club's Group ID are required." });
+            return;
+        }
+        setIsGroupTesting(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: whatsappGroupId,
+                message: `This is a test message for the online club group "${name || 'New Club'}" from Chip Maestro.`,
+                isGroup: true,
+                apiUrl: club.whatsappConfig.apiUrl,
+                apiToken: club.whatsappConfig.apiToken,
+                senderMobile: club.whatsappConfig.senderMobile,
+            });
+            if (result.success) {
+                toast({ title: 'Group Test Successful!', description: 'A test message was sent to the configured group ID.' });
+            } else {
+                throw new Error(result.error || 'Failed to send group test message.');
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+            toast({ variant: 'destructive', title: 'Group Test Failed', description: errorMessage });
+        } finally {
+            setIsGroupTesting(false);
+        }
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -1959,6 +1988,12 @@ const CreateEditOnlineClubDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="online-club-group-id">WhatsApp Group ID (Optional)</Label>
                         <Input id="online-club-group-id" value={whatsappGroupId} onChange={e => setWhatsappGroupId(e.target.value)} placeholder="e.g., 12036302...g.us" />
+                    </div>
+                    <div className="flex justify-end pt-2">
+                        <Button variant="secondary" onClick={handleTestGroupWhatsapp} disabled={isGroupTesting || !whatsappGroupId}>
+                            {isGroupTesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                            Test Group
+                        </Button>
                     </div>
                 </div>
                 <DialogFooter>
