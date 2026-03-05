@@ -1895,11 +1895,12 @@ const CreateEditOnlineClubDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     club: Club | null;
-    players: MasterPlayer[];
+    allPlayers: MasterPlayer[];
+    allClubs: Club[];
     onSave: () => Promise<void>;
     onlineClubToEdit?: OnlineClub | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, club, players, onSave, onlineClubToEdit, toast }) => {
+}> = ({ isOpen, onOpenChange, club, allPlayers, allClubs, onSave, onlineClubToEdit, toast }) => {
     const [name, setName] = useState('');
     const [currency, setCurrency] = useState('');
     const [whatsappGroupId, setWhatsappGroupId] = useState('');
@@ -1922,6 +1923,32 @@ const CreateEditOnlineClubDialog: FC<{
             }
         }
     }, [onlineClubToEdit, isOpen]);
+
+    const playersByClub = useMemo(() => {
+        const grouped = new Map<string, MasterPlayer[]>();
+        allPlayers.forEach(player => {
+            if (player.isActive === false) return; // only show active players
+            const clubId = player.clubId || 'unassigned';
+            if (!grouped.has(clubId)) {
+                grouped.set(clubId, []);
+            }
+            grouped.get(clubId)!.push(player);
+        });
+        
+        grouped.forEach(playerList => playerList.sort((a,b) => a.name.localeCompare(b.name)));
+        
+        const clubMap = new Map(allClubs.map(c => [c.id, c.name]));
+        return Array.from(grouped.entries()).sort((a,b) => {
+            const clubNameA = clubMap.get(a[0]) || 'zzz';
+            const clubNameB = clubMap.get(b[0]) || 'zzz';
+            return clubNameA.localeCompare(clubNameB);
+        });
+    }, [allPlayers, allClubs]);
+
+    const handleSelectAll = (isChecked: boolean) => {
+        setEligiblePlayerIds(isChecked ? allPlayers.filter(p => p.isActive !== false).map(p => p.id) : [])
+    };
+
 
     const handleSave = async () => {
         if (!name.trim() || !club) {
@@ -2004,29 +2031,42 @@ const CreateEditOnlineClubDialog: FC<{
                          <Separator />
                         <div className="space-y-2">
                             <Label>Eligible Players</Label>
-                            <p className="text-sm text-muted-foreground">Select which players can use this online club account. If none are selected, all players in the club will have access.</p>
-                            <ScrollArea className="h-48 border rounded-md p-2">
+                            <p className="text-sm text-muted-foreground">Select which players can use this online club account. If none are selected, all players in the main club will have access.</p>
+                             <ScrollArea className="h-48 border rounded-md p-2">
                                 <div className="flex items-center space-x-2 border-b pb-2">
                                     <Checkbox
                                         id="online-club-select-all"
-                                        onCheckedChange={(checked) => setEligiblePlayerIds(checked ? players.map(p => p.id) : [])}
-                                        checked={players.length > 0 && eligiblePlayerIds.length === players.length}
+                                        onCheckedChange={handleSelectAll}
+                                        checked={allPlayers.filter(p => p.isActive !== false).length > 0 && eligiblePlayerIds.length === allPlayers.filter(p => p.isActive !== false).length}
                                     />
-                                    <Label htmlFor="online-club-select-all" className="font-medium">Select All</Label>
+                                    <Label htmlFor="online-club-select-all" className="font-medium">Select All Players</Label>
                                 </div>
-                                {players.map(player => (
-                                    <div key={player.id} className="flex items-center space-x-3 p-1">
-                                        <Checkbox
-                                            id={`online-club-player-${player.id}`}
-                                            checked={eligiblePlayerIds.includes(player.id)}
-                                            onCheckedChange={checked => {
-                                                setEligiblePlayerIds(prev => checked ? [...prev, player.id] : prev.filter(id => id !== player.id))
-                                            }}
-                                        />
-                                        <Label htmlFor={`online-club-player-${player.id}`}>{player.name}</Label>
-                                    </div>
+                                
+                                {playersByClub.map(([clubId, clubPlayers]) => (
+                                    <Accordion type="single" collapsible key={clubId} defaultValue={clubId === club?.id ? clubId : undefined} className="w-full">
+                                        <AccordionItem value={clubId} className="border-b-0">
+                                            <AccordionTrigger className="py-2 text-sm font-semibold [&[data-state=open]>svg]:text-primary">
+                                            {allClubs.find(c => c.id === clubId)?.name || 'Unassigned'} ({clubPlayers.length})
+                                            </AccordionTrigger>
+                                            <AccordionContent className="pl-4">
+                                                {clubPlayers.map(player => (
+                                                    <div key={player.id} className="flex items-center space-x-3 p-1">
+                                                        <Checkbox
+                                                            id={`online-club-player-${player.id}`}
+                                                            checked={eligiblePlayerIds.includes(player.id)}
+                                                            onCheckedChange={checked => {
+                                                                setEligiblePlayerIds(prev => checked ? [...prev, player.id] : prev.filter(id => id !== player.id))
+                                                            }}
+                                                        />
+                                                        <Label htmlFor={`online-club-player-${player.id}`}>{player.name}</Label>
+                                                    </div>
+                                                ))}
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
                                 ))}
-                                {players.length === 0 && <p className="text-center text-muted-foreground p-4">No players in this club.</p>}
+
+                                {allPlayers.length === 0 && <p className="text-center text-muted-foreground p-4">No players found in the system.</p>}
                             </ScrollArea>
                         </div>
                     </div>
@@ -2199,7 +2239,8 @@ const OnlineClubManagement: FC<{
                 isOpen={isModalOpen}
                 onOpenChange={setModalOpen}
                 club={clubForModal}
-                players={players.filter(p => p.clubId === clubForModal?.id)}
+                allPlayers={players}
+                allClubs={clubs}
                 onSave={refreshOnlineClubs}
                 onlineClubToEdit={onlineClubToEdit}
                 toast={toast}
@@ -2310,8 +2351,8 @@ export default function SettingsPage() {
        )}
        {(isAdmin) && (
           <OnlineClubManagement
-            clubs={filteredClubs}
-            players={filteredPlayers}
+            clubs={clubs}
+            players={players}
             toast={toast}
             isSuperAdmin={isSuperAdmin}
             activeClub={activeClub}
