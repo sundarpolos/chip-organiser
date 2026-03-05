@@ -272,7 +272,9 @@ const SendOnlineClubReportDialog: FC<{
                 to: onlineClub.whatsappGroupId,
                 message: message,
                 isGroup: true,
-                ...configToSend
+                apiUrl: configToSend.apiUrl,
+                apiToken: configToSend.apiToken,
+                senderMobile: configToSend.senderMobile,
             });
             if (result && result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
@@ -994,6 +996,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 

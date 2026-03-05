@@ -77,6 +77,7 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       }
 
       console.log(`Attempting to send WhatsApp message via POST to: ${finalApiUrl}`);
+      console.log('Request Body:', body.toString());
       
       const response = await fetch(finalApiUrl, {
         method: 'POST',

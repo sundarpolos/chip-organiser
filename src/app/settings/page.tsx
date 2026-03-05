@@ -907,7 +907,9 @@ const CreateEditClubDialog: FC<{
             const result = await sendWhatsappMessage({
                 to: currentUser.whatsappNumber,
                 message: 'This is a test message from Chip Maestro.',
-                ...whatsappConfig,
+                apiUrl: whatsappConfig.apiUrl,
+                apiToken: whatsappConfig.apiToken,
+                senderMobile: whatsappConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Test Successful!', description: 'A test message was sent to your WhatsApp number.' });
@@ -933,7 +935,9 @@ const CreateEditClubDialog: FC<{
                 to: whatsappConfig.whatsappGroupId,
                 message: 'This is a group test message from Chip Maestro.',
                 isGroup: true,
-                ...whatsappConfig,
+                apiUrl: whatsappConfig.apiUrl,
+                apiToken: whatsappConfig.apiToken,
+                senderMobile: whatsappConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Test Successful!', description: 'A test message was sent to your configured group ID.' });
@@ -1569,11 +1573,16 @@ const CreatePlayerDialog: FC<{
             // Send welcome message
             const selectedClub = clubs.find(c => c.id === clubId);
             if (selectedClub && savedPlayer.whatsappNumber) {
+                const config = selectedClub.whatsappConfig || {};
                 await sendWelcomeMessage({
                     playerName: savedPlayer.name,
                     clubName: selectedClub.name,
                     whatsappNumber: savedPlayer.whatsappNumber,
-                    whatsappConfig: selectedClub.whatsappConfig || {},
+                    whatsappConfig: {
+                        apiUrl: config.apiUrl,
+                        apiToken: config.apiToken,
+                        senderMobile: config.senderMobile,
+                    },
                 });
                 toast({ title: 'Welcome Message Sent', description: `A welcome message has been sent to ${savedPlayer.name}.`});
             }
@@ -1745,10 +1754,13 @@ const SendGameAnnouncementDialog: FC<{
             const player = playersToSend[i];
             const personalizedMessage = message.replace(/\[Player Name\]/g, player.name);
             try {
+                const config = club.whatsappConfig || {};
                 const result = await sendWhatsappMessage({
                     to: player.whatsappNumber,
                     message: personalizedMessage,
-                    ...(club.whatsappConfig || {}),
+                    apiUrl: config.apiUrl,
+                    apiToken: config.apiToken,
+                    senderMobile: config.senderMobile,
                 });
                 if (result.success) {
                     successfulSends++;
@@ -1791,11 +1803,14 @@ const SendGameAnnouncementDialog: FC<{
         try {
             // Remove personalization for group message
             const groupMessage = message.replace(/Hi \[Player Name\],/g, 'Hi everyone,');
+            const config = club.whatsappConfig || {};
             const result = await sendWhatsappMessage({
                 to: groupId,
                 message: groupMessage,
                 isGroup: true,
-                ...(club.whatsappConfig || {}),
+                apiUrl: config.apiUrl,
+                apiToken: config.apiToken,
+                senderMobile: config.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Message Sent!', description: 'The announcement has been sent to the club group.'});

@@ -239,10 +239,13 @@ Please be on time!`;
             const player = playersToSend[i];
             const finalMessage = whatsappMessage.replace('[Player Name]', player.playerName);
             try {
+                const config = activeClub.whatsappConfig || {};
                 const result = await sendWhatsappMessage({
                     to: player.playerWhatsappNumber,
                     message: finalMessage,
-                    ...(activeClub.whatsappConfig || {}),
+                    apiUrl: config.apiUrl,
+                    apiToken: config.apiToken,
+                    senderMobile: config.senderMobile,
                 });
                 if (result.success) {
                     successfulSends++;

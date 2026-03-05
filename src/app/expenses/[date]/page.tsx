@@ -383,7 +383,7 @@ const DailyExpensesPage = () => {
         const chartData = getDonutChartData(baseAmount, expenses);
 
         // Donut Chart
-        const drawDonutChart = (cx: number, cy: number, radius: number, data: { label: string, value: number, color: string }[]) => {
+        const drawDonutChart = (cx: number, cy: number, radius: number, data: { label: string; value: number; color: string }[]) => {
             let startAngle = -90;
             const total = data.reduce((sum, item) => sum + item.value, 0);
             
@@ -761,11 +761,14 @@ const SendExpenseSummaryDialog: FC<{
 
         setIsSending(true);
         try {
+            const config = club?.whatsappConfig || {};
             const result = await sendWhatsappMessage({
                 to: groupId,
                 message: message,
                 isGroup: true,
-                ...(club.whatsappConfig || {})
+                apiUrl: config.apiUrl,
+                apiToken: config.apiToken,
+                senderMobile: config.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Summary Sent!', description: 'The financial summary has been sent to the group.' });

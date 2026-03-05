@@ -57,10 +57,13 @@ const sendBookingOtpFlow = ai.defineFlow(
       const otp = generateOtp();
       const message = `Hi ${playerName}, your seat booking confirmation code for the game on ${gameDate} is ${otp}.`;
       
+      const config = club.whatsappConfig || {};
       const whatsappPayload: SendWhatsappMessageInput = {
         to: whatsappNumber,
         message,
-        ...(club.whatsappConfig || {}),
+        apiUrl: config.apiUrl,
+        apiToken: config.apiToken,
+        senderMobile: config.senderMobile,
       };
 
       const whatsappResult = await sendWhatsappMessage(whatsappPayload);
