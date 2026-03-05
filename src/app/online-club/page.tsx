@@ -222,6 +222,7 @@ const SendOnlineClubReportDialog: FC<{
     onOpenChange: (open: boolean) => void;
     onlineClub: OnlineClub | undefined;
     club: Club | null; // The main club for WA credentials
+    player: OnlinePlayerAccount | null;
     weeklyData: {
         week: string;
         openingBalance: number;
@@ -229,14 +230,15 @@ const SendOnlineClubReportDialog: FC<{
         closingBalance: number;
     }[];
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, onlineClub, club, weeklyData, toast }) => {
+}> = ({ isOpen, onOpenChange, onlineClub, club, player, weeklyData, toast }) => {
     const [isSending, setIsSending] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
 
     const message = useMemo(() => {
-        if (!onlineClub || !weeklyData || weeklyData.length === 0) return 'No data to send.';
+        if (!onlineClub || !weeklyData || weeklyData.length === 0 || !player) return 'No data to send.';
         
-        let msg = `*Statement for ${onlineClub.name}*\n`;
+        let msg = `*Statement for ${player.playerName}*\n`;
+        msg += `_Online Club: ${onlineClub.name}_\n`;
         if (club?.name) {
           msg += `_Club: ${club.name}_\n\n`;
         }
@@ -255,7 +257,7 @@ const SendOnlineClubReportDialog: FC<{
                 } else if (entry.type === 'withdrawal') {
                     description = `Withdrawal via ${entry.notes}`;
                 } else {
-                    description = 'Daily Profit/Loss';
+                    description = entry.amount >= 0 ? 'Profit' : 'Loss';
                 }
 
                 const sign = entry.amount >= 0 ? '+' : '-';
@@ -271,7 +273,7 @@ const SendOnlineClubReportDialog: FC<{
         });
         
         return msg.trim();
-    }, [onlineClub, club, weeklyData]);
+    }, [onlineClub, club, weeklyData, player]);
 
     const handleSend = async () => {
         if (!onlineClub?.whatsappGroupId) {
@@ -868,6 +870,7 @@ const OnlineClubPage: FC = () => {
                 onOpenChange={setReportModalOpen}
                 onlineClub={activeOnlineClub}
                 club={club}
+                player={account}
                 weeklyData={weeklyData}
                 toast={toast}
             />
@@ -1019,3 +1022,4 @@ const EditPlDialog: FC<{
 export default OnlineClubPage;
 
     
+
