@@ -236,23 +236,34 @@ const SendOnlineClubReportDialog: FC<{
     const message = useMemo(() => {
         if (!onlineClub || !weeklyData || weeklyData.length === 0) return 'No data to send.';
         
-        let msg = `*Online Ledger: ${onlineClub.name}*\n`;
-        msg += `_Club: ${club?.name}_\n\n`;
+        let msg = `*Statement for ${onlineClub.name}*\n`;
+        if (club?.name) {
+          msg += `_Club: ${club.name}_\n\n`;
+        }
     
         [...weeklyData].reverse().forEach(week => {
             const currencySymbol = onlineClub.currency || '₹';
-            msg += `*Week: ${week.week}*\n`;
+            msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
             msg += `----------------------------------\n`;
     
             week.entries.forEach(entry => {
-                const sign = entry.amount >= 0 ? '+' : '-';
-                msg += `${format(parseISO(entry.date), 'dd MMM')}: ${entry.type}`;
-                if (entry.type !== 'p/l' && entry.notes) {
-                    msg += ` (${entry.notes})`;
+                const date = format(parseISO(entry.date), 'dd MMM');
+                let description = '';
+                if (entry.type === 'deposit') {
+                    description = `Deposit via ${entry.notes}`;
+                } else if (entry.type === 'withdrawal') {
+                    description = `Withdrawal via ${entry.notes}`;
+                } else {
+                    description = 'Daily Profit/Loss';
                 }
-                msg += `\n*Amount: ${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}* | Balance: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
-                msg += `-\n`;
+
+                const sign = entry.amount >= 0 ? '+' : '-';
+                const amount = `${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`;
+                const balance = `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`;
+    
+                msg += `*${date}* - ${description}\n`;
+                msg += `  \`${amount}\`  (Balance: \`${balance}\`)\n\n`;
             });
             
             msg += `----------------------------------\n`;
@@ -1007,14 +1018,4 @@ const EditPlDialog: FC<{
 
 export default OnlineClubPage;
 
-
-
-
-
-
-
-
-
-
-
-
+    
