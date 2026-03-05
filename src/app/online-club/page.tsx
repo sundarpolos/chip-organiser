@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus, MessageSquare, Send } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus, MessageSquare, Send, Copy, Check } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -231,6 +231,7 @@ const SendOnlineClubReportDialog: FC<{
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, onlineClub, club, weeklyData, toast }) => {
     const [isSending, setIsSending] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     const message = useMemo(() => {
         if (!onlineClub || !weeklyData || weeklyData.length === 0) return 'No data to send.';
@@ -264,9 +265,7 @@ const SendOnlineClubReportDialog: FC<{
                 to: onlineClub.whatsappGroupId,
                 message: message,
                 isGroup: true,
-                apiUrl: club?.whatsappConfig?.apiUrl,
-                apiToken: club?.whatsappConfig?.apiToken,
-                senderMobile: club?.whatsappConfig?.senderMobile,
+                ...(club?.whatsappConfig || {}),
             });
             if (result && result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
@@ -281,6 +280,14 @@ const SendOnlineClubReportDialog: FC<{
             setIsSending(false);
         }
     };
+    
+    const handleCopyToClipboard = () => {
+        navigator.clipboard.writeText(message).then(() => {
+            setIsCopied(true);
+            toast({ title: 'Copied!', description: 'Report message copied to clipboard.' });
+            setTimeout(() => setIsCopied(false), 2000);
+        });
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -290,7 +297,12 @@ const SendOnlineClubReportDialog: FC<{
                     <DialogDescription>A summary for "{onlineClub?.name}" will be sent to its configured WhatsApp group.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    <Label>Message Preview</Label>
+                    <div className="flex justify-between items-center">
+                        <Label>Message Preview</Label>
+                        <Button variant="ghost" size="icon" onClick={handleCopyToClipboard}>
+                            {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                    </div>
                     <ScrollArea className="h-64 border rounded-md p-4 bg-muted">
                         <pre className="text-sm whitespace-pre-wrap">{message}</pre>
                     </ScrollArea>
@@ -975,3 +987,4 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
