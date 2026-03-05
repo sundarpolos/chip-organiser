@@ -42,15 +42,15 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     outputSchema: SendWhatsappMessageOutputSchema,
   },
   async ({ to, message, isGroup = false, apiUrl, apiToken, senderMobile }) => {
-    // Prioritize environment variables, falling back to passed-in credentials.
-    const finalApiUrl = process.env.WHATSAPP_API_URL || apiUrl;
-    const finalApiToken = process.env.WHATSAPP_API_TOKEN || apiToken;
-    const finalSenderMobile = process.env.WHATSAPP_SENDER_MOBILE || senderMobile;
+    // Prioritize passed-in credentials, falling back to environment variables.
+    const finalApiUrl = apiUrl || process.env.WHATSAPP_API_URL;
+    const finalApiToken = apiToken || process.env.WHATSAPP_API_TOKEN;
+    const finalSenderMobile = senderMobile || process.env.WHATSAPP_SENDER_MOBILE;
 
     console.log('--- WhatsApp API Settings Used ---');
-    console.log('URL:', finalApiUrl);
-    console.log('Token is set:', !!finalApiToken);
-    console.log('Sender Mobile:', finalSenderMobile || 'Not Set');
+    console.log('Final URL:', finalApiUrl);
+    console.log('Final Token is set:', !!finalApiToken);
+    console.log('Final Sender Mobile:', finalSenderMobile || 'Not Set');
     console.log('------------------------------------');
 
     if (!finalApiUrl || !finalApiToken) {
@@ -126,3 +126,5 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
   }
 );
+
+    

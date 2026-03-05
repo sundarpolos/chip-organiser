@@ -3044,7 +3044,9 @@ ${formattedTransfers}
                 to: groupId,
                 message: previewMessage,
                 isGroup: true,
-                ...whatsappConfig,
+                apiUrl: whatsappConfig.apiUrl,
+                apiToken: whatsappConfig.apiToken,
+                senderMobile: whatsappConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Sent to Group!', description: 'The settlement details have been sent.'});
@@ -3086,7 +3088,9 @@ ${formattedTransfers}
                 const result = await sendWhatsappMessage({
                     to: player.whatsappNumber,
                     message: previewMessage,
-                    ...whatsappConfig
+                    apiUrl: whatsappConfig.apiUrl,
+                    apiToken: whatsappConfig.apiToken,
+                    senderMobile: whatsappConfig.senderMobile,
                 });
 
                 if (result.success) {
@@ -3244,7 +3248,9 @@ const SendMessageDialog: FC<{
                 to: whatsappConfig.whatsappGroupId,
                 message,
                 isGroup: true,
-                ...whatsappConfig
+                apiUrl: whatsappConfig.apiUrl,
+                apiToken: whatsappConfig.apiToken,
+                senderMobile: whatsappConfig.senderMobile,
             });
 
             if (result.success) {
@@ -3371,7 +3377,13 @@ const BuyInSummaryDialog: FC<{
             }
             
             try {
-                const result = await sendWhatsappMessage({ to: player.whatsappNumber, message: playerMessage.trim(), ...whatsappConfig });
+                const result = await sendWhatsappMessage({
+                    to: player.whatsappNumber,
+                    message: playerMessage.trim(),
+                    apiUrl: whatsappConfig.apiUrl,
+                    apiToken: whatsappConfig.apiToken,
+                    senderMobile: whatsappConfig.senderMobile,
+                });
                 if (result.success) {
                     successfulSends++;
                 } else {
@@ -4001,3 +4013,5 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     )
 }
+
+    
