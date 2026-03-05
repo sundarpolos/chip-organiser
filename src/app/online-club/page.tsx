@@ -42,7 +42,8 @@ const WeeklyLedgerAccordion: FC<{
     onlineClubCurrencyMap: Map<string, string>,
     onEditEntry: (entry: OnlineLedgerEntry) => void,
     onDeleteEntry: (entryId: string) => void,
-}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry }) => {
+    currencySymbol?: string,
+}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol }) => {
 
     const weeklyData = useMemo(() => {
         if (entries.length === 0) return [];
@@ -130,6 +131,8 @@ const WeeklyLedgerAccordion: FC<{
         );
     }
     
+    const displaySymbol = currencySymbol || '₹';
+
     return (
         <Accordion type="single" collapsible className="w-full" defaultValue={weeklyData.length > 0 ? weeklyData[0].week : undefined}>
             {weeklyData.map(week => (
@@ -137,7 +140,7 @@ const WeeklyLedgerAccordion: FC<{
                     <AccordionTrigger>
                         <div className="flex justify-between w-full pr-4">
                             <span>{week.week}</span>
-                            <span className="font-semibold">Closing: ₹{week.closingBalance.toFixed(0)}</span>
+                            <span className="font-semibold">Closing: {displaySymbol}{week.closingBalance.toFixed(0)}</span>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -156,7 +159,7 @@ const WeeklyLedgerAccordion: FC<{
                         <TableBody>
                             <TableRow className="font-semibold bg-muted/50">
                                 <TableCell colSpan={5}>Opening Balance</TableCell>
-                                <TableCell className="text-right font-mono">₹{week.openingBalance.toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-mono">{displaySymbol}{week.openingBalance.toFixed(0)}</TableCell>
                                 <TableCell></TableCell>
                             </TableRow>
                             {week.entries.map(entry => (
@@ -170,7 +173,7 @@ const WeeklyLedgerAccordion: FC<{
                                         {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                     </TableCell>
                                      <TableCell className="text-right font-mono">
-                                       ₹{entry.localRunningBalance.toFixed(0)}
+                                       {displaySymbol}{entry.localRunningBalance.toFixed(0)}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {entry.type === 'p/l' && (
@@ -200,7 +203,7 @@ const WeeklyLedgerAccordion: FC<{
                         <TableFooter>
                             <TableRow className="font-bold text-base bg-muted hover:bg-muted">
                                 <TableCell colSpan={5}>Closing Balance</TableCell>
-                                <TableCell className="text-right font-mono">₹{week.closingBalance.toFixed(0)}</TableCell>
+                                <TableCell className="text-right font-mono">{displaySymbol}{week.closingBalance.toFixed(0)}</TableCell>
                                 <TableCell></TableCell>
                             </TableRow>
                         </TableFooter>
@@ -512,6 +515,12 @@ const OnlineClubPage: FC = () => {
         return onlineClubs.find(oc => oc.name === activeTab);
     }, [onlineClubs, activeTab]);
 
+    const currencyForLedger = useMemo(() => {
+        if (activeTab === 'all') return undefined; // Return undefined for 'All' tab
+        const club = onlineClubs.find(oc => oc.name === activeTab);
+        return club?.currency || '₹'; // Default to '₹' if currency is not set for the club
+    }, [activeTab, onlineClubs]);
+
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -779,6 +788,7 @@ const OnlineClubPage: FC = () => {
                                 onlineClubCurrencyMap={onlineClubCurrencyMap}
                                 onEditEntry={handleEditEntry}
                                 onDeleteEntry={handleDeleteEntry}
+                                currencySymbol={currencyForLedger}
                             />
                         </TabsContent>
                     </Tabs>
