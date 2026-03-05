@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, type FC, useCallback, useRef } from 'react';
@@ -48,8 +47,6 @@ const WeeklyLedgerAccordion: FC<{
     activeTab: string,
 }> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol, activeTab }) => {
     
-    const showOnlineClubColumn = activeTab === 'all';
-
     const weeklyData = useMemo(() => {
         if (entries.length === 0) return [];
     
@@ -154,7 +151,6 @@ const WeeklyLedgerAccordion: FC<{
                             <TableRow>
                                 <TableHead className="p-2 text-xs">Date</TableHead>
                                 <TableHead className="p-2 text-xs">Type</TableHead>
-                                {showOnlineClubColumn && <TableHead className="p-2 text-xs">Online Club</TableHead>}
                                 <TableHead className="text-right p-2 text-xs">Amount</TableHead>
                                 <TableHead className="text-right p-2 text-xs">Balance</TableHead>
                                 <TableHead className="text-right p-2 text-xs">Actions</TableHead>
@@ -162,7 +158,7 @@ const WeeklyLedgerAccordion: FC<{
                         </TableHeader>
                         <TableBody>
                             <TableRow className="font-semibold bg-muted/50">
-                                <TableCell colSpan={showOnlineClubColumn ? 4 : 3} className="p-2 text-xs">Opening Balance</TableCell>
+                                <TableCell colSpan={3} className="p-2 text-xs">Opening Balance</TableCell>
                                 <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.openingBalance.toFixed(0)}</TableCell>
                                 <TableCell className="p-2"></TableCell>
                             </TableRow>
@@ -175,7 +171,6 @@ const WeeklyLedgerAccordion: FC<{
                                             {entry.type !== 'p/l' && entry.type}
                                         </span>
                                     </TableCell>
-                                    {showOnlineClubColumn && <TableCell className="p-2 text-xs">{entry.onlineClubName || '-'}</TableCell>}
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                         {entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                     </TableCell>
@@ -209,7 +204,7 @@ const WeeklyLedgerAccordion: FC<{
                         </TableBody>
                         <TableFooter>
                             <TableRow className="font-bold text-sm bg-muted hover:bg-muted">
-                                <TableCell colSpan={showOnlineClubColumn ? 4 : 3} className="p-2 text-xs">Closing Balance</TableCell>
+                                <TableCell colSpan={3} className="p-2 text-xs">Closing Balance</TableCell>
                                 <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.closingBalance.toFixed(0)}</TableCell>
                                 <TableCell className="p-2"></TableCell>
                             </TableRow>
@@ -1011,6 +1006,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 
