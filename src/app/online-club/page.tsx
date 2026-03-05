@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, type FC, useCallback, useRef } from 'react';
@@ -267,11 +268,11 @@ const SendOnlineClubReportDialog: FC<{
                 apiToken: club?.whatsappConfig?.apiToken,
                 senderMobile: club?.whatsappConfig?.senderMobile,
             });
-            if (result.success) {
+            if (result && result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
                 onOpenChange(false);
             } else {
-                throw new Error(result.error);
+                throw new Error(result?.error || 'Failed to send report. The server did not provide an error message.');
             }
         } catch (e) {
             const error = e as Error;
@@ -625,7 +626,7 @@ const OnlineClubPage: FC = () => {
             // --- BALANCE BADGES ---
             let currentX = pageWidth - 40;
             balanceByClub.slice().reverse().forEach(clubBalance => {
-                const currencySymbol = clubBalance.name === 'Phoenix' ? 'Rs.' : onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
                 const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                 const textWidth = doc.getTextWidth(text);
                 const badgeWidth = textWidth + 20;
@@ -650,7 +651,7 @@ const OnlineClubPage: FC = () => {
                 }
 
                 const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
-                const currencySymbol = clubName === 'Phoenix' ? 'Rs.' : onlineClubCurrencyMap.get(clubName) || '₹';
+                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
 
                 const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
                 const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
@@ -753,7 +754,7 @@ const OnlineClubPage: FC = () => {
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {balanceByClub.map((clubBalance, index) => (
                                         <Badge key={clubBalance.name} className={cn('font-semibold', badgeColors[index % badgeColors.length])}>
-                                            {clubBalance.name}: {clubBalance.currency}{clubBalance.balance.toFixed(0)}
+                                            {clubBalance.name}: {onlineClubCurrencyMap.get(clubBalance.name) || '₹'}{clubBalance.balance.toFixed(0)}
                                         </Badge>
                                     ))}
                                     {balanceByClub.length === 0 && <p className="text-sm text-muted-foreground">No balances to display.</p>}
