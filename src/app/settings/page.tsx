@@ -1949,13 +1949,14 @@ const CreateEditOnlineClubDialog: FC<{
         }
         setIsGroupTesting(true);
         try {
+            const config = club?.whatsappConfig || {};
             const result = await sendWhatsappMessage({
                 to: whatsappGroupId,
                 message: `This is a test message for the online club group "${name || 'New Club'}" from Chip Maestro.`,
                 isGroup: true,
-                apiUrl: club.whatsappConfig.apiUrl,
-                apiToken: club.whatsappConfig.apiToken,
-                senderMobile: club.whatsappConfig.senderMobile,
+                apiUrl: config.apiUrl,
+                apiToken: config.apiToken,
+                senderMobile: config.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Test Successful!', description: 'A test message was sent to the configured group ID.' });
