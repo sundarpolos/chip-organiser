@@ -1886,6 +1886,7 @@ const CreateEditOnlineClubDialog: FC<{
 }> = ({ isOpen, onOpenChange, club, onSave, onlineClubToEdit, toast }) => {
     const [name, setName] = useState('');
     const [currency, setCurrency] = useState('');
+    const [whatsappGroupId, setWhatsappGroupId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -1893,9 +1894,11 @@ const CreateEditOnlineClubDialog: FC<{
             if (onlineClubToEdit) {
                 setName(onlineClubToEdit.name);
                 setCurrency(onlineClubToEdit.currency || 'INR');
+                setWhatsappGroupId(onlineClubToEdit.whatsappGroupId || '');
             } else {
                 setName('');
                 setCurrency('INR');
+                setWhatsappGroupId('');
             }
         }
     }, [onlineClubToEdit, isOpen]);
@@ -1908,10 +1911,10 @@ const CreateEditOnlineClubDialog: FC<{
         setIsSaving(true);
         try {
             if (onlineClubToEdit) {
-                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR' });
+                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim() });
                 toast({ title: 'Success', description: `Online club "${name.trim()}" updated.` });
             } else {
-                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR');
+                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR', whatsappGroupId.trim());
                 toast({ title: 'Success', description: `Online club "${name.trim()}" created.` });
             }
             await onSave();
@@ -1937,6 +1940,10 @@ const CreateEditOnlineClubDialog: FC<{
                     <div className="space-y-2">
                         <Label htmlFor="online-club-currency">Currency</Label>
                         <Input id="online-club-currency" value={currency} onChange={e => setCurrency(e.target.value)} placeholder="e.g., INR" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="online-club-group-id">WhatsApp Group ID (Optional)</Label>
+                        <Input id="online-club-group-id" value={whatsappGroupId} onChange={e => setWhatsappGroupId(e.target.value)} placeholder="e.g., 12036302...g.us" />
                     </div>
                 </div>
                 <DialogFooter>

@@ -11,14 +11,14 @@ import {
   deleteProfitLoss,
   getOnlineClubs
 } from '@/services/online-club-service';
-import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, OnlineClub } from '@/lib/types';
+import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, OnlineClub, Club } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus, MessageSquare, Send } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -31,6 +31,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -210,6 +212,93 @@ const WeeklyLedgerAccordion: FC<{
     )
 }
 
+const SendOnlineClubReportDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    onlineClub: OnlineClub | undefined;
+    club: Club | null; // The main club for WA credentials
+    weeklyData: {
+        week: string;
+        openingBalance: number;
+        entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+        closingBalance: number;
+    }[];
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, onlineClub, club, weeklyData, toast }) => {
+    const [isSending, setIsSending] = useState(false);
+
+    const message = useMemo(() => {
+        if (!onlineClub || !weeklyData || weeklyData.length === 0) return 'No data to send.';
+        
+        let msg = `*Online Ledger Report for ${onlineClub.name}*\n`;
+        msg += `_Club: ${club?.name}_\n\n`;
+
+        [...weeklyData].reverse().forEach(week => { // chronological order for message
+            const currencySymbol = onlineClub.currency || '₹';
+            msg += `*${week.week}*\n`;
+            msg += `Opening: ${currencySymbol}${week.openingBalance.toFixed(0)}\n`;
+            week.entries.forEach(entry => {
+                 const sign = entry.amount >= 0 ? '+' : '-';
+                 msg += `  ${format(parseISO(entry.date), 'dd/MM')}: ${entry.notes || entry.type} (${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}) -> Bal: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
+            });
+            msg += `*Closing: ${currencySymbol}${week.closingBalance.toFixed(0)}*\n\n`;
+        });
+        
+        return msg.trim();
+    }, [onlineClub, club, weeklyData]);
+
+    const handleSend = async () => {
+        if (!onlineClub?.whatsappGroupId) {
+            toast({ variant: 'destructive', title: 'Group ID Missing', description: `No WhatsApp Group ID configured for ${onlineClub.name}.`});
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: onlineClub.whatsappGroupId,
+                message: message,
+                isGroup: true,
+                ...(club?.whatsappConfig || {})
+            });
+            if (result.success) {
+                toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (e) {
+            const error = e as Error;
+            toast({ variant: 'destructive', title: 'Send Failed', description: error.message });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Send Report to Group</DialogTitle>
+                    <DialogDescription>A summary for "{onlineClub?.name}" will be sent to its configured WhatsApp group.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-2">
+                    <Label>Message Preview</Label>
+                    <ScrollArea className="h-64 border rounded-md p-4 bg-muted">
+                        <pre className="text-sm whitespace-pre-wrap">{message}</pre>
+                    </ScrollArea>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSend} disabled={isSending || !onlineClub?.whatsappGroupId}>
+                        {isSending ? <Loader2 className="animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Report</>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const OnlineClubPage: FC = () => {
     const { toast } = useToast();
     const router = useRouter();
@@ -217,6 +306,7 @@ const OnlineClubPage: FC = () => {
     const [account, setAccount] = useState<OnlinePlayerAccount | null>(null);
     const [ledger, setLedger] = useState<OnlineLedgerEntry[]>([]);
     const [onlineClubs, setOnlineClubs] = useState<OnlineClub[]>([]);
+    const [club, setClub] = useState<Club | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -224,6 +314,7 @@ const OnlineClubPage: FC = () => {
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
+    const [isReportModalOpen, setReportModalOpen] = useState(false);
 
     const badgeColors = [
         "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300",
@@ -266,19 +357,21 @@ const OnlineClubPage: FC = () => {
                     toast({ variant: 'destructive', title: 'No active club', description: 'Please select a club from your dashboard.' });
                 }
                 setOnlineClubs([]);
+                setClub(null);
                 return;
             }
 
-            // Fetch all data in parallel
-            const [playerAccount, playerLedger, clubs] = await Promise.all([
+            const [playerAccount, playerLedger, clubs, mainClub] = await Promise.all([
                 getOnlinePlayerAccount(currentUser.id),
                 getOnlineLedgerEntries(currentUser.id),
                 getOnlineClubs(activeClubId),
+                getClub(activeClubId),
             ]);
 
             setAccount(playerAccount);
             setLedger(playerLedger);
             setOnlineClubs(clubs);
+            setClub(mainClub);
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Failed to load online account data.';
             if (isInitialLoad) {
@@ -327,7 +420,6 @@ const OnlineClubPage: FC = () => {
         ledger.forEach(entry => {
             if (entry.onlineClubName) {
                 if (balances[entry.onlineClubName] === undefined) {
-                    // This can happen if a transaction exists for an online club that was deleted.
                     balances[entry.onlineClubName] = { balance: 0, currency: onlineClubCurrencyMap.get(entry.onlineClubName) || '₹' };
                 }
                 balances[entry.onlineClubName].balance += entry.amount;
@@ -336,6 +428,90 @@ const OnlineClubPage: FC = () => {
     
         return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
     }, [ledger, onlineClubs, onlineClubCurrencyMap]);
+
+    const weeklyData = useMemo(() => {
+        const entriesForTab = activeTab === 'all' ? ledger : ledger.filter(e => e.onlineClubName === activeTab);
+        if (entriesForTab.length === 0) return [];
+    
+        const sortedLedger = [...entriesForTab].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+        const statements: {
+            week: string;
+            openingBalance: number;
+            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            closingBalance: number;
+        }[] = [];
+    
+        if (sortedLedger.length > 0) {
+            let runningBalance = 0;
+            const earliestEntry = sortedLedger[0];
+            const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
+            
+            let openingBalanceForFirstWeek = 0;
+            sortedLedger.forEach(entry => {
+                if (parseISO(entry.date) < firstWeekStart) {
+                    openingBalanceForFirstWeek += entry.amount;
+                }
+            });
+            
+            runningBalance = openingBalanceForFirstWeek;
+
+            let weekEntries: OnlineLedgerEntry[] = [];
+            let currentWeekStart = firstWeekStart;
+    
+            for (const entry of sortedLedger) {
+                const entryDate = parseISO(entry.date);
+    
+                if (entryDate < firstWeekStart) continue;
+    
+                if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
+                    if (weekEntries.length > 0) {
+                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+                        let weekRunningBalance = runningBalance;
+                        const augmentedEntries = weekEntries.map(e => {
+                            weekRunningBalance += e.amount;
+                            return {...e, localRunningBalance: weekRunningBalance };
+                        });
+                        
+                        statements.push({
+                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                            openingBalance: runningBalance,
+                            entries: augmentedEntries,
+                            closingBalance: weekRunningBalance
+                        });
+                        runningBalance = weekRunningBalance;
+                    }
+                    
+                    currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
+                    weekEntries = [entry];
+                } else {
+                    weekEntries.push(entry);
+                }
+            }
+            
+            if (weekEntries.length > 0) {
+                let weekRunningBalance = runningBalance;
+                const augmentedEntries = weekEntries.map(e => {
+                    weekRunningBalance += e.amount;
+                    return {...e, localRunningBalance: weekRunningBalance };
+                });
+                
+                statements.push({
+                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
+                    openingBalance: runningBalance,
+                    entries: augmentedEntries,
+                    closingBalance: weekRunningBalance
+                });
+            }
+        }
+        
+        return statements.reverse();
+    }, [ledger, activeTab]);
+
+    const activeOnlineClub = useMemo(() => {
+        return onlineClubs.find(oc => oc.name === activeTab);
+    }, [onlineClubs, activeTab]);
+
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -587,6 +763,17 @@ const OnlineClubPage: FC = () => {
                             ))}
                         </TabsList>
                         <TabsContent value={activeTab} className="mt-4">
+                            <div className="flex justify-end mb-4">
+                                {activeTab !== 'all' && (
+                                    <Button
+                                        onClick={() => setReportModalOpen(true)}
+                                        disabled={!activeOnlineClub?.whatsappGroupId}
+                                    >
+                                        <MessageSquare className="mr-2 h-4 w-4" />
+                                        Send to Group
+                                    </Button>
+                                )}
+                            </div>
                             <WeeklyLedgerAccordion 
                                 entries={activeTab === 'all' ? ledger : ledger.filter(e => e.onlineClubName === activeTab)}
                                 onlineClubCurrencyMap={onlineClubCurrencyMap}
@@ -608,6 +795,14 @@ const OnlineClubPage: FC = () => {
                 onlineClubs={onlineClubs}
               />
             )}
+            <SendOnlineClubReportDialog
+                isOpen={isReportModalOpen}
+                onOpenChange={setReportModalOpen}
+                onlineClub={activeOnlineClub}
+                club={club}
+                weeklyData={weeklyData}
+                toast={toast}
+            />
         </div>
     );
 };
