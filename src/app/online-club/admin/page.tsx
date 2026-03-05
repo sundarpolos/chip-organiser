@@ -33,11 +33,10 @@ const AdminOnlineClubPage: FC = () => {
     const [allClubs, setAllClubs] = useState<Club[]>([]);
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
     const [allLedgerEntries, setAllLedgerEntries] = useState<OnlineLedgerEntry[]>([]);
     
     // Filtering and Dialog states
-    const [selectedClubId, setSelectedClubId] = useState<string>('');
+    const [selectedClubId, setSelectedClubId] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
     const [isLedgerModalOpen, setLedgerModalOpen] = useState(false);
@@ -73,20 +72,15 @@ const AdminOnlineClubPage: FC = () => {
         const userStr = localStorage.getItem('chip-maestro-user');
         if (userStr) {
             const user = JSON.parse(userStr);
-            setCurrentUser(user);
             const isSuper = user.whatsappNumber === '919843350000';
-            setIsSuperAdmin(isSuper);
             
-            if (isSuper) {
-                setSelectedClubId('all');
-            } else if (user.clubId) {
-                setSelectedClubId(user.clubId);
+            if (!isSuper) {
+                toast({ variant: 'destructive', title: 'Access Denied', description: "Only Super Admins can manage online clubs." });
+                router.push('/dashboard');
+                return;
             }
 
-            if (!user.isAdmin) {
-                toast({ variant: 'destructive', title: 'Access Denied' });
-                router.push('/dashboard');
-            }
+            setCurrentUser(user);
         } else {
             router.push('/login');
         }
@@ -98,7 +92,7 @@ const AdminOnlineClubPage: FC = () => {
         try {
             const [playerAccounts, clubs, onlineClubs, allEntries] = await Promise.all([
                 getOnlinePlayerAccounts(),
-                isSuperAdmin ? getClubs() : Promise.resolve([]),
+                getClubs(),
                 getOnlineClubs(),
                 getAllOnlineLedgerEntries(),
             ]);
@@ -114,7 +108,7 @@ const AdminOnlineClubPage: FC = () => {
     };
 
     useEffect(() => {
-        if (currentUser?.isAdmin) {
+        if (currentUser) {
             refreshData();
         }
     }, [currentUser]);
@@ -145,14 +139,10 @@ const AdminOnlineClubPage: FC = () => {
     const filteredAccounts = useMemo(() => {
         return accountsWithClubBalances
             .filter(acc => {
-                if (isSuperAdmin) {
-                    return selectedClubId === 'all' || acc.clubId === selectedClubId;
-                }
-                // For regular admins, they should only see their club's accounts
-                return acc.clubId === currentUser?.clubId;
+                return selectedClubId === 'all' || acc.clubId === selectedClubId;
             })
             .filter(acc => acc.playerName.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [accountsWithClubBalances, selectedClubId, searchTerm, isSuperAdmin, currentUser]);
+    }, [accountsWithClubBalances, selectedClubId, searchTerm]);
 
     const handleOpenTransaction = (account: OnlinePlayerAccount, type: 'deposit' | 'withdrawal') => {
         setSelectedAccount(account);
@@ -223,17 +213,15 @@ const AdminOnlineClubPage: FC = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                        {isSuperAdmin && (
-                            <Select value={selectedClubId} onValueChange={setSelectedClubId}>
-                                <SelectTrigger className="w-full sm:w-[200px]">
-                                    <SelectValue placeholder="Filter by club..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Clubs</SelectItem>
-                                    {allClubs.map(club => <SelectItem key={club.id} value={club.id}>{club.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        )}
+                        <Select value={selectedClubId} onValueChange={setSelectedClubId}>
+                            <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectValue placeholder="Filter by club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Clubs</SelectItem>
+                                {allClubs.map(club => <SelectItem key={club.id} value={club.id}>{club.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
                         <div className="relative flex-1">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -248,7 +236,7 @@ const AdminOnlineClubPage: FC = () => {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Player</TableHead>
-                                {isSuperAdmin && <TableHead>Club</TableHead>}
+                                <TableHead>Club</TableHead>
                                 <TableHead className="text-right">Club Balances</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -257,7 +245,7 @@ const AdminOnlineClubPage: FC = () => {
                             {filteredAccounts.map(account => (
                                 <TableRow key={account.id}>
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
-                                    {isSuperAdmin && <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>}
+                                    <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex flex-wrap justify-end gap-1">
                                             {Object.entries(account.clubBalances).map(([clubName, balance], index) => {

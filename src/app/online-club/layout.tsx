@@ -32,7 +32,7 @@ export default function OnlineClubLayout({
           </Link>
         </Button>
         <div className="flex items-center gap-2">
-            {currentUser?.isAdmin && (
+            {currentUser?.whatsappNumber === '919843350000' && (
                 <Button asChild variant="outline" size="icon">
                     <Link href="/online-club/admin">
                         <Landmark className="h-4 w-4" />
