@@ -72,13 +72,13 @@ export async function getAllOnlineLedgerEntries(): Promise<OnlineLedgerEntry[]> 
     return entries;
 }
 
-export async function addProfitLoss(accountId: string, amount: number, notes: string, date: string, onlineClubName: string): Promise<void> {
+export async function addProfitLoss(accountId: string, amount: number, date: string, onlineClubName: string): Promise<void> {
     const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
         accountId,
         type: 'p/l',
         amount,
         date: new Date(date).toISOString(),
-        notes,
+        notes: '',
         onlineClubName,
         runningBalance: 0, // Placeholder, will be corrected by recalculation
     };
@@ -113,7 +113,7 @@ export async function recordTransaction(accountId: string, type: 'deposit' | 'wi
     await recalculateAccountBalance(accountId);
 }
 
-export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newNotes: string, newDate: string, newOnlineClubName: string): Promise<void> {
+export async function updateProfitLoss(accountId: string, entryId: string, newAmount: number, newDate: string, newOnlineClubName: string): Promise<void> {
     const entryRef = doc(db, ONLINE_LEDGER_COLLECTION, entryId);
     const entryDoc = await getDoc(entryRef);
 
@@ -125,7 +125,7 @@ export async function updateProfitLoss(accountId: string, entryId: string, newAm
     updatedDate.setHours(12, 0, 0, 0);
     await setDoc(entryRef, {
         amount: newAmount,
-        notes: newNotes,
+        notes: '',
         date: updatedDate.toISOString(),
         onlineClubName: newOnlineClubName,
     }, { merge: true });

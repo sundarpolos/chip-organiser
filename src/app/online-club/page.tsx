@@ -152,7 +152,6 @@ const WeeklyLedgerAccordion: FC<{
                                 <TableHead className="p-2 text-xs">Date</TableHead>
                                 <TableHead className="p-2 text-xs">Type</TableHead>
                                 <TableHead className="p-2 text-xs">Online Club</TableHead>
-                                <TableHead className="p-2 text-xs">Notes</TableHead>
                                 <TableHead className="text-right p-2 text-xs">Amount</TableHead>
                                 <TableHead className="text-right p-2 text-xs">Balance</TableHead>
                                 <TableHead className="text-right p-2 text-xs">Actions</TableHead>
@@ -160,7 +159,7 @@ const WeeklyLedgerAccordion: FC<{
                         </TableHeader>
                         <TableBody>
                             <TableRow className="font-semibold bg-muted/50">
-                                <TableCell colSpan={5} className="p-2 text-xs">Opening Balance</TableCell>
+                                <TableCell colSpan={4} className="p-2 text-xs">Opening Balance</TableCell>
                                 <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.openingBalance.toFixed(0)}</TableCell>
                                 <TableCell className="p-2"></TableCell>
                             </TableRow>
@@ -174,7 +173,6 @@ const WeeklyLedgerAccordion: FC<{
                                         </span>
                                     </TableCell>
                                     <TableCell className="p-2 text-xs">{entry.onlineClubName || '-'}</TableCell>
-                                    <TableCell className="p-2 text-xs">{entry.notes}</TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                         {entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                     </TableCell>
@@ -208,7 +206,7 @@ const WeeklyLedgerAccordion: FC<{
                         </TableBody>
                         <TableFooter>
                             <TableRow className="font-bold text-sm bg-muted hover:bg-muted">
-                                <TableCell colSpan={5} className="p-2 text-xs">Closing Balance</TableCell>
+                                <TableCell colSpan={4} className="p-2 text-xs">Closing Balance</TableCell>
                                 <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.closingBalance.toFixed(0)}</TableCell>
                                 <TableCell className="p-2"></TableCell>
                             </TableRow>
@@ -251,8 +249,11 @@ const SendOnlineClubReportDialog: FC<{
     
             week.entries.forEach(entry => {
                 const sign = entry.amount >= 0 ? '+' : '-';
-                msg += `${format(parseISO(entry.date), 'dd MMM')}: ${entry.notes || entry.type}\n`;
-                msg += `*Amount: ${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}* | Balance: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
+                msg += `${format(parseISO(entry.date), 'dd MMM')}: ${entry.type}`;
+                if (entry.type !== 'p/l' && entry.notes) {
+                    msg += ` (${entry.notes})`;
+                }
+                msg += `\n*Amount: ${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}* | Balance: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
                 msg += `-\n`;
             });
             
@@ -555,11 +556,11 @@ const OnlineClubPage: FC = () => {
     }, [activeTab, onlineClubs]);
 
 
-    const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
+    const handlePlSubmit = async (amount: number, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            await addProfitLoss(currentUser.id, amount, notes, date, onlineClubName);
+            await addProfitLoss(currentUser.id, amount, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L has been recorded.' });
             await refreshData(false);
         } catch (error) {
@@ -570,11 +571,11 @@ const OnlineClubPage: FC = () => {
         }
     };
     
-    const handleEditSubmit = async (entryId: string, amount: number, notes: string, date: string, onlineClubName: string) => {
+    const handleEditSubmit = async (entryId: string, amount: number, date: string, onlineClubName: string) => {
         if (!currentUser) return;
         setIsSubmitting(true);
         try {
-            await updateProfitLoss(currentUser.id, entryId, amount, notes, date, onlineClubName);
+            await updateProfitLoss(currentUser.id, entryId, amount, date, onlineClubName);
             toast({ title: 'Success', description: 'Your P/L entry has been updated.' });
             await refreshData(false);
             setEditModalOpen(false);
@@ -719,19 +720,18 @@ const OnlineClubPage: FC = () => {
                 // --- TRANSACTIONS TABLE ---
                 (doc as any).autoTable({
                     startY: yPos,
-                    head: [['Date', 'Type', 'Notes', 'Amount']],
+                    head: [['Date', 'Type', 'Amount']],
                     body: clubEntries.map(entry => [
                         format(parseISO(entry.date), 'dd/MM/yyyy p'),
                         entry.type.toUpperCase(),
-                        entry.notes,
                         `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
                     ]),
                     theme: 'plain',
                     styles: { font: 'helvetica', fontSize: 10, cellPadding: { top: 6, bottom: 6 } },
                     headStyles: { textColor: FONT_MUTED, fontStyle: 'normal' },
-                    columnStyles: { 3: { halign: 'right' } },
+                    columnStyles: { 2: { halign: 'right' } },
                     didParseCell: (data: any) => {
-                        if (data.column.index === 3 && data.cell.section === 'body') {
+                        if (data.column.index === 2 && data.cell.section === 'body') {
                            const value = clubEntries[data.row.index].amount;
                            data.cell.styles.textColor = value >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
                         }
@@ -865,9 +865,8 @@ const OnlineClubPage: FC = () => {
     );
 };
 
-const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes: string, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
+const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, date: string, onlineClubName: string) => void; onlineClubs: OnlineClub[] }> = ({ isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
-    const [notes, setNotes] = useState('');
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [onlineClubName, setOnlineClubName] = useState('');
 
@@ -878,9 +877,8 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
             alert('Please enter a valid amount and select an online club.');
             return;
         }
-        onSubmit(numAmount, notes, date, onlineClubName);
+        onSubmit(numAmount, date, onlineClubName);
         setAmount('');
-        setNotes('');
         setOnlineClubName('');
     };
 
@@ -920,10 +918,6 @@ const SubmitPlCard: FC<{ isSubmitting: boolean; onSubmit: (amount: number, notes
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="pl-notes">Notes (Optional)</Label>
-                        <Textarea id="pl-notes" placeholder="e.g. PokerBaazi session, 2 tables" value={notes} onChange={e => setNotes(e.target.value)} />
-                    </div>
                 </CardContent>
                 <CardFooter>
                     <Button type="submit" disabled={isSubmitting}>
@@ -941,18 +935,16 @@ const EditPlDialog: FC<{
   onOpenChange: (open: boolean) => void;
   entry: OnlineLedgerEntry;
   isSubmitting: boolean;
-  onSubmit: (entryId: string, amount: number, notes: string, date: string, onlineClubName: string) => void;
+  onSubmit: (entryId: string, amount: number, date: string, onlineClubName: string) => void;
   onlineClubs: OnlineClub[];
 }> = ({ isOpen, onOpenChange, entry, isSubmitting, onSubmit, onlineClubs }) => {
     const [amount, setAmount] = useState('');
-    const [notes, setNotes] = useState('');
     const [date, setDate] = useState('');
     const [onlineClubName, setOnlineClubName] = useState('');
 
     useEffect(() => {
         if (entry) {
             setAmount(String(entry.amount));
-            setNotes(entry.notes);
             setDate(format(parseISO(entry.date), 'yyyy-MM-dd'));
             setOnlineClubName(entry.onlineClubName || '');
         }
@@ -964,7 +956,7 @@ const EditPlDialog: FC<{
             alert('Please enter a valid amount and select an online club.');
             return;
         }
-        onSubmit(entry.id, numAmount, notes, date, onlineClubName);
+        onSubmit(entry.id, numAmount, date, onlineClubName);
     };
 
     return (
@@ -1001,10 +993,6 @@ const EditPlDialog: FC<{
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="edit-pl-notes">Notes (Optional)</Label>
-                        <Textarea id="edit-pl-notes" value={notes} onChange={e => setNotes(e.target.value)} />
-                    </div>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
@@ -1019,6 +1007,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 
