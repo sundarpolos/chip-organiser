@@ -1974,20 +1974,20 @@ const CreateEditOnlineClubDialog: FC<{
     };
     
     const handleTestGroupWhatsapp = async () => {
-        if (!club?.whatsappConfig?.apiUrl || !club?.whatsappConfig?.apiToken || !whatsappGroupId) {
+        const activeClubConfig = club?.whatsappConfig;
+        if (!activeClubConfig?.apiUrl || !activeClubConfig?.apiToken || !whatsappGroupId) {
             toast({ variant: 'destructive', title: 'Missing Info', description: "Main club API settings and this Online Club's Group ID are required." });
             return;
         }
         setIsGroupTesting(true);
         try {
-            const config = club.whatsappConfig || {};
             const result = await sendWhatsappMessage({
                 to: whatsappGroupId,
                 message: `This is a test message for the online club group "${name || 'New Club'}" from Chip Maestro.`,
                 isGroup: true,
-                apiUrl: config.apiUrl,
-                apiToken: config.apiToken,
-                senderMobile: config.senderMobile,
+                apiUrl: activeClubConfig.apiUrl,
+                apiToken: activeClubConfig.apiToken,
+                senderMobile: activeClubConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Test Successful!', description: 'A test message was sent to the configured group ID.' });
@@ -2349,7 +2349,7 @@ export default function SettingsPage() {
             currentUser={currentUser} 
         />
        )}
-       {(isAdmin) && (
+       {isSuperAdmin && (
           <OnlineClubManagement
             clubs={clubs}
             players={players}
