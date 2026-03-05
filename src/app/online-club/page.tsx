@@ -18,8 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,6 +30,7 @@ import 'jspdf-autotable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -137,6 +138,82 @@ const OnlineClubPage: FC = () => {
         };
     }, [currentUser, refreshData]);
 
+    const weeklyData = useMemo(() => {
+        if (ledger.length === 0) return [];
+    
+        const sortedLedger = [...ledger].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+        const statements: {
+            week: string;
+            openingBalance: number;
+            entries: OnlineLedgerEntry[];
+            closingBalance: number;
+        }[] = [];
+    
+        if (sortedLedger.length > 0) {
+            let runningBalance = 0;
+            const earliestEntry = sortedLedger[0];
+            
+            // Calculate opening balance up to the start of the first week
+            const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
+            let openingBalanceForFirstWeek = 0;
+            sortedLedger.forEach(entry => {
+                if (parseISO(entry.date) < firstWeekStart) {
+                    openingBalanceForFirstWeek += entry.amount;
+                }
+            });
+            
+            runningBalance = openingBalanceForFirstWeek;
+
+            let weekEntries: OnlineLedgerEntry[] = [];
+            let currentWeekStart = firstWeekStart;
+    
+            for (const entry of sortedLedger) {
+                const entryDate = parseISO(entry.date);
+    
+                if (entryDate < firstWeekStart) continue; // Skip entries before the first week we're showing
+    
+                if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
+                    if (weekEntries.length > 0) {
+                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+                        statements.push({
+                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                            openingBalance: runningBalance - weekEntries.reduce((sum, e) => sum + e.amount, 0),
+                            entries: weekEntries,
+                            closingBalance: runningBalance,
+                        });
+                    }
+                    
+                    currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
+                    weekEntries = [entry];
+
+                } else {
+                    weekEntries.push(entry);
+                }
+                // We update the running balance *after* checking the week so it reflects the end of the entry's day
+                if(sortedLedger.find(e => e.id === entry.id)) {
+                    const entryIndex = sortedLedger.findIndex(e => e.id === entry.id);
+                    let balanceUpToEntry = 0;
+                    for(let i=0; i<= entryIndex; i++) {
+                        balanceUpToEntry += sortedLedger[i].amount;
+                    }
+                    runningBalance = balanceUpToEntry;
+                }
+            }
+            
+            if (weekEntries.length > 0) {
+                 statements.push({
+                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
+                    openingBalance: runningBalance - weekEntries.reduce((sum, e) => sum + e.amount, 0),
+                    entries: weekEntries,
+                    closingBalance: runningBalance
+                });
+            }
+        }
+        
+        return statements.reverse(); // Show most recent first
+    }, [ledger]);
+    
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
@@ -160,21 +237,6 @@ const OnlineClubPage: FC = () => {
     
         return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
     }, [ledger, onlineClubs, onlineClubCurrencyMap]);
-    
-    const filteredLedger = useMemo(() => {
-        if (activeTab === 'all') {
-            return ledger;
-        }
-        return ledger.filter(entry => entry.onlineClubName === activeTab);
-    }, [ledger, activeTab]);
-
-    const currencyForTab = useMemo(() => {
-        if (activeTab === 'all') {
-            return onlineClubCurrencyMap.values().next().value || '₹'; // Default currency
-        }
-        return onlineClubCurrencyMap.get(activeTab) || '₹';
-    }, [activeTab, onlineClubCurrencyMap]);
-
 
     const handlePlSubmit = async (amount: number, notes: string, date: string, onlineClubName: string) => {
         if (!currentUser) return;
@@ -235,163 +297,45 @@ const OnlineClubPage: FC = () => {
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
-
-            // Design tokens
-            const textPrimary = '#0F172A';
-            const textMuted = '#94A3B8';
-            const profitColor = '#10B981';
-            const lossColor = '#F43F5E';
-            const badgeColors = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FEE2E2", "#E0E7FF", "#DBEAFE", "#E0E7FF"];
-            const badgeTextColors = ["#1E40AF", "#065F46", "#92400E", "#991B1B", "#3730A3", "#1E40AF", "#5B21B6"];
             
-            // Group entries by club
-            const entriesByClub = ledger.reduce((acc, entry) => {
-                const clubName = entry.onlineClubName || 'Unassigned';
-                if (!acc[clubName]) {
-                    acc[clubName] = [];
-                }
-                acc[clubName].push(entry);
-                return acc;
-            }, {} as Record<string, OnlineLedgerEntry[]>);
-
-
-            const drawHeader = () => {
-                doc.setFontSize(36);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(textPrimary);
-                doc.text('SETTLEMENT LEDGER', 20, 30);
-                
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(textMuted);
-                doc.text('PLAYER', 20, 50);
-                
-                doc.setFontSize(16);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(textPrimary);
-                doc.text(account.playerName, 20, 58);
-                
-                // Balance Badges
-                let currentX = pageWidth - 20;
-                doc.setFontSize(8);
-                doc.setFont('helvetica', 'normal');
-                balanceByClub.slice().reverse().forEach((clubBalance, index) => {
-                    const currency = clubBalance.name === 'Phoenix' ? 'Rs.' : clubBalance.currency;
-                    const text = `${clubBalance.name}: ${currency}${clubBalance.balance.toFixed(0)}`;
-                    const textWidth = doc.getTextWidth(text) + 12; // with padding
-                    
-                    if (currentX - textWidth < 20) { 
-                        currentX = pageWidth - 20;
-                    }
-                    
-                    doc.setFillColor(badgeColors[index % badgeColors.length]);
-                    doc.setTextColor(badgeTextColors[index % badgeTextColors.length]);
-                    doc.roundedRect(currentX - textWidth, 50, textWidth, 10, 3, 3, 'F');
-                    doc.text(text, currentX - textWidth + 6, 56.5, {baseline: 'middle'});
-                    currentX -= (textWidth + 5);
-                });
-            };
-
-            const drawFooter = (page: number, totalPages: number) => {
-                doc.setFontSize(8);
-                doc.setTextColor(textMuted);
-                doc.text(`Page ${page} of ${totalPages}`, pageWidth - 20, pageHeight - 10, { align: 'right' });
-                doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 20, pageHeight - 10);
-            };
+            doc.text(`Ledger for ${account.playerName}`, 14, 22);
+            doc.setFontSize(12);
+            doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 14, 30);
             
-            drawHeader();
-            let lastY = 75;
+            const tableData = ledger.map(entry => [
+                format(parseISO(entry.date), 'dd/MM/yyyy'),
+                entry.type.toUpperCase(),
+                entry.onlineClubName || '-',
+                entry.notes || '-',
+                `${entry.amount >= 0 ? '+' : '-'}${onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}${Math.abs(entry.amount).toFixed(0)}`
+            ]);
 
-            const sortedClubNames = Object.keys(entriesByClub).sort();
-
-            for (const clubName of sortedClubNames) {
-                const clubEntries = entriesByClub[clubName];
-                const clubBalance = balanceByClub.find(b => b.name === clubName);
-
-                // Calculate club-wise stats
-                const clubProfit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
-                const clubLoss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
-                const clubDeposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
-                const clubWithdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
-                const currency = clubName === 'Phoenix' ? 'Rs.' : (clubBalance?.currency || '₹');
-
-
-                if (lastY + 80 > pageHeight - 40) { // Check for page break
-                    doc.addPage();
-                    drawHeader();
-                    lastY = 75;
-                }
-
-                // Add a header for the club section
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(textPrimary);
-                doc.text(`${clubName}`, 20, lastY);
-                lastY += 15;
-
-                // Draw summary cards for the club
-                const cardStartY = lastY;
-                const cardWidth = (pageWidth - 40 - 30) / 4;
-                const drawClubCard = (x: number, label: string, value: string, color: string) => {
-                    doc.setFontSize(8);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(textMuted);
-                    doc.text(label, x, cardStartY);
-                    doc.setFontSize(12);
-                    doc.setFont('courier', 'bold');
-                    doc.setTextColor(color);
-                    doc.text(value, x, cardStartY + 8);
-                };
-
-                drawClubCard(20, 'PROFIT', `${currency} ${clubProfit.toFixed(0)}`, profitColor);
-                drawClubCard(20 + cardWidth + 10, 'LOSS', `${currency} ${Math.abs(clubLoss).toFixed(0)}`, lossColor);
-                drawClubCard(20 + 2 * (cardWidth + 10), 'DEPOSITS', `${currency} ${clubDeposits.toFixed(0)}`, textPrimary);
-                drawClubCard(20 + 3 * (cardWidth + 10), 'WITHDRAWALS', `${currency} ${Math.abs(clubWithdrawals).toFixed(0)}`, textPrimary);
-                
-                lastY += 25;
-
-                const tableColumn = ["Date", "Type", "Notes", "Amount"];
-                const tableRows = clubEntries.map(entry => {
-                    return [
-                        format(parseISO(entry.date), 'dd/MM/yyyy p'),
-                        entry.type.toUpperCase(),
-                        entry.notes || '-',
-                        `${entry.amount >= 0 ? '+' : '-'}${currency}${Math.abs(entry.amount).toFixed(0)}`,
-                    ];
-                });
-
-                (doc as any).autoTable({
-                    head: [tableColumn],
-                    body: tableRows,
-                    startY: lastY,
-                    theme: 'plain',
-                    headStyles: { textColor: textMuted, fontStyle: 'bold', fontSize: 9 },
-                    styles: { font: 'helvetica', textColor: textPrimary, fontSize: 10 },
-                    columnStyles: { 
-                        3: { 
-                            halign: 'right',
-                            font: 'courier', // Using a monospaced font
-                            fontStyle: 'bold'
-                        } 
-                    },
-                    willDrawCell: (data: any) => {
-                        doc.setTextColor(textPrimary);
-                        if (data.column.index === 3 && data.section === 'body') {
-                            const rawValue = clubEntries[data.row.index].amount;
-                            doc.setTextColor(rawValue >= 0 ? profitColor : lossColor);
+            (doc as any).autoTable({
+                head: [['Date', 'Type', 'Online Club', 'Notes', 'Amount']],
+                body: tableData,
+                startY: 40,
+                theme: 'striped',
+                headStyles: { fillColor: [22, 163, 74] },
+                didDrawCell: (data: any) => {
+                    if (data.column.index === 4 && data.cell.section === 'body') {
+                        const rawValue = ledger[data.row.index].amount;
+                        if (rawValue < 0) {
+                            doc.setTextColor(255, 0, 0); // red
                         }
-                    },
-                });
+                    }
+                },
+            });
+            
+            let finalY = (doc as any).lastAutoTable.finalY + 15;
+            doc.setFontSize(14);
+            doc.text('Final Balances:', 14, finalY);
+            finalY += 8;
+            doc.setFontSize(12);
+            balanceByClub.forEach(clubBalance => {
+                doc.text(`${clubBalance.name}: ${clubBalance.currency}${clubBalance.balance.toFixed(0)}`, 14, finalY);
+                finalY += 7;
+            });
 
-                lastY = (doc as any).lastAutoTable.finalY + 15;
-            }
-
-            // Draw footer on all pages
-            const pageCount = (doc as any).internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                drawFooter(i, pageCount);
-            }
 
             const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
             doc.save(filename);
@@ -446,68 +390,89 @@ const OnlineClubPage: FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
-                        <TabsList>
-                            <TabsTrigger value="all">All</TabsTrigger>
-                            {onlineClubs.map(club => (
-                                <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
-                            ))}
-                        </TabsList>
-                        <TabsContent value={activeTab} className="mt-4">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Online Club</TableHead>
-                                        <TableHead>Payment Mode / Notes</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredLedger.map(entry => (
-                                        <TableRow key={entry.id}>
-                                            <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell className="capitalize">{entry.type}</TableCell>
-                                            <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                            <TableCell>{entry.notes}</TableCell>
-                                            <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {entry.amount >= 0 ? `+` : `-`}{(entry.onlineClubName && onlineClubCurrencyMap.get(entry.onlineClubName)) || '₹'}{Math.abs(entry.amount).toFixed(0)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                            {entry.type === 'p/l' && (
-                                                <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                <AlertDialogDescription>This will permanently delete this P/L entry of {currencyForTab}{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                </AlertDialog>
-                                                </div>
-                                            )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {filteredLedger.length === 0 && (
+                    <Accordion type="single" collapsible className="w-full" defaultValue={weeklyData.length > 0 ? weeklyData[0].week : undefined}>
+                        {weeklyData.map(week => (
+                            <AccordionItem value={week.week} key={week.week}>
+                                <AccordionTrigger>
+                                    <div className="flex justify-between w-full pr-4">
+                                        <span>{week.week}</span>
+                                        <span className="font-semibold">Closing: ₹{week.closingBalance.toFixed(0)}</span>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center h-24">No transactions for this view.</TableCell>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Online Club</TableHead>
+                                            <TableHead>Notes</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TabsContent>
-                    </Tabs>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow className="font-semibold bg-muted/50">
+                                            <TableCell colSpan={5}>Opening Balance</TableCell>
+                                            <TableCell className="text-right font-mono">₹{week.openingBalance.toFixed(0)}</TableCell>
+                                            <TableCell></TableCell>
+                                        </TableRow>
+                                        {week.entries.map(entry => (
+                                            <TableRow key={entry.id}>
+                                                <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell className="capitalize">{entry.type}</TableCell>
+                                                <TableCell>{entry.onlineClubName || '-'}</TableCell>
+                                                <TableCell>{entry.notes}</TableCell>
+                                                <TableCell className={cn('text-right font-mono', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                                    {entry.amount >= 0 ? <ArrowUp className="inline h-3 w-3 mr-1"/> : <ArrowDown className="inline h-3 w-3 mr-1"/>}
+                                                    {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
+                                                </TableCell>
+                                                 <TableCell className="text-right font-mono">
+                                                   ₹{entry.runningBalance.toFixed(0)}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {entry.type === 'p/l' && (
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>This will permanently delete this P/L entry. This action cannot be undone.</AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="font-bold text-base bg-muted hover:bg-muted">
+                                            <TableCell colSpan={5}>Closing Balance</TableCell>
+                                            <TableCell className="text-right font-mono">₹{week.closingBalance.toFixed(0)}</TableCell>
+                                            <TableCell></TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                    {weeklyData.length === 0 && (
+                        <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
+                            No transactions recorded yet.
+                        </div>
+                    )}
                 </CardContent>
             </Card>
             

@@ -12,7 +12,7 @@ import { importGameFromText } from "@/ai/flows/import-game"
 import { sendDeletePlayerOtp } from "@/ai/flows/send-delete-player-otp";
 import { sendDeleteGameOtp } from "@/ai/flows/send-delete-game-otp";
 import { sendBookingOtp } from "@/ai/flows/send-booking-otp";
-import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking, GameExpense } from "@/lib/types"
+import type { Player, MasterPlayer, MasterVenue, GameHistory, CalculatedPlayer, WhatsappConfig, Club, BuyIn, GameProgressLog, PlayerProgress, ScheduledGame, SeatBooking, GameExpense, OnlineClub, OnlineLedgerEntry } from "@/lib/types"
 import { calculateInterPlayerTransfers } from "@/lib/game-logic"
 import { ChipDistributionChart } from "@/components/ChipDistributionChart"
 import { useToast } from "@/hooks/use-toast"
@@ -116,7 +116,7 @@ import {
 import jsPDF from "jspdf"
 import "jspdf-autotable"
 import html2canvas from 'html2canvas';
-import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds, formatDuration, parse } from "date-fns"
+import { format, isSameDay, set, intervalToDuration, addHours, differenceInMilliseconds, formatDuration, parse, parseISO } from "date-fns"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -132,6 +132,7 @@ import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { getClub, getClubs } from "@/services/club-service"
 import { getScheduledGamesForClub, getSeatBookingsForGame, createSeatBooking, updateSeatBooking, cancelSeatBooking, getScheduledGame, createScheduledGame, deleteScheduledGame } from "@/services/booking-service"
+import { getOnlineClubs, getOnlineLedgerEntries } from '@/services/online-club-service';
 
 
 const WhatsappIcon = ({ className }: { className?: string }) => (
@@ -596,8 +597,135 @@ const EditableDate: FC<{
   );
 };
 
+const OnlineAccountsSummaryCard: FC<{
+    onlineClubs: OnlineClub[];
+    ledger: OnlineLedgerEntry[];
+}> = ({ onlineClubs, ledger }) => {
 
-// Separate component that uses searchParams
+    const onlineClubCurrencyMap = useMemo(() => {
+        const map = new Map<string, string>();
+        onlineClubs.forEach(club => {
+            if (club.name) {
+                map.set(club.name, club.currency || '₹');
+            }
+        });
+        return map;
+    }, [onlineClubs]);
+
+    const balanceByClub = useMemo(() => {
+        const balances: { [key: string]: { balance: number; currency: string; } } = {};
+        onlineClubs.forEach(club => {
+            if(club.name) {
+                balances[club.name] = { balance: 0, currency: club.currency || '₹' };
+            }
+        });
+        ledger.forEach(entry => {
+            if (entry.onlineClubName) {
+                if (balances[entry.onlineClubName] === undefined) {
+                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubCurrencyMap.get(entry.onlineClubName) || '₹' };
+                }
+                balances[entry.onlineClubName].balance += entry.amount;
+            }
+        });
+        return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
+    }, [ledger, onlineClubs, onlineClubCurrencyMap]);
+
+    const recentTransactionsByClub = useMemo(() => {
+        const grouped: Record<string, OnlineLedgerEntry[]> = {};
+        onlineClubs.forEach(club => {
+            if (club.name) {
+                grouped[club.name] = [];
+            }
+        });
+        
+        [...ledger].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .forEach(entry => {
+                if (entry.onlineClubName && grouped[entry.onlineClubName]) {
+                    if (grouped[entry.onlineClubName].length < 5) { // Limit to 5 recent
+                        grouped[entry.onlineClubName].push(entry);
+                    }
+                }
+            });
+        return grouped;
+    }, [ledger, onlineClubs]);
+    
+    if (onlineClubs.length === 0 && ledger.length === 0) return null;
+
+    return (
+        <Card className="mb-6">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Landmark /> Online Accounts
+                </CardTitle>
+                <CardDescription>Click on a balance to view the full ledger.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+                <div className="flex flex-wrap gap-2">
+                    {balanceByClub.map(club => (
+                        <Link href="/online-club" key={club.name}>
+                            <Badge variant="outline" className="text-base p-2 hover:bg-accent">
+                                {club.name}: {club.currency}{club.balance.toFixed(0)}
+                            </Badge>
+                        </Link>
+                    ))}
+                </div>
+                 {Object.keys(recentTransactionsByClub).length > 0 && (
+                    <Tabs defaultValue={Object.keys(recentTransactionsByClub)[0]}>
+                        <TabsList>
+                            {Object.keys(recentTransactionsByClub).map(clubName => (
+                                <TabsTrigger key={clubName} value={clubName}>{clubName}</TabsTrigger>
+                            ))}
+                        </TabsList>
+                        {Object.entries(recentTransactionsByClub).map(([clubName, transactions]) => (
+                            <TabsContent key={clubName} value={clubName} className="mt-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {transactions.length > 0 ? transactions.map(tx => (
+                                            <TableRow key={tx.id}>
+                                                <TableCell>{format(parseISO(tx.date), 'dd MMM')}</TableCell>
+                                                <TableCell className="capitalize">{tx.notes || tx.type}</TableCell>
+                                                <TableCell className={cn("text-right font-mono", tx.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                                    {tx.amount >= 0 ? '+' : ''}
+                                                    {onlineClubCurrencyMap.get(clubName) || '₹'}
+                                                    {Math.abs(tx.amount).toFixed(0)}
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : <TableRow><TableCell colSpan={3} className="text-center h-24 text-muted-foreground">No recent transactions.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                 )}
+            </CardContent>
+        </Card>
+    );
+};
+
+// Main component with Suspense boundary
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading Dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+    
+
 function DashboardContent() {
   const { toast } = useToast()
   const router = useRouter();
@@ -627,6 +755,10 @@ function DashboardContent() {
   const [gameDuration, setGameDuration] = useState<string>("00:00:00");
   const [joinableGame, setJoinableGame] = useState<GameHistory | null>(null);
   const [hasCheckedForGame, setHasCheckedForGame] = useState(false);
+  
+  // Online Club State
+  const [onlineClubs, setOnlineClubs] = useState<OnlineClub[]>([]);
+  const [onlineLedger, setOnlineLedger] = useState<OnlineLedgerEntry[]>([]);
 
   // App Settings
   const [whatsappConfig, setWhatsappConfig] = useState<WhatsappConfig>({
@@ -735,17 +867,23 @@ function DashboardContent() {
                 loadedMasterPlayers,
                 loadedMasterVenues,
                 loadedGameHistory,
+                loadedOnlineClubs,
+                loadedOnlineLedger,
             ] = await Promise.all([
                 getClubs(),
                 getMasterPlayers(),
                 getMasterVenues(),
                 getGameHistory(),
+                getOnlineClubs(),
+                getOnlineLedgerEntries(currentUser.id),
             ]);
 
             setAllClubs(loadedClubs);
             setAllPlayers(loadedMasterPlayers);
             setAllVenues(loadedMasterVenues);
             setGameHistory(loadedGameHistory);
+            setOnlineClubs(loadedOnlineClubs);
+            setOnlineLedger(loadedOnlineLedger);
             
             const club = loadedClubs.find(c => c.id === clubId);
 
@@ -1443,6 +1581,11 @@ function DashboardContent() {
         </div>
       </header>
       
+      <OnlineAccountsSummaryCard
+        onlineClubs={onlineClubs}
+        ledger={onlineLedger}
+      />
+
         {activeGame ? (
             <AdminView
                 activeGame={activeGame}
@@ -1600,6 +1743,8 @@ function DashboardContent() {
     </div>
   )
 }
+    
+    
 
 const OtpVerificationDialog: FC<{
     isOpen: boolean;
@@ -3856,39 +4001,3 @@ const SaveConfirmDialog: FC<{
         </Dialog>
     )
 }
-
-// Main component with Suspense boundary
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading Dashboard...</p>
-        </div>
-      </div>
-    }>
-      <DashboardContent />
-    </Suspense>
-  );
-}
-    
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
