@@ -236,18 +236,24 @@ const SendOnlineClubReportDialog: FC<{
     const message = useMemo(() => {
         if (!onlineClub || !weeklyData || weeklyData.length === 0) return 'No data to send.';
         
-        let msg = `*Online Ledger Report for ${onlineClub.name}*\n`;
+        let msg = `*Online Ledger: ${onlineClub.name}*\n`;
         msg += `_Club: ${club?.name}_\n\n`;
-
-        [...weeklyData].reverse().forEach(week => { // chronological order for message
+    
+        [...weeklyData].reverse().forEach(week => {
             const currencySymbol = onlineClub.currency || '₹';
-            msg += `*${week.week}*\n`;
-            msg += `Opening: ${currencySymbol}${week.openingBalance.toFixed(0)}\n`;
+            msg += `*Week: ${week.week}*\n`;
+            msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
+            msg += `----------------------------------\n`;
+    
             week.entries.forEach(entry => {
-                 const sign = entry.amount >= 0 ? '+' : '-';
-                 msg += `  ${format(parseISO(entry.date), 'dd/MM')}: ${entry.notes || entry.type} (${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}) -> Bal: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
+                const sign = entry.amount >= 0 ? '+' : '-';
+                msg += `${format(parseISO(entry.date), 'dd MMM')}: ${entry.notes || entry.type}\n`;
+                msg += `*Amount: ${sign}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}* | Balance: ${currencySymbol}${entry.localRunningBalance.toFixed(0)}\n`;
+                msg += `-\n`;
             });
-            msg += `*Closing: ${currencySymbol}${week.closingBalance.toFixed(0)}*\n\n`;
+            
+            msg += `----------------------------------\n`;
+            msg += `Closing Balance: *${currencySymbol}${week.closingBalance.toFixed(0)}*\n\n`;
         });
         
         return msg.trim();
@@ -265,7 +271,9 @@ const SendOnlineClubReportDialog: FC<{
                 to: onlineClub.whatsappGroupId,
                 message: message,
                 isGroup: true,
-                ...(club?.whatsappConfig || {}),
+                apiUrl: club?.whatsappConfig?.apiUrl,
+                apiToken: club?.whatsappConfig?.apiToken,
+                senderMobile: club?.whatsappConfig?.senderMobile,
             });
             if (result && result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
@@ -707,7 +715,7 @@ const OnlineClubPage: FC = () => {
                         format(parseISO(entry.date), 'dd/MM/yyyy p'),
                         entry.type.toUpperCase(),
                         entry.notes,
-                        `${entry.amount >= 0 ? '+' : '-'}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
+                        `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
                     ]),
                     theme: 'plain',
                     styles: { font: 'helvetica', fontSize: 10, cellPadding: { top: 6, bottom: 6 } },
@@ -987,4 +995,5 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
