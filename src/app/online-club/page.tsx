@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -34,6 +34,181 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
+
+const WeeklyLedgerAccordion: FC<{
+    entries: OnlineLedgerEntry[],
+    onlineClubCurrencyMap: Map<string, string>,
+    onEditEntry: (entry: OnlineLedgerEntry) => void,
+    onDeleteEntry: (entryId: string) => void,
+}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry }) => {
+
+    const weeklyData = useMemo(() => {
+        if (entries.length === 0) return [];
+    
+        const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+        const statements: {
+            week: string;
+            openingBalance: number;
+            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            closingBalance: number;
+        }[] = [];
+    
+        if (sortedLedger.length > 0) {
+            let runningBalance = 0;
+            const earliestEntry = sortedLedger[0];
+            const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
+            
+            let openingBalanceForFirstWeek = 0;
+            sortedLedger.forEach(entry => {
+                if (parseISO(entry.date) < firstWeekStart) {
+                    openingBalanceForFirstWeek += entry.amount;
+                }
+            });
+            
+            runningBalance = openingBalanceForFirstWeek;
+
+            let weekEntries: OnlineLedgerEntry[] = [];
+            let currentWeekStart = firstWeekStart;
+    
+            for (const entry of sortedLedger) {
+                const entryDate = parseISO(entry.date);
+    
+                if (entryDate < firstWeekStart) continue;
+    
+                if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
+                    if (weekEntries.length > 0) {
+                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+                        let weekRunningBalance = runningBalance;
+                        const augmentedEntries = weekEntries.map(e => {
+                            weekRunningBalance += e.amount;
+                            return {...e, localRunningBalance: weekRunningBalance };
+                        });
+                        
+                        statements.push({
+                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                            openingBalance: runningBalance,
+                            entries: augmentedEntries,
+                            closingBalance: weekRunningBalance
+                        });
+                        runningBalance = weekRunningBalance;
+                    }
+                    
+                    currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
+                    weekEntries = [entry];
+                } else {
+                    weekEntries.push(entry);
+                }
+            }
+            
+            if (weekEntries.length > 0) {
+                let weekRunningBalance = runningBalance;
+                const augmentedEntries = weekEntries.map(e => {
+                    weekRunningBalance += e.amount;
+                    return {...e, localRunningBalance: weekRunningBalance };
+                });
+                
+                statements.push({
+                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
+                    openingBalance: runningBalance,
+                    entries: augmentedEntries,
+                    closingBalance: weekRunningBalance
+                });
+            }
+        }
+        
+        return statements.reverse();
+    }, [entries]);
+
+    if (entries.length === 0) {
+        return (
+            <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
+                No transactions for this club.
+            </div>
+        );
+    }
+    
+    return (
+        <Accordion type="single" collapsible className="w-full" defaultValue={weeklyData.length > 0 ? weeklyData[0].week : undefined}>
+            {weeklyData.map(week => (
+                <AccordionItem value={week.week} key={week.week}>
+                    <AccordionTrigger>
+                        <div className="flex justify-between w-full pr-4">
+                            <span>{week.week}</span>
+                            <span className="font-semibold">Closing: ₹{week.closingBalance.toFixed(0)}</span>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Online Club</TableHead>
+                                <TableHead>Notes</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            <TableRow className="font-semibold bg-muted/50">
+                                <TableCell colSpan={5}>Opening Balance</TableCell>
+                                <TableCell className="text-right font-mono">₹{week.openingBalance.toFixed(0)}</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                            {week.entries.map(entry => (
+                                <TableRow key={entry.id}>
+                                    <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell className="capitalize">{entry.type}</TableCell>
+                                    <TableCell>{entry.onlineClubName || '-'}</TableCell>
+                                    <TableCell>{entry.notes}</TableCell>
+                                    <TableCell className={cn('text-right font-mono', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                        {entry.amount >= 0 ? <ArrowUp className="inline h-3 w-3 mr-1"/> : <ArrowDown className="inline h-3 w-3 mr-1"/>}
+                                        {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
+                                    </TableCell>
+                                     <TableCell className="text-right font-mono">
+                                       ₹{entry.localRunningBalance.toFixed(0)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {entry.type === 'p/l' && (
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => onEditEntry(entry)}><Edit className="h-4 w-4"/></Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                            <AlertDialogDescription>This will permanently delete this P/L entry. This action cannot be undone.</AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => onDeleteEntry(entry.id)}>Delete</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter>
+                            <TableRow className="font-bold text-base bg-muted hover:bg-muted">
+                                <TableCell colSpan={5}>Closing Balance</TableCell>
+                                <TableCell className="text-right font-mono">₹{week.closingBalance.toFixed(0)}</TableCell>
+                                <TableCell></TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                    </AccordionContent>
+                </AccordionItem>
+            ))}
+        </Accordion>
+    )
+}
 
 const OnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -138,82 +313,6 @@ const OnlineClubPage: FC = () => {
         };
     }, [currentUser, refreshData]);
 
-    const weeklyData = useMemo(() => {
-        if (ledger.length === 0) return [];
-    
-        const sortedLedger = [...ledger].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-        const statements: {
-            week: string;
-            openingBalance: number;
-            entries: OnlineLedgerEntry[];
-            closingBalance: number;
-        }[] = [];
-    
-        if (sortedLedger.length > 0) {
-            let runningBalance = 0;
-            const earliestEntry = sortedLedger[0];
-            
-            // Calculate opening balance up to the start of the first week
-            const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
-            let openingBalanceForFirstWeek = 0;
-            sortedLedger.forEach(entry => {
-                if (parseISO(entry.date) < firstWeekStart) {
-                    openingBalanceForFirstWeek += entry.amount;
-                }
-            });
-            
-            runningBalance = openingBalanceForFirstWeek;
-
-            let weekEntries: OnlineLedgerEntry[] = [];
-            let currentWeekStart = firstWeekStart;
-    
-            for (const entry of sortedLedger) {
-                const entryDate = parseISO(entry.date);
-    
-                if (entryDate < firstWeekStart) continue; // Skip entries before the first week we're showing
-    
-                if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
-                    if (weekEntries.length > 0) {
-                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                        statements.push({
-                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                            openingBalance: runningBalance - weekEntries.reduce((sum, e) => sum + e.amount, 0),
-                            entries: weekEntries,
-                            closingBalance: runningBalance,
-                        });
-                    }
-                    
-                    currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
-                    weekEntries = [entry];
-
-                } else {
-                    weekEntries.push(entry);
-                }
-                // We update the running balance *after* checking the week so it reflects the end of the entry's day
-                if(sortedLedger.find(e => e.id === entry.id)) {
-                    const entryIndex = sortedLedger.findIndex(e => e.id === entry.id);
-                    let balanceUpToEntry = 0;
-                    for(let i=0; i<= entryIndex; i++) {
-                        balanceUpToEntry += sortedLedger[i].amount;
-                    }
-                    runningBalance = balanceUpToEntry;
-                }
-            }
-            
-            if (weekEntries.length > 0) {
-                 statements.push({
-                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                    openingBalance: runningBalance - weekEntries.reduce((sum, e) => sum + e.amount, 0),
-                    entries: weekEntries,
-                    closingBalance: runningBalance
-                });
-            }
-        }
-        
-        return statements.reverse(); // Show most recent first
-    }, [ledger]);
-    
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
@@ -280,6 +379,11 @@ const OnlineClubPage: FC = () => {
             const msg = error instanceof Error ? error.message : 'Could not delete entry.';
             toast({ variant: 'destructive', title: 'Error', description: msg });
         }
+    };
+    
+    const handleEditEntry = (entry: OnlineLedgerEntry) => {
+        setEntryToEdit(entry);
+        setEditModalOpen(true);
     };
 
     const handleExportPdf = async () => {
@@ -475,89 +579,22 @@ const OnlineClubPage: FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="single" collapsible className="w-full" defaultValue={weeklyData.length > 0 ? weeklyData[0].week : undefined}>
-                        {weeklyData.map(week => (
-                            <AccordionItem value={week.week} key={week.week}>
-                                <AccordionTrigger>
-                                    <div className="flex justify-between w-full pr-4">
-                                        <span>{week.week}</span>
-                                        <span className="font-semibold">Closing: ₹{week.closingBalance.toFixed(0)}</span>
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Online Club</TableHead>
-                                            <TableHead>Notes</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
-                                            <TableHead className="text-right">Balance</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        <TableRow className="font-semibold bg-muted/50">
-                                            <TableCell colSpan={5}>Opening Balance</TableCell>
-                                            <TableCell className="text-right font-mono">₹{week.openingBalance.toFixed(0)}</TableCell>
-                                            <TableCell></TableCell>
-                                        </TableRow>
-                                        {week.entries.map(entry => (
-                                            <TableRow key={entry.id}>
-                                                <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                                <TableCell className="capitalize">{entry.type}</TableCell>
-                                                <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                                <TableCell>{entry.notes}</TableCell>
-                                                <TableCell className={cn('text-right font-mono', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                                    {entry.amount >= 0 ? <ArrowUp className="inline h-3 w-3 mr-1"/> : <ArrowDown className="inline h-3 w-3 mr-1"/>}
-                                                    {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
-                                                </TableCell>
-                                                 <TableCell className="text-right font-mono">
-                                                   ₹{entry.runningBalance.toFixed(0)}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {entry.type === 'p/l' && (
-                                                        <div className="flex justify-end gap-2">
-                                                            <Button variant="ghost" size="icon" onClick={() => { setEntryToEdit(entry); setEditModalOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>This will permanently delete this P/L entry. This action cannot be undone.</AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteEntry(entry.id)}>Delete</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                    <TableFooter>
-                                        <TableRow className="font-bold text-base bg-muted hover:bg-muted">
-                                            <TableCell colSpan={5}>Closing Balance</TableCell>
-                                            <TableCell className="text-right font-mono">₹{week.closingBalance.toFixed(0)}</TableCell>
-                                            <TableCell></TableCell>
-                                        </TableRow>
-                                    </TableFooter>
-                                </Table>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                    {weeklyData.length === 0 && (
-                        <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
-                            No transactions recorded yet.
-                        </div>
-                    )}
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList>
+                            <TabsTrigger value="all">All</TabsTrigger>
+                            {onlineClubs.map(club => (
+                                <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
+                            ))}
+                        </TabsList>
+                        <TabsContent value={activeTab} className="mt-4">
+                            <WeeklyLedgerAccordion 
+                                entries={activeTab === 'all' ? ledger : ledger.filter(e => e.onlineClubName === activeTab)}
+                                onlineClubCurrencyMap={onlineClubCurrencyMap}
+                                onEditEntry={handleEditEntry}
+                                onDeleteEntry={handleDeleteEntry}
+                            />
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
             
