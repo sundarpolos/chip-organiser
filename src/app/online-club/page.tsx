@@ -294,53 +294,138 @@ const OnlineClubPage: FC = () => {
 
         setIsExporting(true);
         try {
-            const doc = new jsPDF();
+            const doc = new jsPDF('p', 'pt', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            
-            doc.text(`Ledger for ${account.playerName}`, 14, 22);
-            doc.setFontSize(12);
-            doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 14, 30);
-            
-            const tableData = ledger.map(entry => [
-                format(parseISO(entry.date), 'dd/MM/yyyy'),
-                entry.type.toUpperCase(),
-                entry.onlineClubName || '-',
-                entry.notes || '-',
-                `${entry.amount >= 0 ? '+' : '-'}${onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}${Math.abs(entry.amount).toFixed(0)}`
-            ]);
+            let yPos = 60;
 
-            (doc as any).autoTable({
-                head: [['Date', 'Type', 'Online Club', 'Notes', 'Amount']],
-                body: tableData,
-                startY: 40,
-                theme: 'striped',
-                headStyles: { fillColor: [22, 163, 74] },
-                didDrawCell: (data: any) => {
-                    if (data.column.index === 4 && data.cell.section === 'body') {
-                        const rawValue = ledger[data.row.index].amount;
-                        if (rawValue < 0) {
-                            doc.setTextColor(255, 0, 0); // red
+            const FONT_PRIMARY = '#0a0a0a';
+            const FONT_MUTED = '#737373';
+            const POSITIVE_COLOR = '#16a34a';
+            const NEGATIVE_COLOR = '#dc2626';
+
+            const addPageFooter = () => {
+                const pageCount = (doc as any).internal.getNumberOfPages();
+                doc.setFontSize(8);
+                doc.setTextColor(FONT_MUTED);
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 40, doc.internal.pageSize.getHeight() - 20);
+                    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 60, doc.internal.pageSize.getHeight() - 20);
+                }
+            };
+            
+            // --- HEADER ---
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(24);
+            doc.setTextColor(FONT_PRIMARY);
+            doc.text('SETTLEMENT LEDGER', 40, yPos);
+            yPos += 40;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(FONT_MUTED);
+            doc.text('PLAYER', 40, yPos);
+            yPos += 15;
+            doc.setFontSize(18);
+            doc.setTextColor(FONT_PRIMARY);
+            doc.text(account.playerName, 40, yPos);
+
+            // --- BALANCE BADGES ---
+            let currentX = pageWidth - 40;
+            balanceByClub.slice().reverse().forEach(clubBalance => {
+                const currencySymbol = clubBalance.name === 'Phoenix' ? 'Rs.' : onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
+                const textWidth = doc.getTextWidth(text);
+                const badgeWidth = textWidth + 20;
+
+                currentX -= (badgeWidth + 10);
+                doc.setFillColor(241, 245, 249);
+                doc.roundedRect(currentX, yPos - 18, badgeWidth, 24, 8, 8, 'F');
+                
+                doc.setFontSize(10);
+                doc.setTextColor(FONT_MUTED);
+                doc.text(text, currentX + 10, yPos - 4);
+            });
+            yPos += 40;
+
+            // --- CLUB SECTIONS ---
+            const clubsWithTransactions = Array.from(new Set(ledger.map(entry => entry.onlineClubName).filter(Boolean)));
+            
+            for (const clubName of clubsWithTransactions) {
+                if (yPos > doc.internal.pageSize.getHeight() - 250) {
+                    doc.addPage();
+                    yPos = 60;
+                }
+
+                const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
+                const currencySymbol = clubName === 'Phoenix' ? 'Rs.' : onlineClubCurrencyMap.get(clubName) || '₹';
+
+                const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+                const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+                const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+                const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text(clubName, 40, yPos);
+                yPos += 30;
+
+                // --- STATS SUMMARY ---
+                const statXPositions = [40, 160, 280, 400];
+                doc.setFontSize(9);
+                doc.setTextColor(FONT_MUTED);
+                doc.text('PROFIT', statXPositions[0], yPos);
+                doc.text('LOSS', statXPositions[1], yPos);
+                doc.text('DEPOSITS', statXPositions[2], yPos);
+                doc.text('WITHDRAWALS', statXPositions[3], yPos);
+                yPos += 15;
+
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                
+                doc.setTextColor(POSITIVE_COLOR);
+                doc.text(`${currencySymbol} ${profit.toFixed(0)}`, statXPositions[0], yPos);
+                doc.setTextColor(NEGATIVE_COLOR);
+                doc.text(`${currencySymbol} ${Math.abs(loss).toFixed(0)}`, statXPositions[1], yPos);
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text(`${currencySymbol} ${deposits.toFixed(0)}`, statXPositions[2], yPos);
+                doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
+                
+                yPos += 20;
+
+                // --- TRANSACTIONS TABLE ---
+                (doc as any).autoTable({
+                    startY: yPos,
+                    head: [['Date', 'Type', 'Notes', 'Amount']],
+                    body: clubEntries.map(entry => [
+                        format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                        entry.type.toUpperCase(),
+                        entry.notes,
+                        `${entry.amount >= 0 ? '+' : '-'}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
+                    ]),
+                    theme: 'plain',
+                    styles: { font: 'helvetica', fontSize: 10, cellPadding: { top: 6, bottom: 6 } },
+                    headStyles: { textColor: FONT_MUTED, fontStyle: 'normal' },
+                    columnStyles: { 3: { halign: 'right' } },
+                    didParseCell: (data: any) => {
+                        if (data.column.index === 3 && data.cell.section === 'body') {
+                           const value = clubEntries[data.row.index].amount;
+                           data.cell.styles.textColor = value >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
                         }
+                    },
+                    didDrawPage: (data: any) => {
+                        yPos = data.cursor.y;
                     }
-                },
-            });
+                });
+                yPos = (doc as any).lastAutoTable.finalY + 20;
+            }
             
-            let finalY = (doc as any).lastAutoTable.finalY + 15;
-            doc.setFontSize(14);
-            doc.text('Final Balances:', 14, finalY);
-            finalY += 8;
-            doc.setFontSize(12);
-            balanceByClub.forEach(clubBalance => {
-                doc.text(`${clubBalance.name}: ${clubBalance.currency}${clubBalance.balance.toFixed(0)}`, 14, finalY);
-                finalY += 7;
-            });
+            addPageFooter();
 
-
-            const filename = `online-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+            const filename = `settlement-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
             doc.save(filename);
-
-            toast({ title: 'PDF Exported', description: 'Your ledger has been downloaded.' });
+            toast({ title: 'PDF Exported', description: 'Your settlement ledger has been downloaded.' });
 
         } catch (error) {
             console.error("Could not export PDF:", error);
