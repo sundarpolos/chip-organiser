@@ -140,7 +140,7 @@ const WeeklyLedgerAccordion: FC<{
             {weeklyData.map(week => (
                 <AccordionItem value={week.week} key={week.week}>
                     <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4">
+                        <div className="flex justify-between w-full pr-4 text-sm">
                             <span>{week.week}</span>
                             <span className="font-semibold">Closing: {displaySymbol}{week.closingBalance.toFixed(0)}</span>
                         </div>
@@ -149,41 +149,41 @@ const WeeklyLedgerAccordion: FC<{
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Online Club</TableHead>
-                                <TableHead>Notes</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="p-2 text-xs">Date</TableHead>
+                                <TableHead className="p-2 text-xs">Type</TableHead>
+                                <TableHead className="p-2 text-xs">Online Club</TableHead>
+                                <TableHead className="p-2 text-xs">Notes</TableHead>
+                                <TableHead className="text-right p-2 text-xs">Amount</TableHead>
+                                <TableHead className="text-right p-2 text-xs">Balance</TableHead>
+                                <TableHead className="text-right p-2 text-xs">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             <TableRow className="font-semibold bg-muted/50">
-                                <TableCell colSpan={5}>Opening Balance</TableCell>
-                                <TableCell className="text-right font-mono">{displaySymbol}{week.openingBalance.toFixed(0)}</TableCell>
-                                <TableCell></TableCell>
+                                <TableCell colSpan={5} className="p-2 text-xs">Opening Balance</TableCell>
+                                <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.openingBalance.toFixed(0)}</TableCell>
+                                <TableCell className="p-2"></TableCell>
                             </TableRow>
                             {week.entries.map(entry => (
                                 <TableRow key={entry.id}>
-                                    <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell className="capitalize">{entry.type}</TableCell>
-                                    <TableCell>{entry.onlineClubName || '-'}</TableCell>
-                                    <TableCell>{entry.notes}</TableCell>
-                                    <TableCell className={cn('text-right font-mono', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                    <TableCell className="p-2 text-xs">{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell className="capitalize p-2 text-xs">{entry.type}</TableCell>
+                                    <TableCell className="p-2 text-xs">{entry.onlineClubName || '-'}</TableCell>
+                                    <TableCell className="p-2 text-xs">{entry.notes}</TableCell>
+                                    <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                         {entry.amount >= 0 ? <ArrowUp className="inline h-3 w-3 mr-1"/> : <ArrowDown className="inline h-3 w-3 mr-1"/>}
                                         {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                     </TableCell>
-                                     <TableCell className="text-right font-mono">
+                                     <TableCell className="text-right font-mono p-2 text-xs">
                                        {displaySymbol}{entry.localRunningBalance.toFixed(0)}
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right p-2">
                                         {entry.type === 'p/l' && (
                                             <div className="flex justify-end gap-2">
-                                                <Button variant="ghost" size="icon" onClick={() => onEditEntry(entry)}><Edit className="h-4 w-4"/></Button>
+                                                <Button variant="ghost" size="icon" onClick={() => onEditEntry(entry)} className="h-8 w-8"><Edit className="h-4 w-4"/></Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-red-500"/></Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8"><Trash2 className="h-4 w-4 text-red-500"/></Button>
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
@@ -203,10 +203,10 @@ const WeeklyLedgerAccordion: FC<{
                             ))}
                         </TableBody>
                         <TableFooter>
-                            <TableRow className="font-bold text-base bg-muted hover:bg-muted">
-                                <TableCell colSpan={5}>Closing Balance</TableCell>
-                                <TableCell className="text-right font-mono">{displaySymbol}{week.closingBalance.toFixed(0)}</TableCell>
-                                <TableCell></TableCell>
+                            <TableRow className="font-bold text-sm bg-muted hover:bg-muted">
+                                <TableCell colSpan={5} className="p-2 text-xs">Closing Balance</TableCell>
+                                <TableCell className="text-right font-mono p-2 text-xs">{displaySymbol}{week.closingBalance.toFixed(0)}</TableCell>
+                                <TableCell className="p-2"></TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
@@ -1015,6 +1015,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 
