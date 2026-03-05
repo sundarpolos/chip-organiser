@@ -167,12 +167,16 @@ const WeeklyLedgerAccordion: FC<{
                             {week.entries.map(entry => (
                                 <TableRow key={entry.id}>
                                     <TableCell className="p-2 text-xs">{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell className="capitalize p-2 text-xs">{entry.type}</TableCell>
+                                    <TableCell className="capitalize p-2 text-xs">
+                                        <span className={cn('inline-flex items-center gap-1.5', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
+                                            {entry.amount >= 0 ? <ArrowUp className="h-3 w-3"/> : <ArrowDown className="h-3 w-3"/>}
+                                            {entry.type}
+                                        </span>
+                                    </TableCell>
                                     <TableCell className="p-2 text-xs">{entry.onlineClubName || '-'}</TableCell>
                                     <TableCell className="p-2 text-xs">{entry.notes}</TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                        {entry.amount >= 0 ? <ArrowUp className="inline h-3 w-3 mr-1"/> : <ArrowDown className="inline h-3 w-3 mr-1"/>}
-                                        {onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
+                                        {entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
                                     </TableCell>
                                      <TableCell className="text-right font-mono p-2 text-xs">
                                        {displaySymbol}{entry.localRunningBalance.toFixed(0)}
@@ -1015,6 +1019,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 
