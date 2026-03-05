@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, type FC, useCallback, useRef } from 'react';
@@ -262,7 +263,9 @@ const SendOnlineClubReportDialog: FC<{
                 to: onlineClub.whatsappGroupId,
                 message: message,
                 isGroup: true,
-                ...(club?.whatsappConfig || {})
+                apiUrl: club?.whatsappConfig?.apiUrl,
+                apiToken: club?.whatsappConfig?.apiToken,
+                senderMobile: club?.whatsappConfig?.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
