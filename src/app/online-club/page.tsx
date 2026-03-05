@@ -437,7 +437,7 @@ const OnlineClubPage: FC = () => {
     const eligibleOnlineClubs = useMemo(() => {
         if (!currentUser || !onlineClubs.length) return [];
         return onlineClubs.filter(oc => 
-            !oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0 || oc.eligiblePlayerIds.includes(currentUser.id)
+            currentUser.isAdmin || (oc.eligiblePlayerIds && oc.eligiblePlayerIds.includes(currentUser.id))
         );
     }, [onlineClubs, currentUser]);
 
@@ -1015,6 +1015,7 @@ const EditPlDialog: FC<{
 };
 
 export default OnlineClubPage;
+
 
 
 

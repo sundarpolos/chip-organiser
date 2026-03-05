@@ -600,39 +600,46 @@ const EditableDate: FC<{
 const OnlineAccountsSummaryCard: FC<{
     onlineClubs: OnlineClub[];
     ledger: OnlineLedgerEntry[];
-}> = ({ onlineClubs, ledger }) => {
+    currentUser: MasterPlayer | null;
+}> = ({ onlineClubs, ledger, currentUser }) => {
+
+    const eligibleOnlineClubs = useMemo(() => {
+        if (!currentUser || !onlineClubs.length) return [];
+        return onlineClubs.filter(oc => 
+            currentUser.isAdmin || (oc.eligiblePlayerIds && oc.eligiblePlayerIds.includes(currentUser.id))
+        );
+    }, [onlineClubs, currentUser]);
 
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
-        onlineClubs.forEach(club => {
+        eligibleOnlineClubs.forEach(club => {
             if (club.name) {
                 map.set(club.name, club.currency || '₹');
             }
         });
         return map;
-    }, [onlineClubs]);
+    }, [eligibleOnlineClubs]);
 
     const balanceByClub = useMemo(() => {
         const balances: { [key: string]: { balance: number; currency: string; } } = {};
-        onlineClubs.forEach(club => {
+        eligibleOnlineClubs.forEach(club => {
             if(club.name) {
                 balances[club.name] = { balance: 0, currency: club.currency || '₹' };
             }
         });
         ledger.forEach(entry => {
             if (entry.onlineClubName) {
-                if (balances[entry.onlineClubName] === undefined) {
-                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubCurrencyMap.get(entry.onlineClubName) || '₹' };
+                if (balances[entry.onlineClubName] !== undefined) {
+                    balances[entry.onlineClubName].balance += entry.amount;
                 }
-                balances[entry.onlineClubName].balance += entry.amount;
             }
         });
         return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
-    }, [ledger, onlineClubs, onlineClubCurrencyMap]);
+    }, [ledger, eligibleOnlineClubs, onlineClubCurrencyMap]);
 
     const recentTransactionsByClub = useMemo(() => {
         const grouped: Record<string, OnlineLedgerEntry[]> = {};
-        onlineClubs.forEach(club => {
+        eligibleOnlineClubs.forEach(club => {
             if (club.name) {
                 grouped[club.name] = [];
             }
@@ -647,9 +654,9 @@ const OnlineAccountsSummaryCard: FC<{
                 }
             });
         return grouped;
-    }, [ledger, onlineClubs]);
+    }, [ledger, eligibleOnlineClubs]);
     
-    if (onlineClubs.length === 0 && ledger.length === 0) return null;
+    if (eligibleOnlineClubs.length === 0) return null;
 
     return (
         <Card className="mb-6">
@@ -708,6 +715,7 @@ const OnlineAccountsSummaryCard: FC<{
         </Card>
     );
 };
+
 
 // Main component with Suspense boundary
 export default function DashboardPage() {
@@ -1584,6 +1592,7 @@ function DashboardContent() {
       <OnlineAccountsSummaryCard
         onlineClubs={onlineClubs}
         ledger={onlineLedger}
+        currentUser={currentUser}
       />
 
         {activeGame ? (
