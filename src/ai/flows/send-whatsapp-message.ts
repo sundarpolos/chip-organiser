@@ -70,9 +70,11 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       }
 
       if (isGroup) {
-        // For group messages, 'to' is the group ID.
-        body.append('group', to);
+        // For group messages, format the ID to ensure it ends with @g.us
+        const groupId = `${to.replace(/\D/g, "")}@g.us`;
+        body.append('group', groupId);
       } else {
+        // For individual messages, the number is expected to be correctly formatted.
         body.append('receiver', to);
       }
 
@@ -126,5 +128,3 @@ const sendWhatsappMessageFlow = ai.defineFlow(
     }
   }
 );
-
-    
