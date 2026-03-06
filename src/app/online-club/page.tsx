@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus, MessageSquare, Send, Copy, Check } from 'lucide-react';
+import { Loader2, Plus, Save, Edit, Trash2, Landmark, Banknote, FileDown, ArrowUp, ArrowDown, Minus, MessageSquare, Send, Copy, Check, HelpCircle } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -168,7 +169,7 @@ const WeeklyLedgerAccordion: FC<{
                                     <TableCell className="capitalize p-2 text-xs">
                                         <span className={cn('inline-flex items-center gap-1.5', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                             {entry.amount >= 0 ? <ArrowUp className="h-3 w-3"/> : <ArrowDown className="h-3 w-3"/>}
-                                            {entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : ''}
+                                            {entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : 'P/L'}
                                         </span>
                                     </TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
@@ -318,6 +319,13 @@ const SendOnlineClubReportDialog: FC<{
                     <DialogTitle>Send Report to Group</DialogTitle>
                     <DialogDescription>A summary for "{onlineClub?.name}" will be sent to its configured WhatsApp group.</DialogDescription>
                 </DialogHeader>
+                <Alert>
+                    <HelpCircle className="h-4 w-4" />
+                    <AlertTitle>WhatsApp API Settings</AlertTitle>
+                    <AlertDescription>
+                        To ensure reliable delivery, reports are sent using the system's central <strong>Super Admin</strong> settings, not club-specific ones.
+                    </AlertDescription>
+                </Alert>
                 <div className="py-4 space-y-2">
                     <div className="flex justify-between items-center">
                         <Label>Message Preview</Label>
@@ -1021,3 +1029,6 @@ export default OnlineClubPage;
     
 
 
+
+
+    
