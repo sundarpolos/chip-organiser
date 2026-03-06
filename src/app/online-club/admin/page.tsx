@@ -5,18 +5,18 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries, addProfitLoss } from '@/services/online-club-service';
 import { getClubs } from '@/services/club-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club, OnlineClub } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save } from 'lucide-react';
+import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save, ChevronsUpDown, Check } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,6 +24,162 @@ import { sendDeleteOnlineAccountOtp } from '@/ai/flows/send-delete-online-accoun
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
+
+const PlayerCombobox: FC<{
+    accounts: OnlinePlayerAccount[];
+    selectedId: string;
+    onSelect: (id: string) => void;
+}> = ({ accounts, selectedId, onSelect }) => {
+    const [open, setOpen] = useState(false);
+    const selectedName = accounts.find(acc => acc.id === selectedId)?.playerName || "";
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+                    {selectedId ? selectedName : "Select a player..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                    <CommandInput placeholder="Search player..." />
+                    <CommandEmpty>No player found.</CommandEmpty>
+                    <CommandList>
+                        <ScrollArea className="h-48">
+                            {accounts.map(account => (
+                                <CommandItem
+                                    key={account.id}
+                                    value={account.playerName}
+                                    onSelect={() => {
+                                        onSelect(account.id);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check className={cn("mr-2 h-4 w-4", selectedId === account.id ? "opacity-100" : "opacity-0")} />
+                                    {account.playerName}
+                                </CommandItem>
+                            ))}
+                        </ScrollArea>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+const RecordPlayerPLCard: FC<{
+    accounts: OnlinePlayerAccount[];
+    onlineClubs: OnlineClub[];
+    onSuccess: () => void;
+}> = ({ accounts, onlineClubs, onSuccess }) => {
+    const { toast } = useToast();
+    const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [amount, setAmount] = useState('');
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [onlineClubName, setOnlineClubName] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const numAmount = parseFloat(amount);
+        if (!selectedAccountId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please select a player.' });
+            return;
+        }
+        if (isNaN(numAmount)) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please enter a valid amount.' });
+            return;
+        }
+        if (!onlineClubName) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please select an online club.' });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await addProfitLoss(selectedAccountId, numAmount, date, onlineClubName);
+            toast({ title: 'Success', description: `P/L of ${numAmount} recorded for the selected player.` });
+            // Reset form
+            setSelectedAccountId('');
+            setAmount('');
+            setDate(format(new Date(), 'yyyy-MM-dd'));
+            setOnlineClubName('');
+            onSuccess(); // To refresh the main accounts list
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Could not record P/L.';
+            toast({ variant: 'destructive', title: 'Error', description: msg });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
+    const availableOnlineClubs = selectedAccount ? onlineClubs.filter(oc => oc.clubId === selectedAccount.clubId) : [];
+    
+    // reset online club if player changes and it's no longer valid
+    useEffect(() => {
+        if (selectedAccount && !availableOnlineClubs.some(oc => oc.name === onlineClubName)) {
+            setOnlineClubName('');
+        }
+    }, [selectedAccountId, availableOnlineClubs, onlineClubName]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Record Player Profit/Loss</CardTitle>
+                <CardDescription>Manually enter a P/L entry for any player in any online club.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Player</Label>
+                        <PlayerCombobox accounts={accounts} selectedId={selectedAccountId} onSelect={setSelectedAccountId} />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="pl-amount">Amount</Label>
+                            <Input id="pl-amount" type="number" step="any" placeholder="e.g. 1500 or -500" value={amount} onChange={e => setAmount(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="pl-date">Date</Label>
+                            <Input id="pl-date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="pl-online-club">Online Club</Label>
+                        <Select value={onlineClubName} onValueChange={setOnlineClubName} disabled={!selectedAccountId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select an online club..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableOnlineClubs.length > 0 ? (
+                                    availableOnlineClubs.map(club => (
+                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                    ))
+                                ) : (
+                                    <div className="p-2 text-center text-sm text-muted-foreground">
+                                        {selectedAccountId ? "No online clubs for this player's club." : "Select a player first."}
+                                    </div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                        Submit P/L
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
+    );
+};
+
 
 const AdminOnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -202,6 +358,11 @@ const AdminOnlineClubPage: FC = () => {
 
     return (
         <div className="space-y-6">
+            <RecordPlayerPLCard
+                accounts={accounts}
+                onlineClubs={allOnlineClubs}
+                onSuccess={refreshData}
+            />
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
