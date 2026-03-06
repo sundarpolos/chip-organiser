@@ -168,7 +168,7 @@ const WeeklyLedgerAccordion: FC<{
                                     <TableCell className="capitalize p-2 text-xs">
                                         <span className={cn('inline-flex items-center gap-1.5', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                             {entry.amount >= 0 ? <ArrowUp className="h-3 w-3"/> : <ArrowDown className="h-3 w-3"/>}
-                                            {entry.type !== 'p/l' && entry.type}
+                                            {entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : ''}
                                         </span>
                                     </TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
@@ -283,14 +283,11 @@ const SendOnlineClubReportDialog: FC<{
 
         setIsSending(true);
         try {
-            const configToSend = club?.whatsappConfig || {};
+            // Not passing API credentials forces the flow to use environment variables (Super Admin's settings).
             const result = await sendWhatsappMessage({
                 to: onlineClub.whatsappGroupId,
                 message: message,
                 isGroup: true,
-                apiUrl: configToSend.apiUrl,
-                apiToken: configToSend.apiToken,
-                senderMobile: configToSend.senderMobile,
             });
             if (result && result.success) {
                 toast({ title: 'Report Sent!', description: `The summary for ${onlineClub.name} has been sent.` });
@@ -1022,4 +1019,5 @@ const EditPlDialog: FC<{
 export default OnlineClubPage;
 
     
+
 
