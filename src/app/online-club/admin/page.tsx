@@ -122,14 +122,27 @@ const RecordPlayerPLCard: FC<{
     };
     
     const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
-    const availableOnlineClubs = selectedAccount ? onlineClubs.filter(oc => oc.clubId === selectedAccount.clubId) : [];
+
+    const availableOnlineClubs = useMemo(() => {
+        if (!selectedAccount) return [];
+        
+        return onlineClubs.filter(oc => {
+            if (oc.clubId !== selectedAccount.clubId) {
+                return false;
+            }
+            if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
+                return true;
+            }
+            return oc.eligiblePlayerIds.includes(selectedAccount.id);
+        });
+    }, [selectedAccount, onlineClubs]);
     
     // reset online club if player changes and it's no longer valid
     useEffect(() => {
         if (selectedAccount && !availableOnlineClubs.some(oc => oc.name === onlineClubName)) {
             setOnlineClubName('');
         }
-    }, [selectedAccountId, availableOnlineClubs, onlineClubName]);
+    }, [selectedAccount, availableOnlineClubs, onlineClubName]);
 
     return (
         <Card>
@@ -166,7 +179,7 @@ const RecordPlayerPLCard: FC<{
                                     ))
                                 ) : (
                                     <div className="p-2 text-center text-sm text-muted-foreground">
-                                        {selectedAccountId ? "No online clubs for this player's club." : "Select a player first."}
+                                        {selectedAccountId ? "No eligible online clubs for this player." : "Select a player first."}
                                     </div>
                                 )}
                             </SelectContent>
@@ -884,12 +897,12 @@ const LedgerDialog: FC<{
 const SendAdminReportDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onlineClub: OnlineClub | undefined;
+    player: OnlinePlayerAccount;
+    onlineClub: OnlineClub;
     club: Club | null;
-    player: OnlinePlayerAccount | null;
     ledger: OnlineLedgerEntry[];
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, onlineClub, club, player, ledger, toast }) => {
+}> = ({ isOpen, onOpenChange, player, onlineClub, club, ledger, toast }) => {
     const [isSendingGroup, setIsSendingGroup] = useState(false);
     const [isSendingAdmin, setIsSendingAdmin] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
