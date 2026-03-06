@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, type FC, useCallback, useRef } from 'react';
@@ -259,7 +260,7 @@ const SendOnlineClubReportDialog: FC<{
                 } else if (entry.type === 'withdrawal') {
                     description = `Withdrawal via ${entry.notes}`;
                 } else {
-                    description = entry.amount >= 0 ? 'Profit' : 'Loss';
+                     description = entry.amount >= 0 ? 'Profit' : 'Loss';
                 }
 
                 const sign = entry.amount >= 0 ? '+' : '-';
@@ -345,13 +346,6 @@ const SendOnlineClubReportDialog: FC<{
                     <DialogTitle>Send Report</DialogTitle>
                     <DialogDescription>A statement for "{player?.playerName}" will be sent.</DialogDescription>
                 </DialogHeader>
-                <Alert>
-                    <HelpCircle className="h-4 w-4" />
-                    <AlertTitle>WhatsApp API Settings</AlertTitle>
-                    <AlertDescription>
-                        To ensure reliable delivery, reports are sent using the system's central <strong>Super Admin</strong> settings, not club-specific ones.
-                    </AlertDescription>
-                </Alert>
                 <div className="py-4 space-y-2">
                     <div className="flex justify-between items-center">
                         <Label>Message Preview</Label>
@@ -364,9 +358,7 @@ const SendOnlineClubReportDialog: FC<{
                     </ScrollArea>
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline" disabled={isSendingGroup || isSendingAdmin}>Cancel</Button>
-                    </DialogClose>
+                    <DialogClose asChild><Button variant="outline" disabled={isSendingGroup || isSendingAdmin}>Cancel</Button></DialogClose>
                     <Button onClick={handleSendToAdmin} disabled={isSendingGroup || isSendingAdmin}>
                         {isSendingAdmin ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
                         Send to Admin
@@ -873,10 +865,9 @@ const OnlineClubPage: FC = () => {
                                 {activeTab !== 'all' && (
                                     <Button
                                         onClick={() => setReportModalOpen(true)}
-                                        disabled={!activeOnlineClub?.whatsappGroupId}
                                     >
                                         <MessageSquare className="mr-2 h-4 w-4" />
-                                        Send to Group
+                                        Send Report
                                     </Button>
                                 )}
                             </div>
