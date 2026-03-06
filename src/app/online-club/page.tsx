@@ -169,7 +169,7 @@ const WeeklyLedgerAccordion: FC<{
                                     <TableCell className="capitalize p-2 text-xs">
                                         <span className={cn('inline-flex items-center gap-1.5', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
                                             {entry.amount >= 0 ? <ArrowUp className="h-3 w-3"/> : <ArrowDown className="h-3 w-3"/>}
-                                            {entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : 'P/L'}
+                                            {entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : (entry.amount >= 0 ? 'Profit' : 'Loss')}
                                         </span>
                                     </TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
@@ -232,7 +232,8 @@ const SendOnlineClubReportDialog: FC<{
     }[];
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, onlineClub, club, player, weeklyData, toast }) => {
-    const [isSending, setIsSending] = useState(false);
+    const [isSendingGroup, setIsSendingGroup] = useState(false);
+    const [isSendingAdmin, setIsSendingAdmin] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
 
     const message = useMemo(() => {
@@ -276,13 +277,13 @@ const SendOnlineClubReportDialog: FC<{
         return msg.trim();
     }, [onlineClub, club, weeklyData, player]);
 
-    const handleSend = async () => {
+    const handleSendToGroup = async () => {
         if (!onlineClub?.whatsappGroupId) {
             toast({ variant: 'destructive', title: 'Group ID Missing', description: `No WhatsApp Group ID configured for ${onlineClub.name}.`});
             return;
         }
 
-        setIsSending(true);
+        setIsSendingGroup(true);
         try {
             // Not passing API credentials forces the flow to use environment variables (Super Admin's settings).
             const result = await sendWhatsappMessage({
@@ -300,7 +301,32 @@ const SendOnlineClubReportDialog: FC<{
             const error = e as Error;
             toast({ variant: 'destructive', title: 'Send Failed', description: error.message });
         } finally {
-            setIsSending(false);
+            setIsSendingGroup(false);
+        }
+    };
+    
+    const handleSendToAdmin = async () => {
+        if (!message || message === 'No data to send.') {
+             toast({ variant: 'destructive', title: 'No Data', description: "There is no report to send." });
+             return;
+        }
+        setIsSendingAdmin(true);
+        try {
+            const result = await sendWhatsappMessage({
+                to: SUPER_ADMIN_WHATSAPP,
+                message: message,
+                isGroup: false, // sending to a person
+            });
+            if (result && result.success) {
+                toast({ title: 'Report Sent!', description: `The summary has been sent to the Super Admin.` });
+            } else {
+                throw new Error(result?.error || 'Failed to send report. The server did not provide an error message.');
+            }
+        } catch (e) {
+            const error = e as Error;
+            toast({ variant: 'destructive', title: 'Send Failed', description: error.message });
+        } finally {
+            setIsSendingAdmin(false);
         }
     };
     
@@ -316,8 +342,8 @@ const SendOnlineClubReportDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Send Report to Group</DialogTitle>
-                    <DialogDescription>A summary for "{onlineClub?.name}" will be sent to its configured WhatsApp group.</DialogDescription>
+                    <DialogTitle>Send Report</DialogTitle>
+                    <DialogDescription>A statement for "{player?.playerName}" will be sent.</DialogDescription>
                 </DialogHeader>
                 <Alert>
                     <HelpCircle className="h-4 w-4" />
@@ -338,9 +364,16 @@ const SendOnlineClubReportDialog: FC<{
                     </ScrollArea>
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSend} disabled={isSending || !onlineClub?.whatsappGroupId}>
-                        {isSending ? <Loader2 className="animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> Send Report</>}
+                    <DialogClose asChild>
+                        <Button variant="outline" disabled={isSendingGroup || isSendingAdmin}>Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleSendToAdmin} disabled={isSendingGroup || isSendingAdmin}>
+                        {isSendingAdmin ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4" />}
+                        Send to Admin
+                    </Button>
+                    <Button onClick={handleSendToGroup} disabled={isSendingGroup || isSendingAdmin || !onlineClub?.whatsappGroupId}>
+                        {isSendingGroup ? <Loader2 className="animate-spin mr-2" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                        Send to Group
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -1030,5 +1063,7 @@ export default OnlineClubPage;
 
 
 
+
+    
 
     
