@@ -70,8 +70,19 @@ const sendWhatsappMessageFlow = ai.defineFlow(
       }
 
       if (isGroup) {
-        // For group messages, format the ID to ensure it ends with @g.us
-        const groupId = `${to.replace(/\D/g, "")}@g.us`;
+        // More robust group ID formatting.
+        // It's common for group IDs to already be in the correct format,
+        // or to be a numeric string that just needs '@g.us' appended.
+        let groupId = to.trim();
+        
+        // Don't re-append if it's already there
+        if (!groupId.endsWith('@g.us')) {
+            // Remove any existing whatsapp suffixes before appending the correct one.
+            groupId = groupId.replace(/@s\.whatsapp\.net|@c\.us/g, '');
+            // Simple cleanup: allow numbers and hyphens, then append @g.us
+            groupId = `${groupId.replace(/[^0-9-]/g, '')}@g.us`;
+        }
+        
         body.append('group', groupId);
       } else {
         // For individual messages, the number is expected to be correctly formatted.
