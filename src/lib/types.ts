@@ -1,5 +1,4 @@
 
-
 export interface BuyIn {
   id: string;
   amount: number;
@@ -112,7 +111,6 @@ export interface SeatBooking {
 export interface OnlineClub {
   id: string;
   name: string;
-  clubId: string; // The main club it belongs to
   currency?: string;
   whatsappGroupId?: string;
   eligiblePlayerIds?: string[];

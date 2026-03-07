@@ -224,8 +224,8 @@ async function recalculateAccountBalance(accountId: string): Promise<void> {
 
 // ====== ONLINE CLUB MANAGEMENT ======
 
-export async function createOnlineClub(name: string, clubId: string, currency?: string, whatsappGroupId?: string, eligiblePlayerIds?: string[]): Promise<OnlineClub> {
-    const newOnlineClub: Omit<OnlineClub, 'id'> = { name, clubId, currency: currency || 'INR', whatsappGroupId: whatsappGroupId || '', eligiblePlayerIds: eligiblePlayerIds || [] };
+export async function createOnlineClub(name: string, currency?: string, whatsappGroupId?: string, eligiblePlayerIds?: string[]): Promise<OnlineClub> {
+    const newOnlineClub: Omit<OnlineClub, 'id'> = { name, currency: currency || 'INR', whatsappGroupId: whatsappGroupId || '', eligiblePlayerIds: eligiblePlayerIds || [] };
     const docRef = await addDoc(collection(db, ONLINE_CLUBS_COLLECTION), newOnlineClub);
     return { id: docRef.id, ...newOnlineClub };
 }
@@ -235,12 +235,8 @@ export async function updateOnlineClub(onlineClubId: string, updates: Partial<Pi
     await setDoc(docRef, updates, { merge: true });
 }
 
-export async function getOnlineClubs(clubId?: string): Promise<OnlineClub[]> {
-    const q = clubId 
-        ? query(collection(db, ONLINE_CLUBS_COLLECTION), where("clubId", "==", clubId))
-        : collection(db, ONLINE_CLUBS_COLLECTION);
-        
-    const querySnapshot = await getDocs(q);
+export async function getOnlineClubs(): Promise<OnlineClub[]> {
+    const querySnapshot = await getDocs(collection(db, ONLINE_CLUBS_COLLECTION));
     const clubs: OnlineClub[] = [];
     querySnapshot.forEach((doc) => {
         clubs.push({ id: doc.id, ...doc.data() } as OnlineClub);
@@ -287,13 +283,6 @@ export async function deleteAllOnlineDataForClub(clubId: string): Promise<void> 
         // Also delete the account document itself
         batch.delete(accountDoc.ref);
     }
-    
-    // Also delete the Online Club names associated with this club
-    const onlineClubsQuery = query(collection(db, ONLINE_CLUBS_COLLECTION), where("clubId", "==", clubId));
-    const onlineClubsSnapshot = await getDocs(onlineClubsQuery);
-    onlineClubsSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-    });
 
     await batch.commit();
 }

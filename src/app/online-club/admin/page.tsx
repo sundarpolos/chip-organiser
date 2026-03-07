@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Command, CommandInput, CommandEmpty, CommandItem, CommandList } from '@/components/ui/command';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
 
@@ -90,11 +90,7 @@ const RecordPlayerPLCard: FC<{
     const eligibleAccounts = useMemo(() => {
         return accounts
             .filter(account => {
-                const parentClubOnlineClubs = onlineClubs.filter(oc => oc.clubId === account.clubId);
-                if (parentClubOnlineClubs.length === 0) {
-                    return false;
-                }
-                return parentClubOnlineClubs.some(oc => {
+                return onlineClubs.some(oc => {
                     if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
                         return true;
                     }
@@ -146,9 +142,6 @@ const RecordPlayerPLCard: FC<{
         if (!selectedAccount) return [];
         
         return onlineClubs.filter(oc => {
-            if (oc.clubId !== selectedAccount.clubId) {
-                return false;
-            }
             if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
                 return true;
             }
@@ -489,7 +482,7 @@ const AdminOnlineClubPage: FC = () => {
                         account={selectedAccount}
                         type={transactionType}
                         onSuccess={refreshData}
-                        onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
+                        onlineClubs={allOnlineClubs}
                     />
                     <LedgerDialog
                         isOpen={isLedgerModalOpen}
@@ -498,7 +491,7 @@ const AdminOnlineClubPage: FC = () => {
                         ledger={playerLedger}
                         onEditTransaction={handleOpenEditTransaction}
                         onDeleteTransaction={handleDeleteTransaction}
-                        onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
+                        onlineClubs={allOnlineClubs}
                         onOpenReportModal={handleOpenReportModal}
                     />
                     {entryToEdit && (
@@ -518,7 +511,7 @@ const AdminOnlineClubPage: FC = () => {
                                 setPlayerLedger(ledger);
                                 setLedgerModalOpen(true);
                             }}
-                            onlineClubs={allOnlineClubs.filter(oc => oc.clubId === selectedAccount.clubId)}
+                            onlineClubs={allOnlineClubs}
                         />
                     )}
                 </>
@@ -1263,6 +1256,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 

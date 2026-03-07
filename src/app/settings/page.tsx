@@ -1894,13 +1894,12 @@ const SendGameAnnouncementDialog: FC<{
 const CreateEditOnlineClubDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    club: Club | null;
     allPlayers: MasterPlayer[];
     allClubs: Club[];
     onSave: () => Promise<void>;
     onlineClubToEdit?: OnlineClub | null;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, club, allPlayers, allClubs, onSave, onlineClubToEdit, toast }) => {
+}> = ({ isOpen, onOpenChange, allPlayers, allClubs, onSave, onlineClubToEdit, toast }) => {
     const [name, setName] = useState('');
     const [currency, setCurrency] = useState('');
     const [whatsappGroupId, setWhatsappGroupId] = useState('');
@@ -1951,7 +1950,7 @@ const CreateEditOnlineClubDialog: FC<{
 
 
     const handleSave = async () => {
-        if (!name.trim() || !club) {
+        if (!name.trim()) {
             toast({ variant: 'destructive', title: 'Error', description: 'Online club name is required.' });
             return;
         }
@@ -1961,7 +1960,7 @@ const CreateEditOnlineClubDialog: FC<{
                 await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim(), eligiblePlayerIds });
                 toast({ title: 'Success', description: `Online club "${name.trim()}" updated.` });
             } else {
-                await createOnlineClub(name.trim(), club.id, currency.trim() || 'INR', whatsappGroupId.trim(), eligiblePlayerIds);
+                await createOnlineClub(name.trim(), currency.trim() || 'INR', whatsappGroupId.trim(), eligiblePlayerIds);
                 toast({ title: 'Success', description: `Online club "${name.trim()}" created.` });
             }
             await onSave();
@@ -1974,9 +1973,9 @@ const CreateEditOnlineClubDialog: FC<{
     };
     
     const handleTestGroupWhatsapp = async () => {
-        const activeClubConfig = club?.whatsappConfig;
-        if (!activeClubConfig?.apiUrl || !activeClubConfig?.apiToken || !whatsappGroupId) {
-            toast({ variant: 'destructive', title: 'Missing Info', description: "Main club API settings and this Online Club's Group ID are required." });
+        // Super admin uses env vars for sending
+        if (!whatsappGroupId) {
+            toast({ variant: 'destructive', title: 'Missing Info', description: "This Online Club's Group ID is required." });
             return;
         }
         setIsGroupTesting(true);
@@ -1985,9 +1984,6 @@ const CreateEditOnlineClubDialog: FC<{
                 to: whatsappGroupId,
                 message: `This is a test message for the online club group "${name || 'New Club'}" from Chip Maestro.`,
                 isGroup: true,
-                apiUrl: activeClubConfig.apiUrl,
-                apiToken: activeClubConfig.apiToken,
-                senderMobile: activeClubConfig.senderMobile,
             });
             if (result.success) {
                 toast({ title: 'Group Test Successful!', description: 'A test message was sent to the configured group ID.' });
@@ -2006,7 +2002,7 @@ const CreateEditOnlineClubDialog: FC<{
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{onlineClubToEdit ? 'Edit' : 'Create'} Online Club for {club?.name}</DialogTitle>
+                    <DialogTitle>{onlineClubToEdit ? 'Edit' : 'Create'} Online Club</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[70vh] py-4 pr-4">
                     <div className="space-y-4">
@@ -2031,7 +2027,7 @@ const CreateEditOnlineClubDialog: FC<{
                          <Separator />
                         <div className="space-y-2">
                             <Label>Eligible Players</Label>
-                            <p className="text-sm text-muted-foreground">Select which players can use this online club account. If none are selected, all players in the main club will have access.</p>
+                            <p className="text-sm text-muted-foreground">Select which players can use this online club account. If none are selected, all players in the system will have access.</p>
                              <ScrollArea className="h-48 border rounded-md p-2">
                                 <div className="flex items-center space-x-2 border-b pb-2">
                                     <Checkbox
@@ -2043,7 +2039,7 @@ const CreateEditOnlineClubDialog: FC<{
                                 </div>
                                 
                                 {playersByClub.map(([clubId, clubPlayers]) => (
-                                    <Accordion type="single" collapsible key={clubId} defaultValue={clubId === club?.id ? clubId : undefined} className="w-full">
+                                    <Accordion type="single" collapsible key={clubId} className="w-full">
                                         <AccordionItem value={clubId} className="border-b-0">
                                             <AccordionTrigger className="py-2 text-sm font-semibold [&[data-state=open]>svg]:text-primary">
                                             {allClubs.find(c => c.id === clubId)?.name || 'Unassigned'} ({clubPlayers.length})
@@ -2083,25 +2079,28 @@ const CreateEditOnlineClubDialog: FC<{
 };
 
 const OnlineClubManagement: FC<{
-    clubs: Club[];
-    players: MasterPlayer[];
     toast: ReturnType<typeof useToast>['toast'];
     isSuperAdmin: boolean;
-    activeClub: Club | null;
-}> = ({ clubs, players, toast, isSuperAdmin, activeClub }) => {
+}> = ({ toast, isSuperAdmin }) => {
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
+    const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
+    const [allClubs, setAllClubs] = useState<Club[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setModalOpen] = useState(false);
-    const [clubForModal, setClubForModal] = useState<Club | null>(null);
     const [onlineClubToEdit, setOnlineClubToEdit] = useState<OnlineClub | null>(null);
 
     const refreshOnlineClubs = useCallback(async () => {
-        // No need to set loading to true here, to avoid flicker
         try {
-            const onlineClubs = await getOnlineClubs(); // Get all
+            const [onlineClubs, players, clubs] = await Promise.all([
+                getOnlineClubs(),
+                getMasterPlayers(),
+                getClubs(),
+            ]);
             setAllOnlineClubs(onlineClubs);
+            setAllPlayers(players);
+            setAllClubs(clubs);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch online clubs.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch data.' });
         }
     }, [toast]);
 
@@ -2109,18 +2108,6 @@ const OnlineClubManagement: FC<{
         setIsLoading(true);
         refreshOnlineClubs().finally(() => setIsLoading(false));
     }, [refreshOnlineClubs]);
-
-    const onlineClubsByClub = useMemo(() => {
-        const grouped = new Map<string, OnlineClub[]>();
-        allOnlineClubs.forEach(oc => {
-            const clubId = oc.clubId;
-            if (!grouped.has(clubId)) {
-                grouped.set(clubId, []);
-            }
-            grouped.get(clubId)!.push(oc);
-        });
-        return grouped;
-    }, [allOnlineClubs]);
 
     const handleDelete = async (onlineClubId: string) => {
         try {
@@ -2132,73 +2119,16 @@ const OnlineClubManagement: FC<{
         }
     };
     
-    const openCreateDialog = (club: Club) => {
-        setClubForModal(club);
+    const openCreateDialog = () => {
         setOnlineClubToEdit(null);
         setModalOpen(true);
     };
 
-    const openEditDialog = (club: Club, onlineClub: OnlineClub) => {
-        setClubForModal(club);
+    const openEditDialog = (onlineClub: OnlineClub) => {
         setOnlineClubToEdit(onlineClub);
         setModalOpen(true);
     };
     
-    const ManageTable: FC<{club: Club}> = ({club}) => {
-        const clubsForTable = onlineClubsByClub.get(club.id) || [];
-        return (
-             <>
-                <div className="flex justify-end mb-4">
-                    <Button size="sm" onClick={() => openCreateDialog(club)}><Plus className="mr-2 h-4 w-4" /> Create</Button>
-                </div>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Currency</TableHead>
-                            <TableHead>Players</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {clubsForTable.map(oc => (
-                            <TableRow key={oc.id}>
-                                <TableCell>{oc.name}</TableCell>
-                                <TableCell>{oc.currency || 'INR'}</TableCell>
-                                <TableCell>{oc.eligiblePlayerIds?.length || 'All'}</TableCell>
-                                <TableCell className="text-right space-x-1">
-                                    <Button variant="ghost" size="icon" onClick={() => openEditDialog(club, oc)}>
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will permanently delete the "{oc.name}" online club.</AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDelete(oc.id)}>Delete</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                        {clubsForTable.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center">No online clubs created yet for this club.</TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-             </>
-        )
-    };
-
     if (isLoading) {
         return <Card><CardHeader><CardTitle>Online Club Names</CardTitle></CardHeader><CardContent><Loader2 className="animate-spin"/></CardContent></Card>
     }
@@ -2207,40 +2137,65 @@ const OnlineClubManagement: FC<{
         <>
             <Card>
                 <CardHeader>
-                    <CardTitle>Online Club Names</CardTitle>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>Online Club Names</CardTitle>
+                      <Button size="sm" onClick={openCreateDialog}><Plus className="mr-2 h-4 w-4" /> Create Online Club</Button>
+                    </div>
                     <CardDescription>Manage the list of online clubs players can select from (e.g., PokerBaazi, Spartan Poker).</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isSuperAdmin ? (
-                        <Accordion type="multiple" className="w-full">
-                            {clubs.map(club => (
-                                <AccordionItem value={club.id} key={club.id}>
-                                    <AccordionTrigger>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-lg">{club.name}</span>
-                                            <span className="text-sm text-muted-foreground">({onlineClubsByClub.get(club.id)?.length || 0} online clubs)</span>
-                                        </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent>
-                                        <ManageTable club={club} />
-                                    </AccordionContent>
-                                </AccordionItem>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Currency</TableHead>
+                                <TableHead>Players</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {allOnlineClubs.map(oc => (
+                                <TableRow key={oc.id}>
+                                    <TableCell>{oc.name}</TableCell>
+                                    <TableCell>{oc.currency || 'INR'}</TableCell>
+                                    <TableCell>{oc.eligiblePlayerIds?.length || 'All'}</TableCell>
+                                    <TableCell className="text-right space-x-1">
+                                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(oc)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                    <AlertDialogDescription>This will permanently delete the "{oc.name}" online club.</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDelete(oc.id)}>Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </TableCell>
+                                </TableRow>
                             ))}
-                        </Accordion>
-                    ) : activeClub ? (
-                        <ManageTable club={activeClub} />
-                    ) : (
-                        <p className="text-muted-foreground">No active club selected.</p>
-                    )}
+                            {allOnlineClubs.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center">No online clubs created yet.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
             
              <CreateEditOnlineClubDialog
                 isOpen={isModalOpen}
                 onOpenChange={setModalOpen}
-                club={clubForModal}
-                allPlayers={players}
-                allClubs={clubs}
+                allPlayers={allPlayers}
+                allClubs={allClubs}
                 onSave={refreshOnlineClubs}
                 onlineClubToEdit={onlineClubToEdit}
                 toast={toast}
@@ -2351,11 +2306,8 @@ export default function SettingsPage() {
        )}
        {isSuperAdmin && (
           <OnlineClubManagement
-            clubs={clubs}
-            players={players}
             toast={toast}
             isSuperAdmin={isSuperAdmin}
-            activeClub={activeClub}
           />
        )}
        {(isAdmin || isBanker) && (
