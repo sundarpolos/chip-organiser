@@ -87,6 +87,23 @@ const RecordPlayerPLCard: FC<{
     const [onlineClubName, setOnlineClubName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const eligibleAccounts = useMemo(() => {
+        return accounts
+            .filter(account => {
+                const parentClubOnlineClubs = onlineClubs.filter(oc => oc.clubId === account.clubId);
+                if (parentClubOnlineClubs.length === 0) {
+                    return false;
+                }
+                return parentClubOnlineClubs.some(oc => {
+                    if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
+                        return true;
+                    }
+                    return oc.eligiblePlayerIds.includes(account.id);
+                });
+            })
+            .sort((a, b) => a.playerName.localeCompare(b.playerName));
+    }, [accounts, onlineClubs]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const numAmount = parseFloat(amount);
@@ -156,7 +173,7 @@ const RecordPlayerPLCard: FC<{
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label>Player</Label>
-                        <PlayerCombobox accounts={accounts} selectedId={selectedAccountId} onSelect={setSelectedAccountId} />
+                        <PlayerCombobox accounts={eligibleAccounts} selectedId={selectedAccountId} onSelect={setSelectedAccountId} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -1246,4 +1263,5 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
