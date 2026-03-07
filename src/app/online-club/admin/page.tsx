@@ -777,24 +777,24 @@ const LedgerDialog: FC<{
     const balanceByClub = useMemo(() => {
         if (!ledger || !onlineClubs) return [];
     
-        const balances: { [key: string]: number } = {};
+        const balances: { [key: string]: { balance: number; currency: string; } } = {};
     
         onlineClubs.forEach(club => {
             if(club.name) {
-                balances[club.name] = 0;
+                balances[club.name] = { balance: 0, currency: club.currency || '₹' };
             }
         });
     
         ledger.forEach(entry => {
             if (entry.onlineClubName) {
                 if (balances[entry.onlineClubName] === undefined) {
-                    balances[entry.onlineClubName] = 0;
+                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubs.find(c => c.name === entry.onlineClubName)?.currency || '₹' };
                 }
-                balances[entry.onlineClubName] += entry.amount;
+                balances[entry.onlineClubName].balance += entry.amount;
             }
         });
     
-        return Object.entries(balances).map(([name, balance]) => ({ name, balance })).sort((a,b) => a.name.localeCompare(b.name));
+        return Object.entries(balances).map(([name, data]) => ({ name, ...data })).sort((a,b) => a.name.localeCompare(b.name));
     }, [ledger, onlineClubs]);
 
     const filteredLedger = useMemo(() => {
@@ -822,7 +822,7 @@ const LedgerDialog: FC<{
                             <div key={clubBalance.name} className="p-2 rounded-lg border">
                                 <p className="text-xs text-muted-foreground">{clubBalance.name}</p>
                                 <p className={`text-lg font-bold ${clubBalance.balance >= 0 ? '' : 'text-red-500'}`}>
-                                    ₹{clubBalance.balance.toFixed(0)}
+                                    {clubBalance.currency}{clubBalance.balance.toFixed(0)}
                                 </p>
                             </div>
                         ))}
@@ -859,14 +859,16 @@ const LedgerDialog: FC<{
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredLedger.map(entry => (
+                                    {filteredLedger.map(entry => {
+                                        const currencySymbol = (entry.onlineClubName && onlineClubs.find(c => c.name === entry.onlineClubName)?.currency) || '₹';
+                                        return (
                                         <TableRow key={entry.id}>
                                             <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell className="capitalize">{entry.type}</TableCell>
                                             <TableCell>{entry.onlineClubName || '-'}</TableCell>
                                             <TableCell>{entry.notes}</TableCell>
                                             <TableCell className={`text-right font-mono ${entry.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                {entry.amount >= 0 ? '+' : ''}₹{entry.amount.toFixed(0)}
+                                                {entry.amount >= 0 ? '+' : ''}{currencySymbol}{Math.abs(entry.amount).toFixed(0)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {entry.type !== 'p/l' && (
@@ -879,7 +881,7 @@ const LedgerDialog: FC<{
                                                             <AlertDialogContent>
                                                                 <AlertDialogHeader>
                                                                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                                    <AlertDialogDescription>This will permanently delete this {entry.type} of ₹{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
+                                                                    <AlertDialogDescription>This will permanently delete this {entry.type} of {currencySymbol}{Math.abs(entry.amount).toFixed(0)}. This action cannot be undone.</AlertDialogDescription>
                                                                 </AlertDialogHeader>
                                                                 <AlertDialogFooter>
                                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -891,7 +893,7 @@ const LedgerDialog: FC<{
                                                 )}
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )})}
                                     {filteredLedger.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">No transactions for this view.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
@@ -1256,6 +1258,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
