@@ -121,7 +121,9 @@ const RecordPlayerPLCard: FC<{
         }
     };
     
-    const selectedAccount = accounts.find(acc => acc.id === selectedAccountId);
+    const selectedAccount = useMemo(() => 
+        accounts.find(acc => acc.id === selectedAccountId)
+    , [selectedAccountId, accounts]);
 
     const availableOnlineClubs = useMemo(() => {
         if (!selectedAccount) return [];
@@ -1244,3 +1246,4 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
