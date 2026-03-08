@@ -266,9 +266,9 @@ const AdminOnlineClubPage: FC = () => {
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
         allOnlineClubs.forEach(club => {
-            if (club.name.toLowerCase() === 'phoenix') {
+            if (club.name && club.name.toLowerCase() === 'phoenix') {
                 map.set(club.name, 'Rs.');
-            } else {
+            } else if (club.name) {
                 map.set(club.name, club.currency || '₹');
             }
         });
@@ -1131,7 +1131,7 @@ const LedgerDialog: FC<{
     const currencyForLedger = useMemo(() => {
         if (activeTab === 'all') return '₹'; // Default for all tab
         const club = onlineClubs.find(oc => oc.name === activeTab);
-        if (club?.name.toLowerCase() === 'phoenix') return 'Rs.';
+        if (club?.name?.toLowerCase() === 'phoenix') return 'Rs.';
         return club?.currency || '₹';
     }, [activeTab, onlineClubs]);
 
@@ -1704,7 +1704,7 @@ const AdminWeeklyLedgerAccordion: FC<{
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => onDeleteEntry(accountId, entry.id)}>Delete</AlertDialogAction>
+                                                            <AlertDialogAction onClick={() => onDeleteTransaction(accountId, entry.id)}>Delete</AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
                                                 </AlertDialog>
@@ -1731,15 +1731,3 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
-
-
-
-
-
-
-
-
-
-
-
-
