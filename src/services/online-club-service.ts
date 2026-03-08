@@ -266,6 +266,23 @@ export async function deleteOnlinePlayerAccount(accountId: string): Promise<void
     await batch.commit();
 }
 
+export async function deleteMultipleOnlinePlayerAccounts(accountIds: string[]): Promise<void> {
+    const batch = writeBatch(db);
+
+    for (const accountId of accountIds) {
+        const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+        batch.delete(accountRef);
+
+        const ledgerQuery = query(collection(db, ONLINE_LEDGER_COLLECTION), where("accountId", "==", accountId));
+        const ledgerSnapshot = await getDocs(ledgerQuery);
+        ledgerSnapshot.forEach(ledgerDoc => {
+            batch.delete(ledgerDoc.ref);
+        });
+    }
+
+    await batch.commit();
+}
+
 export async function deleteAllOnlineDataForClub(clubId: string): Promise<void> {
     const batch = writeBatch(db);
 

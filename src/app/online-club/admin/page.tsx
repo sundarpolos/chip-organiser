@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries, addProfitLoss } from '@/services/online-club-service';
+import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries, addProfitLoss, deleteMultipleOnlinePlayerAccounts } from '@/services/online-club-service';
 import { getClubs, getClub } from '@/services/club-service';
 import { getMasterPlayers } from '@/services/player-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club, OnlineClub } from '@/lib/types';
@@ -32,6 +32,7 @@ import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -250,6 +251,11 @@ const AdminOnlineClubPage: FC = () => {
 
     const [playerToDelete, setPlayerToDelete] = useState<OnlinePlayerAccount | null>(null);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    
+    const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+    const [isBulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
 
     const [isReportModalOpen, setReportModalOpen] = useState(false);
     const [reportContext, setReportContext] = useState<{ account: OnlinePlayerAccount; onlineClub: OnlineClub; } | null>(null);
@@ -366,6 +372,36 @@ const AdminOnlineClubPage: FC = () => {
             })
             .filter(acc => acc.playerName.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [accountsWithClubBalances, selectedClubId, searchTerm]);
+    
+    const handleSelectAccount = (accountId: string, isSelected: boolean) => {
+        setSelectedAccountIds(prev =>
+            isSelected ? [...prev, accountId] : prev.filter(id => id !== accountId)
+        );
+    };
+
+    const handleSelectAllAccounts = (isSelected: boolean) => {
+        if (isSelected) {
+            setSelectedAccountIds(filteredAccounts.map(acc => acc.id));
+        } else {
+            setSelectedAccountIds([]);
+        }
+    };
+
+    const handleConfirmBulkDelete = async (accountIds: string[]) => {
+        setIsDeleting(true);
+        try {
+            await deleteMultipleOnlinePlayerAccounts(accountIds);
+            toast({ title: 'Accounts Deleted', description: `${accountIds.length} accounts have been successfully removed.` });
+            setSelectedAccountIds([]);
+            await refreshData();
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Could not delete selected accounts.";
+            toast({ variant: 'destructive', title: 'Bulk Deletion Failed', description: msg });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
 
     const handleOpenTransaction = (account: OnlinePlayerAccount, type: 'deposit' | 'withdrawal') => {
         setSelectedAccount(account);
@@ -722,6 +758,12 @@ const AdminOnlineClubPage: FC = () => {
                             <CardTitle className="flex items-center gap-2"><Landmark /> Online Club Admin</CardTitle>
                             <CardDescription>View balances and manage deposits/withdrawals for all players.</CardDescription>
                         </div>
+                         {selectedAccountIds.length > 0 && (
+                            <Button variant="destructive" onClick={() => setBulkDeleteModalOpen(true)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Selected ({selectedAccountIds.length})
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -748,6 +790,13 @@ const AdminOnlineClubPage: FC = () => {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="px-2 w-12">
+                                    <Checkbox
+                                        checked={filteredAccounts.length > 0 && selectedAccountIds.length === filteredAccounts.length}
+                                        onCheckedChange={(checked) => handleSelectAllAccounts(!!checked)}
+                                        aria-label="Select all accounts"
+                                    />
+                                </TableHead>
                                 <TableHead>Player</TableHead>
                                 <TableHead>Club</TableHead>
                                 <TableHead className="text-right">Club Balances</TableHead>
@@ -757,6 +806,13 @@ const AdminOnlineClubPage: FC = () => {
                         <TableBody>
                             {filteredAccounts.map(account => (
                                 <TableRow key={account.id}>
+                                    <TableCell className="px-2">
+                                        <Checkbox
+                                            checked={selectedAccountIds.includes(account.id)}
+                                            onCheckedChange={(checked) => handleSelectAccount(account.id, !!checked)}
+                                            aria-label={`Select account for ${account.playerName}`}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{account.playerName}</TableCell>
                                     <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>
                                     <TableCell className="text-right">
@@ -775,6 +831,9 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
+                                        <Button size="icon" variant="outline" onClick={() => handleExportPdf(account)} disabled={isExporting}>
+                                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileDown className="h-4 w-4" />}
+                                        </Button>
                                         <Button size="icon" variant="destructive" onClick={() => {
                                             setPlayerToDelete(account);
                                             setDeleteModalOpen(true);
@@ -788,6 +847,14 @@ const AdminOnlineClubPage: FC = () => {
                     </Table>
                 </CardContent>
             </Card>
+            
+             <BulkDeleteAccountDialog
+                isOpen={isBulkDeleteModalOpen}
+                onOpenChange={setBulkDeleteModalOpen}
+                accountsToDelete={accounts.filter(acc => selectedAccountIds.includes(acc.id))}
+                onConfirmDelete={handleConfirmBulkDelete}
+                toast={toast}
+            />
 
             {selectedAccount && (
                 <>
@@ -864,6 +931,110 @@ const AdminOnlineClubPage: FC = () => {
         </div>
     );
 };
+
+const BulkDeleteAccountDialog: FC<{
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    accountsToDelete: OnlinePlayerAccount[];
+    onConfirmDelete: (accountIds: string[]) => void;
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast }) => {
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSending(false);
+            setIsDeleting(false);
+        }
+    }, [isOpen]);
+
+    const handleSendOtp = async () => {
+        setIsSending(true);
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: `${accountsToDelete.length} players`,
+                clubName: 'account(s)',
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: "OTP Sent", description: "An OTP has been sent to the Super Admin's WhatsApp." });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleDelete = () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The entered code is incorrect.' });
+            return;
+        }
+        setIsDeleting(true);
+        onConfirmDelete(accountsToDelete.map(a => a.id));
+        setIsDeleting(false);
+        onOpenChange(false);
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete {accountsToDelete.length} Online Accounts?</DialogTitle>
+                    <DialogDescription>
+                        This will permanently delete the online accounts and all transaction history for the selected players. An OTP is required to confirm.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <ScrollArea className="max-h-40 my-4 border rounded-md p-2">
+                    <p className="text-sm font-medium">Players to be deleted:</p>
+                    <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {accountsToDelete.map(acc => <li key={acc.id}>{acc.playerName}</li>)}
+                    </ul>
+                </ScrollArea>
+
+                {isOtpSent ? (
+                    <div className="py-4 space-y-2">
+                        <Label htmlFor="delete-otp">Super Admin OTP</Label>
+                        <Input
+                            id="delete-otp"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value)}
+                            placeholder="4-digit code"
+                        />
+                    </div>
+                ) : null}
+
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    {!isOtpSent ? (
+                        <Button variant="destructive" onClick={handleSendOtp} disabled={isSending}>
+                            {isSending ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send Deletion OTP
+                        </Button>
+                    ) : (
+                         <Button variant="destructive" onClick={handleDelete} disabled={isDeleting || !otp}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete Accounts
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 const DeleteAccountDialog: FC<{
     isOpen: boolean;
