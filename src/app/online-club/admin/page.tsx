@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save, ChevronsUpDown, Check, MessageSquare, Send, Copy, Shield } from 'lucide-react';
+import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save, ChevronsUpDown, Check, MessageSquare, Send, Copy, Shield, FileDown } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +28,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandInput, CommandEmpty, CommandItem, CommandList } from '@/components/ui/command';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { sendWhatsappMessage } from '@/ai/flows/send-whatsapp-message';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -219,6 +221,7 @@ const AdminOnlineClubPage: FC = () => {
     const [allOnlineClubs, setAllOnlineClubs] = useState<OnlineClub[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [allLedgerEntries, setAllLedgerEntries] = useState<OnlineLedgerEntry[]>([]);
+    const [isExporting, setIsExporting] = useState(false);
     
     // Filtering and Dialog states
     const [selectedClubId, setSelectedClubId] = useState<string>('all');
@@ -389,6 +392,160 @@ const AdminOnlineClubPage: FC = () => {
         setReportModalOpen(true);
     };
 
+    const handleExportPdf = async (account: OnlinePlayerAccount & { clubBalances: Record<string, number> }) => {
+        if (!account) {
+            toast({
+                variant: "destructive",
+                title: "Export Error",
+                description: "There is no account data to export.",
+            });
+            return;
+        }
+
+        setIsExporting(true);
+        try {
+            const doc = new jsPDF('p', 'pt', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            let yPos = 60;
+
+            const FONT_PRIMARY = '#0a0a0a';
+            const FONT_MUTED = '#737373';
+            const POSITIVE_COLOR = '#16a34a';
+            const NEGATIVE_COLOR = '#dc2626';
+
+            const addPageFooter = () => {
+                const pageCount = (doc as any).internal.getNumberOfPages();
+                doc.setFontSize(8);
+                doc.setTextColor(FONT_MUTED);
+                for (let i = 1; i <= pageCount; i++) {
+                    doc.setPage(i);
+                    doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 40, doc.internal.pageSize.getHeight() - 20);
+                    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 60, doc.internal.pageSize.getHeight() - 20);
+                }
+            };
+            
+            // --- HEADER ---
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(24);
+            doc.setTextColor(FONT_PRIMARY);
+            doc.text('SETTLEMENT LEDGER', 40, yPos);
+            yPos += 40;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(FONT_MUTED);
+            doc.text('PLAYER', 40, yPos);
+            yPos += 15;
+            doc.setFontSize(18);
+            doc.setTextColor(FONT_PRIMARY);
+            doc.text(account.playerName, 40, yPos);
+
+            // --- BALANCE BADGES ---
+            let currentX = pageWidth - 40;
+            Object.entries(account.clubBalances).slice().reverse().forEach(([clubName, balance]) => {
+                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                const text = `${clubName}: ${currencySymbol}${balance.toFixed(0)}`;
+                const textWidth = doc.getTextWidth(text);
+                const badgeWidth = textWidth + 20;
+
+                currentX -= (badgeWidth + 10);
+                doc.setFillColor(241, 245, 249);
+                doc.roundedRect(currentX, yPos - 18, badgeWidth, 24, 8, 8, 'F');
+                
+                doc.setFontSize(10);
+                doc.setTextColor(FONT_MUTED);
+                doc.text(text, currentX + 10, yPos - 4);
+            });
+            yPos += 40;
+
+            const playerLedger = allLedgerEntries.filter(e => e.accountId === account.id);
+            // --- CLUB SECTIONS ---
+            const clubsWithTransactions = Array.from(new Set(playerLedger.map(entry => entry.onlineClubName).filter(Boolean)));
+            
+            for (const clubName of clubsWithTransactions) {
+                if (yPos > doc.internal.pageSize.getHeight() - 250) {
+                    doc.addPage();
+                    yPos = 60;
+                }
+
+                const clubEntries = playerLedger.filter(entry => entry.onlineClubName === clubName);
+                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+
+                const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+                const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+                const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+                const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text(clubName, 40, yPos);
+                yPos += 30;
+
+                // --- STATS SUMMARY ---
+                const statXPositions = [40, 160, 280, 400];
+                doc.setFontSize(9);
+                doc.setTextColor(FONT_MUTED);
+                doc.text('PROFIT', statXPositions[0], yPos);
+                doc.text('LOSS', statXPositions[1], yPos);
+                doc.text('DEPOSITS', statXPositions[2], yPos);
+                doc.text('WITHDRAWALS', statXPositions[3], yPos);
+                yPos += 15;
+
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                
+                doc.setTextColor(POSITIVE_COLOR);
+                doc.text(`${currencySymbol} ${profit.toFixed(0)}`, statXPositions[0], yPos);
+                doc.setTextColor(NEGATIVE_COLOR);
+                doc.text(`${currencySymbol} ${Math.abs(loss).toFixed(0)}`, statXPositions[1], yPos);
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text(`${currencySymbol} ${deposits.toFixed(0)}`, statXPositions[2], yPos);
+                doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
+                
+                yPos += 20;
+
+                // --- TRANSACTIONS TABLE ---
+                (doc as any).autoTable({
+                    startY: yPos,
+                    head: [['Date', 'Type', 'Amount']],
+                    body: clubEntries.map(entry => [
+                        format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                        entry.type.toUpperCase(),
+                        `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
+                    ]),
+                    theme: 'plain',
+                    styles: { font: 'helvetica', fontSize: 10, cellPadding: { top: 6, bottom: 6 } },
+                    headStyles: { textColor: FONT_MUTED, fontStyle: 'normal' },
+                    columnStyles: { 2: { halign: 'right' } },
+                    didParseCell: (data: any) => {
+                        if (data.column.index === 2 && data.cell.section === 'body') {
+                           const value = clubEntries[data.row.index].amount;
+                           data.cell.styles.textColor = value >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
+                        }
+                    },
+                    didDrawPage: (data: any) => {
+                        yPos = data.cursor.y;
+                    }
+                });
+                yPos = (doc as any).lastAutoTable.finalY + 20;
+            }
+            
+            addPageFooter();
+
+            const filename = `settlement-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+            doc.save(filename);
+            toast({ title: 'PDF Exported', description: 'The player settlement ledger has been downloaded.' });
+
+        } catch (error) {
+            console.error("Could not export PDF:", error);
+            toast({ variant: "destructive", title: "Export Failed", description: "An error occurred while generating the PDF." });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+
     if (isLoading) {
         return <div className="flex h-64 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin" /></div>;
     }
@@ -460,6 +617,9 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
+                                        <Button size="icon" variant="outline" onClick={() => handleExportPdf(account)} disabled={isExporting}>
+                                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileDown className="h-4 w-4" />}
+                                        </Button>
                                         <Button size="icon" variant="destructive" onClick={() => {
                                             setPlayerToDelete(account);
                                             setDeleteModalOpen(true);
@@ -1258,6 +1418,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
