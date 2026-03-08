@@ -392,7 +392,7 @@ const AdminOnlineClubPage: FC = () => {
         setReportModalOpen(true);
     };
 
-    const handleExportPdf = async (account: OnlinePlayerAccount & { clubBalances: Record<string, number> }) => {
+    const handleExportPdf = async (account: OnlinePlayerAccount) => {
         if (!account) {
             toast({
                 variant: "destructive",
@@ -401,18 +401,37 @@ const AdminOnlineClubPage: FC = () => {
             });
             return;
         }
-
+    
         setIsExporting(true);
+    
+        // Re-deriving data inside the function to match the method of the player-facing page.
+        const ledger = allLedgerEntries.filter(e => e.accountId === account.id);
+        
+        const clubBalances: Record<string, number> = {};
+        ledger.forEach(entry => {
+            if (entry.onlineClubName) {
+                if (!clubBalances[entry.onlineClubName]) {
+                    clubBalances[entry.onlineClubName] = 0;
+                }
+                clubBalances[entry.onlineClubName] += entry.amount;
+            }
+        });
+        const balanceByClub = Object.entries(clubBalances).map(([name, balance]) => ({
+            name,
+            balance,
+            currency: onlineClubCurrencyMap.get(name) || '₹',
+        })).sort((a,b) => a.name.localeCompare(b.name));
+    
         try {
             const doc = new jsPDF('p', 'pt', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             let yPos = 60;
-
+    
             const FONT_PRIMARY = '#0a0a0a';
             const FONT_MUTED = '#737373';
             const POSITIVE_COLOR = '#16a34a';
             const NEGATIVE_COLOR = '#dc2626';
-
+    
             const addPageFooter = () => {
                 const pageCount = (doc as any).internal.getNumberOfPages();
                 doc.setFontSize(8);
@@ -430,7 +449,7 @@ const AdminOnlineClubPage: FC = () => {
             doc.setTextColor(FONT_PRIMARY);
             doc.text('SETTLEMENT LEDGER', 40, yPos);
             yPos += 40;
-
+    
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
             doc.setTextColor(FONT_MUTED);
@@ -439,15 +458,15 @@ const AdminOnlineClubPage: FC = () => {
             doc.setFontSize(18);
             doc.setTextColor(FONT_PRIMARY);
             doc.text(account.playerName, 40, yPos);
-
+    
             // --- BALANCE BADGES ---
             let currentX = pageWidth - 40;
-            Object.entries(account.clubBalances).slice().reverse().forEach(([clubName, balance]) => {
-                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
-                const text = `${clubName}: ${currencySymbol}${balance.toFixed(0)}`;
+            balanceByClub.slice().reverse().forEach(clubBalance => {
+                const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                 const textWidth = doc.getTextWidth(text);
                 const badgeWidth = textWidth + 20;
-
+    
                 currentX -= (badgeWidth + 10);
                 doc.setFillColor(241, 245, 249);
                 doc.roundedRect(currentX, yPos - 18, badgeWidth, 24, 8, 8, 'F');
@@ -457,31 +476,30 @@ const AdminOnlineClubPage: FC = () => {
                 doc.text(text, currentX + 10, yPos - 4);
             });
             yPos += 40;
-
-            const playerLedger = allLedgerEntries.filter(e => e.accountId === account.id);
+    
             // --- CLUB SECTIONS ---
-            const clubsWithTransactions = Array.from(new Set(playerLedger.map(entry => entry.onlineClubName).filter(Boolean)));
+            const clubsWithTransactions = Array.from(new Set(ledger.map(entry => entry.onlineClubName).filter(Boolean)));
             
             for (const clubName of clubsWithTransactions) {
                 if (yPos > doc.internal.pageSize.getHeight() - 250) {
                     doc.addPage();
                     yPos = 60;
                 }
-
-                const clubEntries = playerLedger.filter(entry => entry.onlineClubName === clubName);
+    
+                const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
                 const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
-
+    
                 const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
                 const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
                 const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
                 const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
-
+    
                 doc.setFontSize(16);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(FONT_PRIMARY);
                 doc.text(clubName, 40, yPos);
                 yPos += 30;
-
+    
                 // --- STATS SUMMARY ---
                 const statXPositions = [40, 160, 280, 400];
                 doc.setFontSize(9);
@@ -491,7 +509,7 @@ const AdminOnlineClubPage: FC = () => {
                 doc.text('DEPOSITS', statXPositions[2], yPos);
                 doc.text('WITHDRAWALS', statXPositions[3], yPos);
                 yPos += 15;
-
+    
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
                 
@@ -504,7 +522,7 @@ const AdminOnlineClubPage: FC = () => {
                 doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
                 
                 yPos += 20;
-
+    
                 // --- TRANSACTIONS TABLE ---
                 (doc as any).autoTable({
                     startY: yPos,
@@ -532,11 +550,11 @@ const AdminOnlineClubPage: FC = () => {
             }
             
             addPageFooter();
-
+    
             const filename = `settlement-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
             doc.save(filename);
             toast({ title: 'PDF Exported', description: 'The player settlement ledger has been downloaded.' });
-
+    
         } catch (error) {
             console.error("Could not export PDF:", error);
             toast({ variant: "destructive", title: "Export Failed", description: "An error occurred while generating the PDF." });
@@ -1418,6 +1436,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
