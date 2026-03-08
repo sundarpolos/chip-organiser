@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getOnlinePlayerAccounts, getOnlineLedgerEntries, recordTransaction, deleteAllOnlineDataForClub, deleteOnlinePlayerAccount, updateTransaction, deleteTransaction, getOnlineClubs, getAllOnlineLedgerEntries, addProfitLoss } from '@/services/online-club-service';
 import { getClubs, getClub } from '@/services/club-service';
+import { getMasterPlayers } from '@/services/player-service';
 import type { MasterPlayer, OnlinePlayerAccount, OnlineLedgerEntry, Club, OnlineClub } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -299,6 +300,7 @@ const AdminOnlineClubPage: FC = () => {
         try {
             const [playerAccounts, masterPlayers, clubs, onlineClubs, allEntries] = await Promise.all([
                 getOnlinePlayerAccounts(),
+                getMasterPlayers(),
                 getClubs(),
                 getOnlineClubs(),
                 getAllOnlineLedgerEntries(),
@@ -335,7 +337,7 @@ const AdminOnlineClubPage: FC = () => {
     }, [currentUser]);
 
     const accountsWithClubBalances = useMemo(() => {
-        if (!accounts.length) return [];
+        if (!accounts.length || !allLedgerEntries) return [];
         
         return accounts.map(account => {
             const playerEntries = allLedgerEntries.filter(e => e.accountId === account.id);
