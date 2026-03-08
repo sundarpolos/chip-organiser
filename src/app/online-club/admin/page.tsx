@@ -315,23 +315,11 @@ const AdminOnlineClubPage: FC = () => {
                 getAllOnlineLedgerEntries(),
             ]);
 
-            // Synthesize accounts for master players who don't have one yet.
-            const existingAccountIds = new Set(playerAccounts.map(a => a.id));
-            const missingPlayers = masterPlayers.filter(p => !existingAccountIds.has(p.id));
-            const synthesizedAccounts: OnlinePlayerAccount[] = missingPlayers.map(p => ({
-                id: p.id,
-                playerId: p.id,
-                playerName: p.name,
-                clubId: p.clubId,
-                balance: 0,
-                lastUpdated: new Date().toISOString()
-            }));
-
             setAllPlayers(masterPlayers);
-            setAccounts([...playerAccounts, ...synthesizedAccounts]);
+            setAccounts(playerAccounts);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
-            setAllLedgerEntries(allEntries || []);
+            setAllLedgerEntries(allEntries);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -346,7 +334,7 @@ const AdminOnlineClubPage: FC = () => {
     }, [currentUser]);
 
     const accountsWithClubBalances = useMemo(() => {
-        if (!accounts.length || !allLedgerEntries) return [];
+        if (!accounts.length || !allLedgerEntries.length) return accounts.map(acc => ({...acc, clubBalances: {}}));
         
         return accounts.map(account => {
             const playerEntries = allLedgerEntries.filter(e => e.accountId === account.id);
@@ -442,17 +430,9 @@ const AdminOnlineClubPage: FC = () => {
     };
     
     const handleDeletePlayerAccount = async (accountId: string, playerName: string) => {
-        setIsDeletingPlayer(true);
-        try {
-            await deleteOnlinePlayerAccount(accountId);
-            toast({ title: "Account Deleted", description: `The account for ${playerName} has been deleted.` });
-            await refreshData();
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : "Could not delete player account.";
-            toast({ variant: 'destructive', title: 'Deletion Failed', description: msg });
-        } finally {
-            setIsDeletingPlayer(false);
-        }
+        await deleteOnlinePlayerAccount(accountId);
+        toast({ title: "Account Deleted", description: `The account for ${playerName} has been deleted.` });
+        await refreshData();
     };
 
     const handleOpenReportModal = (account: OnlinePlayerAccount, onlineClub: OnlineClub) => {

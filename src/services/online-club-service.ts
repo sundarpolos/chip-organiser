@@ -216,7 +216,24 @@ async function recalculateAccountBalance(accountId: string): Promise<void> {
     }
 
     const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-    batch.update(accountRef, { balance: currentBalance, lastUpdated: new Date().toISOString() });
+    const playerDoc = await getDoc(doc(db, "masterPlayers", accountId));
+    
+    if (!playerDoc.exists()) {
+        console.error(`Cannot recalculate balance: MasterPlayer with ID ${accountId} not found.`);
+        return;
+    }
+    const playerData = playerDoc.data() as MasterPlayer;
+
+    const accountData = {
+        balance: currentBalance,
+        lastUpdated: new Date().toISOString(),
+        playerId: accountId,
+        playerName: playerData.name,
+        clubId: playerData.clubId,
+    };
+    
+    // Use set with merge to create or update the account doc.
+    batch.set(accountRef, accountData, { merge: true });
     
     await batch.commit();
 }
