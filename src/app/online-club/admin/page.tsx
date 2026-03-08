@@ -272,13 +272,15 @@ const AdminOnlineClubPage: FC = () => {
 
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
-        allOnlineClubs.forEach(club => {
-            if (club.name && club.name.toLowerCase() === 'phoenix') {
-                map.set(club.name, 'Rs.');
-            } else if (club.name) {
-                map.set(club.name, club.currency || '₹');
-            }
-        });
+        if (allOnlineClubs) {
+            allOnlineClubs.forEach(club => {
+                if (club.name && club.name.toLowerCase() === 'phoenix') {
+                    map.set(club.name, 'Rs.');
+                } else if (club.name) {
+                    map.set(club.name, club.currency || '₹');
+                }
+            });
+        }
         return map;
     }, [allOnlineClubs]);
 
@@ -328,7 +330,7 @@ const AdminOnlineClubPage: FC = () => {
             setAccounts([...playerAccounts, ...synthesizedAccounts]);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
-            setAllLedgerEntries(allEntries);
+            setAllLedgerEntries(allEntries || []);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -831,9 +833,6 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
-                                        <Button size="icon" variant="outline" onClick={() => handleExportPdf(account)} disabled={isExporting}>
-                                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileDown className="h-4 w-4" />}
-                                        </Button>
                                         <Button size="icon" variant="destructive" onClick={() => {
                                             setPlayerToDelete(account);
                                             setDeleteModalOpen(true);
@@ -939,51 +938,12 @@ const BulkDeleteAccountDialog: FC<{
     onConfirmDelete: (accountIds: string[]) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast }) => {
-    const [otp, setOtp] = useState('');
-    const [sentOtp, setSentOtp] = useState('');
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [isSending, setIsSending] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        if (!isOpen) {
-            setOtp('');
-            setSentOtp('');
-            setIsOtpSent(false);
-            setIsSending(false);
-            setIsDeleting(false);
-        }
-    }, [isOpen]);
-
-    const handleSendOtp = async () => {
-        setIsSending(true);
-        try {
-            const result = await sendDeleteOnlineAccountOtp({
-                playerName: `${accountsToDelete.length} players`,
-                clubName: 'account(s)',
-            });
-            if (result.success && result.otp) {
-                setSentOtp(result.otp);
-                setIsOtpSent(true);
-                toast({ title: "OTP Sent", description: "An OTP has been sent to the Super Admin's WhatsApp." });
-            } else {
-                throw new Error(result.error || 'Failed to send OTP.');
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
-        } finally {
-            setIsSending(false);
-        }
-    };
-
     const handleDelete = () => {
-        if (otp !== sentOtp) {
-            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The entered code is incorrect.' });
-            return;
-        }
         setIsDeleting(true);
         onConfirmDelete(accountsToDelete.map(a => a.id));
-        setIsDeleting(false);
+        setIsDeleting(false); // This might happen before the parent state updates, but it's fine.
         onOpenChange(false);
     };
     
@@ -993,7 +953,7 @@ const BulkDeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {accountsToDelete.length} Online Accounts?</DialogTitle>
                     <DialogDescription>
-                        This will permanently delete the online accounts and all transaction history for the selected players. An OTP is required to confirm.
+                        This will permanently delete the online accounts and all transaction history for the selected players. This action cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1004,31 +964,12 @@ const BulkDeleteAccountDialog: FC<{
                     </ul>
                 </ScrollArea>
 
-                {isOtpSent ? (
-                    <div className="py-4 space-y-2">
-                        <Label htmlFor="delete-otp">Super Admin OTP</Label>
-                        <Input
-                            id="delete-otp"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
-                            placeholder="4-digit code"
-                        />
-                    </div>
-                ) : null}
-
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    {!isOtpSent ? (
-                        <Button variant="destructive" onClick={handleSendOtp} disabled={isSending}>
-                            {isSending ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Send Deletion OTP
-                        </Button>
-                    ) : (
-                         <Button variant="destructive" onClick={handleDelete} disabled={isDeleting || !otp}>
-                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Confirm & Delete Accounts
-                        </Button>
-                    )}
+                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                        Confirm & Delete Accounts
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1044,49 +985,9 @@ const DeleteAccountDialog: FC<{
     onConfirmDelete: (accountId: string, playerName: string) => void;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
-    const [otp, setOtp] = useState('');
-    const [sentOtp, setSentOtp] = useState('');
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [isSending, setIsSending] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        if (!isOpen) {
-            // Reset state on close
-            setOtp('');
-            setSentOtp('');
-            setIsOtpSent(false);
-            setIsSending(false);
-            setIsDeleting(false);
-        }
-    }, [isOpen]);
-
-    const handleSendOtp = async () => {
-        setIsSending(true);
-        try {
-            const result = await sendDeleteOnlineAccountOtp({
-                playerName: account.playerName,
-                clubName: clubName,
-            });
-            if (result.success && result.otp) {
-                setSentOtp(result.otp);
-                setIsOtpSent(true);
-                toast({ title: "OTP Sent", description: "An OTP has been sent to the Super Admin's WhatsApp." });
-            } else {
-                throw new Error(result.error || 'Failed to send OTP.');
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
-        } finally {
-            setIsSending(false);
-        }
-    };
-
     const handleDelete = () => {
-        if (otp !== sentOtp) {
-            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The entered code is incorrect.' });
-            return;
-        }
         setIsDeleting(true);
         onConfirmDelete(account.id, account.playerName);
         setIsDeleting(false);
@@ -1099,38 +1000,15 @@ const DeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {account.playerName}'s Online Account?</DialogTitle>
                     <DialogDescription>
-                        {isOtpSent 
-                            ? "Enter the OTP sent to the Super Admin to confirm deletion."
-                            : "This will permanently delete the online account and all associated transaction history. An OTP will be sent to the Super Admin to confirm this critical action."
-                        }
+                        This action cannot be undone. This will permanently delete the online account and all associated transaction history.
                     </DialogDescription>
                 </DialogHeader>
-
-                {isOtpSent ? (
-                    <div className="py-4 space-y-2">
-                        <Label htmlFor="delete-otp">Super Admin OTP</Label>
-                        <Input
-                            id="delete-otp"
-                            value={otp}
-                            onChange={(e) => setOtp(e.target.value)}
-                            placeholder="4-digit code"
-                        />
-                    </div>
-                ) : null}
-
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    {!isOtpSent ? (
-                        <Button variant="destructive" onClick={handleSendOtp} disabled={isSending}>
-                            {isSending ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Send Deletion OTP
-                        </Button>
-                    ) : (
-                         <Button variant="destructive" onClick={handleDelete} disabled={isDeleting || !otp}>
-                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Confirm & Delete Account
-                        </Button>
-                    )}
+                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                        Confirm & Delete Account
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
