@@ -254,7 +254,11 @@ const AdminOnlineClubPage: FC = () => {
     const onlineClubCurrencyMap = useMemo(() => {
         const map = new Map<string, string>();
         allOnlineClubs.forEach(club => {
-            map.set(club.name, club.currency || '₹');
+            if (club.name.toLowerCase() === 'phoenix') {
+                map.set(club.name, 'Rs.');
+            } else {
+                map.set(club.name, club.currency || '₹');
+            }
         });
         return map;
     }, [allOnlineClubs]);
@@ -960,14 +964,17 @@ const LedgerDialog: FC<{
     
         onlineClubs.forEach(club => {
             if(club.name) {
-                balances[club.name] = { balance: 0, currency: club.currency || '₹' };
+                const currency = club.name.toLowerCase() === 'phoenix' ? 'Rs.' : (club.currency || '₹');
+                balances[club.name] = { balance: 0, currency };
             }
         });
     
         ledger.forEach(entry => {
             if (entry.onlineClubName) {
                 if (balances[entry.onlineClubName] === undefined) {
-                    balances[entry.onlineClubName] = { balance: 0, currency: onlineClubs.find(c => c.name === entry.onlineClubName)?.currency || '₹' };
+                    const club = onlineClubs.find(c => c.name === entry.onlineClubName);
+                    const currency = club?.name?.toLowerCase() === 'phoenix' ? 'Rs.' : (club?.currency || '₹');
+                    balances[entry.onlineClubName] = { balance: 0, currency };
                 }
                 balances[entry.onlineClubName].balance += entry.amount;
             }
@@ -1039,7 +1046,8 @@ const LedgerDialog: FC<{
                                 </TableHeader>
                                 <TableBody>
                                     {filteredLedger.map(entry => {
-                                        const currencySymbol = (entry.onlineClubName && onlineClubs.find(c => c.name === entry.onlineClubName)?.currency) || '₹';
+                                        const clubForEntry = entry.onlineClubName ? onlineClubs.find(c => c.name === entry.onlineClubName) : null;
+                                        const currencySymbol = clubForEntry?.name?.toLowerCase() === 'phoenix' ? 'Rs.' : (clubForEntry?.currency || '₹');
                                         return (
                                         <TableRow key={entry.id}>
                                             <TableCell>{format(parseISO(entry.date), 'dd/MM/yyyy')}</TableCell>
@@ -1441,6 +1449,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
