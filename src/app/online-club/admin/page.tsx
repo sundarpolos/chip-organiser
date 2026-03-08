@@ -145,12 +145,14 @@ const RecordPlayerPLCard: FC<{
     const availableOnlineClubs = useMemo(() => {
         if (!selectedAccount) return [];
         
-        return onlineClubs.filter(oc => {
+        const eligibleClubs = onlineClubs.filter(oc => {
             if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
                 return true;
             }
             return oc.eligiblePlayerIds.includes(selectedAccount.id);
         });
+        
+        return eligibleClubs.length > 0 ? eligibleClubs : onlineClubs;
     }, [selectedAccount, onlineClubs]);
     
     // reset online club if player changes and it's no longer valid
@@ -254,7 +256,6 @@ const AdminOnlineClubPage: FC = () => {
     
     const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
     const [isBulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
 
 
     const [isReportModalOpen, setReportModalOpen] = useState(false);
@@ -390,7 +391,6 @@ const AdminOnlineClubPage: FC = () => {
     };
 
     const handleConfirmBulkDelete = async (accountIds: string[]) => {
-        setIsDeleting(true);
         try {
             await deleteMultipleOnlinePlayerAccounts(accountIds);
             toast({ title: 'Accounts Deleted', description: `${accountIds.length} accounts have been successfully removed.` });
@@ -399,8 +399,6 @@ const AdminOnlineClubPage: FC = () => {
         } catch (error) {
             const msg = error instanceof Error ? error.message : "Could not delete selected accounts.";
             toast({ variant: 'destructive', title: 'Bulk Deletion Failed', description: msg });
-        } finally {
-            setIsDeleting(false);
         }
     };
 
@@ -935,16 +933,19 @@ const BulkDeleteAccountDialog: FC<{
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     accountsToDelete: OnlinePlayerAccount[];
-    onConfirmDelete: (accountIds: string[]) => void;
+    onConfirmDelete: (accountIds: string[]) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast }) => {
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         setIsDeleting(true);
-        onConfirmDelete(accountsToDelete.map(a => a.id));
-        setIsDeleting(false); // This might happen before the parent state updates, but it's fine.
-        onOpenChange(false);
+        try {
+            await onConfirmDelete(accountsToDelete.map(a => a.id));
+            onOpenChange(false);
+        } finally {
+            setIsDeleting(false);
+        }
     };
     
     return (
@@ -982,16 +983,19 @@ const DeleteAccountDialog: FC<{
     onOpenChange: (open: boolean) => void;
     account: OnlinePlayerAccount;
     clubName: string;
-    onConfirmDelete: (accountId: string, playerName: string) => void;
+    onConfirmDelete: (accountId: string, playerName: string) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         setIsDeleting(true);
-        onConfirmDelete(account.id, account.playerName);
-        setIsDeleting(false);
-        onOpenChange(false);
+        try {
+            await onConfirmDelete(account.id, account.playerName);
+            onOpenChange(false);
+        } finally {
+            setIsDeleting(false);
+        }
     };
     
     return (
