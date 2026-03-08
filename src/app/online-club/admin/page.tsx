@@ -635,9 +635,6 @@ const AdminOnlineClubPage: FC = () => {
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
                                         <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
                                         <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
-                                        <Button size="icon" variant="outline" onClick={() => handleExportPdf(account)} disabled={isExporting}>
-                                            {isExporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileDown className="h-4 w-4" />}
-                                        </Button>
                                         <Button size="icon" variant="destructive" onClick={() => {
                                             setPlayerToDelete(account);
                                             setDeleteModalOpen(true);
@@ -671,6 +668,8 @@ const AdminOnlineClubPage: FC = () => {
                         onDeleteTransaction={handleDeleteTransaction}
                         onlineClubs={allOnlineClubs}
                         onOpenReportModal={handleOpenReportModal}
+                        onExportPdf={() => selectedAccount && handleExportPdf(selectedAccount)}
+                        isExporting={isExporting}
                     />
                     {entryToEdit && (
                         <EditTransactionDialog
@@ -949,7 +948,9 @@ const LedgerDialog: FC<{
     onDeleteTransaction: (accountId: string, entryId: string) => void;
     onlineClubs: OnlineClub[];
     onOpenReportModal: (account: OnlinePlayerAccount, onlineClub: OnlineClub) => void;
-}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs, onOpenReportModal }) => {
+    onExportPdf: () => void;
+    isExporting: boolean;
+}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs, onOpenReportModal, onExportPdf, isExporting }) => {
     const [activeTab, setActiveTab] = useState('all');
 
     const balanceByClub = useMemo(() => {
@@ -1079,6 +1080,10 @@ const LedgerDialog: FC<{
                     </TabsContent>
                 </Tabs>
                 <DialogFooter>
+                    <Button onClick={onExportPdf} disabled={isExporting}>
+                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                        Export PDF
+                    </Button>
                     <DialogClose asChild><Button>Close</Button></DialogClose>
                 </DialogFooter>
             </DialogContent>
@@ -1436,6 +1441,7 @@ const EditTransactionDialog: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
