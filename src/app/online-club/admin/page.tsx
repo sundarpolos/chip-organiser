@@ -82,7 +82,8 @@ const RecordPlayerPLCard: FC<{
     accounts: OnlinePlayerAccount[];
     onlineClubs: OnlineClub[];
     onSuccess: () => void;
-}> = ({ accounts, onlineClubs, onSuccess }) => {
+    allPlayers: MasterPlayer[];
+}> = ({ accounts, onlineClubs, onSuccess, allPlayers }) => {
     const { toast } = useToast();
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
     const [amount, setAmount] = useState('');
@@ -90,18 +91,16 @@ const RecordPlayerPLCard: FC<{
     const [onlineClubName, setOnlineClubName] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const eligibleAccounts = useMemo(() => {
-        return accounts
-            .filter(account => {
-                return onlineClubs.some(oc => {
-                    if (!oc.eligiblePlayerIds || oc.eligiblePlayerIds.length === 0) {
-                        return true;
-                    }
-                    return oc.eligiblePlayerIds.includes(account.id);
-                });
-            })
-            .sort((a, b) => a.playerName.localeCompare(b.playerName));
-    }, [accounts, onlineClubs]);
+    const allOnlinePlayers = useMemo(() => {
+        const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+        const onlinePlayerIds = new Set(onlineClubs.flatMap(oc => oc.eligiblePlayerIds || []));
+        if (onlinePlayerIds.size === 0) { // If no players are explicitly assigned, all are eligible
+            return allPlayers.filter(p => p.isActive).sort((a,b) => a.name.localeCompare(b.name));
+        }
+        return allPlayers.filter(p => onlinePlayerIds.has(p.id) && p.isActive)
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+    }, [allPlayers, onlineClubs]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,8 +137,8 @@ const RecordPlayerPLCard: FC<{
     };
     
     const selectedAccount = useMemo(() => 
-        accounts.find(acc => acc.id === selectedAccountId)
-    , [selectedAccountId, accounts]);
+        allPlayers.find(acc => acc.id === selectedAccountId)
+    , [selectedAccountId, allPlayers]);
 
     const availableOnlineClubs = useMemo(() => {
         if (!selectedAccount) return [];
@@ -169,7 +168,18 @@ const RecordPlayerPLCard: FC<{
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label>Player</Label>
-                        <PlayerCombobox accounts={eligibleAccounts} selectedId={selectedAccountId} onSelect={setSelectedAccountId} />
+                        <PlayerCombobox 
+                          accounts={allOnlinePlayers.map(p => ({
+                            id: p.id, 
+                            playerId: p.id, 
+                            playerName: p.name, 
+                            clubId: p.clubId, 
+                            balance: 0, // not used in combobox
+                            lastUpdated: '' // not used
+                          }))} 
+                          selectedId={selectedAccountId} 
+                          onSelect={setSelectedAccountId} 
+                        />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -223,6 +233,7 @@ const AdminOnlineClubPage: FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [allLedgerEntries, setAllLedgerEntries] = useState<OnlineLedgerEntry[]>([]);
     const [isExporting, setIsExporting] = useState(false);
+    const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
     
     // Filtering and Dialog states
     const [selectedClubId, setSelectedClubId] = useState<string>('all');
@@ -286,13 +297,27 @@ const AdminOnlineClubPage: FC = () => {
         if (!currentUser) return;
         setIsLoading(true);
         try {
-            const [playerAccounts, clubs, onlineClubs, allEntries] = await Promise.all([
+            const [playerAccounts, masterPlayers, clubs, onlineClubs, allEntries] = await Promise.all([
                 getOnlinePlayerAccounts(),
                 getClubs(),
                 getOnlineClubs(),
                 getAllOnlineLedgerEntries(),
             ]);
-            setAccounts(playerAccounts);
+
+            // Synthesize accounts for master players who don't have one yet.
+            const existingAccountIds = new Set(playerAccounts.map(a => a.id));
+            const missingPlayers = masterPlayers.filter(p => !existingAccountIds.has(p.id));
+            const synthesizedAccounts: OnlinePlayerAccount[] = missingPlayers.map(p => ({
+                id: p.id,
+                playerId: p.id,
+                playerName: p.name,
+                clubId: p.clubId,
+                balance: 0,
+                lastUpdated: new Date().toISOString()
+            }));
+
+            setAllPlayers(masterPlayers);
+            setAccounts([...playerAccounts, ...synthesizedAccounts]);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
             setAllLedgerEntries(allEntries);
@@ -435,7 +460,8 @@ const AdminOnlineClubPage: FC = () => {
             const FONT_MUTED = '#737373';
             const POSITIVE_COLOR = '#16a34a';
             const NEGATIVE_COLOR = '#dc2626';
-    
+            const PRIMARY_BRAND_COLOR = '#4f46e5';
+
             const addPageFooter = () => {
                 const pageCount = (doc as any).internal.getNumberOfPages();
                 doc.setFontSize(8);
@@ -447,6 +473,7 @@ const AdminOnlineClubPage: FC = () => {
                 }
             };
             
+            // --- HEADER ---
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(24);
             doc.setTextColor(FONT_PRIMARY);
@@ -462,6 +489,7 @@ const AdminOnlineClubPage: FC = () => {
             doc.setTextColor(FONT_PRIMARY);
             doc.text(account.playerName, 40, yPos);
     
+            // --- BALANCE BADGES ---
             let currentX = pageWidth - 40;
             balanceByClub.slice().reverse().forEach(clubBalance => {
                 const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
@@ -553,6 +581,7 @@ const AdminOnlineClubPage: FC = () => {
                 return statements;
             };
     
+            // --- CLUB SECTIONS ---
             const clubsWithTransactions = Array.from(new Set(ledger.map(entry => entry.onlineClubName).filter(Boolean)));
             
             for (const clubName of clubsWithTransactions) {
@@ -563,14 +592,43 @@ const AdminOnlineClubPage: FC = () => {
     
                 const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
                 const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
-                const weeklyStatements = calculateWeeklyData(clubEntries);
+
+                // --- STATS SUMMARY ---
+                const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+                const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+                const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+                const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
 
                 doc.setFontSize(16);
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(FONT_PRIMARY);
+                doc.setTextColor(PRIMARY_BRAND_COLOR);
                 doc.text(clubName, 40, yPos);
                 yPos += 30;
 
+                const statXPositions = [40, 160, 280, 400];
+                doc.setFontSize(9);
+                doc.setTextColor(FONT_MUTED);
+                doc.text('PROFIT', statXPositions[0], yPos);
+                doc.text('LOSS', statXPositions[1], yPos);
+                doc.text('DEPOSITS', statXPositions[2], yPos);
+                doc.text('WITHDRAWALS', statXPositions[3], yPos);
+                yPos += 15;
+
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                
+                doc.setTextColor(POSITIVE_COLOR);
+                doc.text(`${currencySymbol} ${profit.toFixed(0)}`, statXPositions[0], yPos);
+                doc.setTextColor(NEGATIVE_COLOR);
+                doc.text(`${currencySymbol} ${Math.abs(loss).toFixed(0)}`, statXPositions[1], yPos);
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text(`${currencySymbol} ${deposits.toFixed(0)}`, statXPositions[2], yPos);
+                doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
+                
+                yPos += 20;
+
+                // --- TRANSACTIONS TABLE ---
+                const weeklyStatements = calculateWeeklyData(clubEntries);
                 if (weeklyStatements && weeklyStatements.length > 0) {
                     for (const week of [...weeklyStatements].reverse()) { // Show oldest first
                         if (yPos > doc.internal.pageSize.getHeight() - 150) {
@@ -580,6 +638,7 @@ const AdminOnlineClubPage: FC = () => {
 
                         doc.setFontSize(12);
                         doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(FONT_PRIMARY);
                         doc.text(week.week, 40, yPos);
                         yPos += 20;
 
@@ -652,6 +711,7 @@ const AdminOnlineClubPage: FC = () => {
                 accounts={accounts}
                 onlineClubs={allOnlineClubs}
                 onSuccess={refreshData}
+                allPlayers={allPlayers}
             />
             <Card>
                 <CardHeader>
@@ -1671,6 +1731,7 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
