@@ -334,7 +334,7 @@ const AdminOnlineClubPage: FC = () => {
     }, [currentUser]);
 
     const accountsWithClubBalances = useMemo(() => {
-        if (!accounts.length || !allLedgerEntries.length) return accounts.map(acc => ({...acc, clubBalances: {}}));
+        if (!accounts || !allLedgerEntries) return [];
         
         return accounts.map(account => {
             const playerEntries = allLedgerEntries.filter(e => e.accountId === account.id);
@@ -440,275 +440,286 @@ const AdminOnlineClubPage: FC = () => {
         setReportModalOpen(true);
     };
 
-    const handleExportPdf = async (account: OnlinePlayerAccount) => {
-        if (!account) {
+    const handleExportPdf = async (accountsToExport: OnlinePlayerAccount[]) => {
+        if (!accountsToExport || accountsToExport.length === 0) {
             toast({
                 variant: "destructive",
                 title: "Export Error",
-                description: "There is no account data to export.",
+                description: "No players selected to export.",
             });
             return;
         }
     
         setIsExporting(true);
     
-        const ledger = allLedgerEntries.filter(e => e.accountId === account.id);
-        
-        const clubBalances: Record<string, number> = {};
-        ledger.forEach(entry => {
-            if (entry.onlineClubName) {
-                if (!clubBalances[entry.onlineClubName]) {
-                    clubBalances[entry.onlineClubName] = 0;
-                }
-                clubBalances[entry.onlineClubName] += entry.amount;
-            }
-        });
-        const balanceByClub = Object.entries(clubBalances).map(([name, balance]) => ({
-            name,
-            balance,
-            currency: onlineClubCurrencyMap.get(name) || '₹',
-        })).sort((a,b) => a.name.localeCompare(b.name));
-    
         try {
             const doc = new jsPDF('p', 'pt', 'a4');
-            const pageWidth = doc.internal.pageSize.getWidth();
-            let yPos = 60;
     
             const FONT_PRIMARY = '#0a0a0a';
             const FONT_MUTED = '#737373';
             const POSITIVE_COLOR = '#16a34a';
             const NEGATIVE_COLOR = '#dc2626';
             const PRIMARY_BRAND_COLOR = '#4f46e5';
+            const pageWidth = doc.internal.pageSize.getWidth();
 
-            const addPageFooter = () => {
-                const pageCount = (doc as any).internal.getNumberOfPages();
-                doc.setFontSize(8);
-                doc.setTextColor(FONT_MUTED);
-                for (let i = 1; i <= pageCount; i++) {
-                    doc.setPage(i);
-                    doc.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 40, doc.internal.pageSize.getHeight() - 20);
-                    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 60, doc.internal.pageSize.getHeight() - 20);
-                }
-            };
-            
-            // --- HEADER ---
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(24);
-            doc.setTextColor(FONT_PRIMARY);
-            doc.text('SETTLEMENT LEDGER', 40, yPos);
-            yPos += 40;
-    
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(FONT_MUTED);
-            doc.text('PLAYER', 40, yPos);
-            yPos += 15;
-            doc.setFontSize(18);
-            doc.setTextColor(FONT_PRIMARY);
-            doc.text(account.playerName, 40, yPos);
-    
-            // --- BALANCE BADGES ---
-            let currentX = pageWidth - 40;
-            balanceByClub.slice().reverse().forEach(clubBalance => {
-                const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
-                const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
-                const textWidth = doc.getTextWidth(text);
-                const badgeWidth = textWidth + 20;
-    
-                currentX -= (badgeWidth + 10);
-                doc.setFillColor(241, 245, 249);
-                doc.roundedRect(currentX, yPos - 18, badgeWidth, 24, 8, 8, 'F');
+            for (let i = 0; i < accountsToExport.length; i++) {
+                const account = accountsToExport[i];
+                let yPos = 60;
                 
-                doc.setFontSize(10);
-                doc.setTextColor(FONT_MUTED);
-                doc.text(text, currentX + 10, yPos - 4);
-            });
-            yPos += 40;
-
-            const calculateWeeklyData = (entries: OnlineLedgerEntry[]) => {
-                if (entries.length === 0) return [];
-                const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                const statements: {
-                    week: string;
-                    openingBalance: number;
-                    entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
-                    closingBalance: number;
-                }[] = [];
-
-                if (sortedLedger.length > 0) {
-                    let runningBalance = 0;
-                    const earliestEntry = sortedLedger[0];
-                    const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
-                    
-                    let openingBalanceForFirstWeek = 0;
-                    sortedLedger.forEach(entry => {
-                        if (parseISO(entry.date) < firstWeekStart) {
-                            openingBalanceForFirstWeek += entry.amount;
-                        }
-                    });
-                    
-                    runningBalance = openingBalanceForFirstWeek;
-
-                    let weekEntries: OnlineLedgerEntry[] = [];
-                    let currentWeekStart = firstWeekStart;
-
-                    for (const entry of sortedLedger) {
-                        const entryDate = parseISO(entry.date);
-                        if (entryDate < firstWeekStart) continue;
-
-                        if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
-                            if (weekEntries.length > 0) {
-                                const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                                let weekRunningBalance = runningBalance;
-                                const augmentedEntries = weekEntries.map(e => {
-                                    weekRunningBalance += e.amount;
-                                    return {...e, localRunningBalance: weekRunningBalance };
-                                });
-                                
-                                statements.push({
-                                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                                    openingBalance: runningBalance,
-                                    entries: augmentedEntries,
-                                    closingBalance: weekRunningBalance
-                                });
-                                runningBalance = weekRunningBalance;
-                            }
-                            
-                            currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
-                            weekEntries = [entry];
-                        } else {
-                            weekEntries.push(entry);
-                        }
-                    }
-                    
-                    if (weekEntries.length > 0) {
-                        let weekRunningBalance = runningBalance;
-                        const augmentedEntries = weekEntries.map(e => {
-                            weekRunningBalance += e.amount;
-                            return {...e, localRunningBalance: weekRunningBalance };
-                        });
-                        
-                        statements.push({
-                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                            openingBalance: runningBalance,
-                            entries: augmentedEntries,
-                            closingBalance: weekRunningBalance
-                        });
-                    }
-                }
-                return statements;
-            };
-    
-            // --- CLUB SECTIONS ---
-            const clubsWithTransactions = Array.from(new Set(ledger.map(entry => entry.onlineClubName).filter(Boolean)));
+                const ledger = allLedgerEntries.filter(e => e.accountId === account.id);
             
-            for (const clubName of clubsWithTransactions) {
-                if (yPos > doc.internal.pageSize.getHeight() - 250) {
-                    doc.addPage();
-                    yPos = 60;
-                }
-    
-                const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
-                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                const clubBalances: Record<string, number> = {};
+                ledger.forEach(entry => {
+                    if (entry.onlineClubName) {
+                        if (!clubBalances[entry.onlineClubName]) {
+                            clubBalances[entry.onlineClubName] = 0;
+                        }
+                        clubBalances[entry.onlineClubName] += entry.amount;
+                    }
+                });
+                const balanceByClub = Object.entries(clubBalances).map(([name, balance]) => ({
+                    name,
+                    balance,
+                    currency: onlineClubCurrencyMap.get(name) || '₹',
+                })).sort((a,b) => a.name.localeCompare(b.name));
 
-                // --- STATS SUMMARY ---
-                const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
-                const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
-                const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
-                const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
-
-                doc.setFontSize(16);
+                // --- HEADER ---
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(PRIMARY_BRAND_COLOR);
-                doc.text(clubName, 40, yPos);
-                yPos += 30;
-
-                const statXPositions = [40, 160, 280, 400];
+                doc.setFontSize(24);
+                doc.setTextColor(FONT_PRIMARY);
+                doc.text('SETTLEMENT LEDGER', 40, yPos);
+                yPos += 40;
+        
+                doc.setFont('helvetica', 'normal');
                 doc.setFontSize(9);
                 doc.setTextColor(FONT_MUTED);
-                doc.text('PROFIT', statXPositions[0], yPos);
-                doc.text('LOSS', statXPositions[1], yPos);
-                doc.text('DEPOSITS', statXPositions[2], yPos);
-                doc.text('WITHDRAWALS', statXPositions[3], yPos);
+                doc.text('PLAYER', 40, yPos);
                 yPos += 15;
-
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                
-                doc.setTextColor(POSITIVE_COLOR);
-                doc.text(`${currencySymbol} ${profit.toFixed(0)}`, statXPositions[0], yPos);
-                doc.setTextColor(NEGATIVE_COLOR);
-                doc.text(`${currencySymbol} ${Math.abs(loss).toFixed(0)}`, statXPositions[1], yPos);
+                doc.setFontSize(18);
                 doc.setTextColor(FONT_PRIMARY);
-                doc.text(`${currencySymbol} ${deposits.toFixed(0)}`, statXPositions[2], yPos);
-                doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
-                
-                yPos += 20;
-
-                // --- TRANSACTIONS TABLE ---
-                const weeklyStatements = calculateWeeklyData(clubEntries);
-                if (weeklyStatements && weeklyStatements.length > 0) {
-                    for (const week of [...weeklyStatements].reverse()) { // Show oldest first
-                        if (yPos > doc.internal.pageSize.getHeight() - 150) {
-                            doc.addPage();
-                            yPos = 60;
-                        }
-
-                        doc.setFontSize(12);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setTextColor(FONT_PRIMARY);
-                        doc.text(week.week, 40, yPos);
-                        yPos += 20;
-
-                        (doc as any).autoTable({
-                            startY: yPos,
-                            head: [['Date', 'Type / Notes', 'Amount', 'Balance']],
-                            body: [
-                                [{ content: 'Opening Balance', colSpan: 3, styles: { fontStyle: 'bold' } }, { content: `${currencySymbol}${week.openingBalance.toFixed(0)}`, styles: { halign: 'right', fontStyle: 'bold' } }],
-                                ...week.entries.map(entry => {
-                                    const typeText = entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : (entry.amount >= 0 ? 'Profit' : 'Loss');
-                                    const notesText = entry.notes ? ` - ${entry.notes}` : '';
-                                    return [
-                                        format(parseISO(entry.date), 'dd/MM/yyyy'),
-                                        `${typeText}${notesText}`,
-                                        { content: `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`, styles: { halign: 'right' } },
-                                        { content: `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`, styles: { halign: 'right' } }
-                                    ];
-                                })
-                            ],
-                            foot: [[
-                                { content: 'Closing Balance', colSpan: 3, styles: { fontStyle: 'bold' } },
-                                { content: `${currencySymbol}${week.closingBalance.toFixed(0)}`, styles: { halign: 'right', fontStyle: 'bold' } }
-                            ]],
-                            theme: 'striped',
-                            styles: { font: 'helvetica', fontSize: 9, cellPadding: 6 },
-                            headStyles: { textColor: FONT_PRIMARY, fontStyle: 'bold', fillColor: [241, 245, 249] },
-                            footStyles: { textColor: FONT_PRIMARY, fontStyle: 'bold', fillColor: [241, 245, 249] },
-                            didParseCell: (data: any) => {
-                                if (data.column.index === 2 && data.row.section === 'body') {
-                                    const entry = week.entries[data.row.index -1]; // -1 for opening balance row
-                                    if(entry) data.cell.styles.textColor = entry.amount >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
-                                }
-                            },
-                            didDrawPage: (data: any) => {
-                                yPos = data.cursor.y;
-                            }
-                        });
-                        yPos = (doc as any).lastAutoTable.finalY + 25;
-                    }
-                } else {
+                doc.text(account.playerName, 40, yPos);
+        
+                // --- BALANCE BADGES ---
+                let currentX = pageWidth - 40;
+                balanceByClub.slice().reverse().forEach(clubBalance => {
+                    const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                    const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
+                    const textWidth = doc.getTextWidth(text);
+                    const badgeWidth = textWidth + 20;
+        
+                    currentX -= (badgeWidth + 10);
+                    doc.setFillColor(241, 245, 249);
+                    doc.roundedRect(currentX, yPos - 18, badgeWidth, 24, 8, 8, 'F');
+                    
                     doc.setFontSize(10);
                     doc.setTextColor(FONT_MUTED);
-                    doc.text('No transactions for this period.', 40, yPos);
+                    doc.text(text, currentX + 10, yPos - 4);
+                });
+                yPos += 40;
+
+                const calculateWeeklyData = (entries: OnlineLedgerEntry[]) => {
+                    if (entries.length === 0) return [];
+                    const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    const statements: {
+                        week: string;
+                        openingBalance: number;
+                        entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+                        closingBalance: number;
+                    }[] = [];
+
+                    if (sortedLedger.length > 0) {
+                        let runningBalance = 0;
+                        const earliestEntry = sortedLedger[0];
+                        const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
+                        
+                        let openingBalanceForFirstWeek = 0;
+                        sortedLedger.forEach(entry => {
+                            if (parseISO(entry.date) < firstWeekStart) {
+                                openingBalanceForFirstWeek += entry.amount;
+                            }
+                        });
+                        
+                        runningBalance = openingBalanceForFirstWeek;
+
+                        let weekEntries: OnlineLedgerEntry[] = [];
+                        let currentWeekStart = firstWeekStart;
+
+                        for (const entry of sortedLedger) {
+                            const entryDate = parseISO(entry.date);
+                            if (entryDate < firstWeekStart) continue;
+
+                            if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
+                                if (weekEntries.length > 0) {
+                                    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+                                    let weekRunningBalance = runningBalance;
+                                    const augmentedEntries = weekEntries.map(e => {
+                                        weekRunningBalance += e.amount;
+                                        return {...e, localRunningBalance: weekRunningBalance };
+                                    });
+                                    
+                                    statements.push({
+                                        week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                                        openingBalance: runningBalance,
+                                        entries: augmentedEntries,
+                                        closingBalance: weekRunningBalance
+                                    });
+                                    runningBalance = weekRunningBalance;
+                                }
+                                
+                                currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
+                                weekEntries = [entry];
+                            } else {
+                                weekEntries.push(entry);
+                            }
+                        }
+                        
+                        if (weekEntries.length > 0) {
+                            let weekRunningBalance = runningBalance;
+                            const augmentedEntries = weekEntries.map(e => {
+                                weekRunningBalance += e.amount;
+                                return {...e, localRunningBalance: weekRunningBalance };
+                            });
+                            
+                            statements.push({
+                                week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
+                                openingBalance: runningBalance,
+                                entries: augmentedEntries,
+                                closingBalance: weekRunningBalance
+                            });
+                        }
+                    }
+                    return statements;
+                };
+        
+                // --- CLUB SECTIONS ---
+                const clubsWithTransactions = Array.from(new Set(ledger.map(entry => entry.onlineClubName).filter(Boolean)));
+                
+                for (const clubName of clubsWithTransactions) {
+                    if (yPos > doc.internal.pageSize.getHeight() - 250) {
+                        doc.addPage();
+                        yPos = 60;
+                    }
+        
+                    const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
+                    const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+
+                    // --- STATS SUMMARY ---
+                    const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
+                    const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
+                    const deposits = clubEntries.filter(e => e.type === 'deposit').reduce((sum, e) => sum + e.amount, 0);
+                    const withdrawals = clubEntries.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+
+                    doc.setFontSize(16);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(PRIMARY_BRAND_COLOR);
+                    doc.text(clubName, 40, yPos);
+                    yPos += 30;
+
+                    const statXPositions = [40, 160, 280, 400];
+                    doc.setFontSize(9);
+                    doc.setTextColor(FONT_MUTED);
+                    doc.text('PROFIT', statXPositions[0], yPos);
+                    doc.text('LOSS', statXPositions[1], yPos);
+                    doc.text('DEPOSITS', statXPositions[2], yPos);
+                    doc.text('WITHDRAWALS', statXPositions[3], yPos);
+                    yPos += 15;
+
+                    doc.setFontSize(14);
+                    doc.setFont('helvetica', 'bold');
+                    
+                    doc.setTextColor(POSITIVE_COLOR);
+                    doc.text(`${currencySymbol} ${profit.toFixed(0)}`, statXPositions[0], yPos);
+                    doc.setTextColor(NEGATIVE_COLOR);
+                    doc.text(`${currencySymbol} ${Math.abs(loss).toFixed(0)}`, statXPositions[1], yPos);
+                    doc.setTextColor(FONT_PRIMARY);
+                    doc.text(`${currencySymbol} ${deposits.toFixed(0)}`, statXPositions[2], yPos);
+                    doc.text(`${currencySymbol} ${Math.abs(withdrawals).toFixed(0)}`, statXPositions[3], yPos);
+                    
                     yPos += 20;
+
+                    // --- TRANSACTIONS TABLE ---
+                    const weeklyStatements = calculateWeeklyData(clubEntries);
+                    if (weeklyStatements && weeklyStatements.length > 0) {
+                        for (const week of [...weeklyStatements].reverse()) { // Show oldest first
+                            if (yPos > doc.internal.pageSize.getHeight() - 150) {
+                                doc.addPage();
+                                yPos = 60;
+                            }
+
+                            doc.setFontSize(12);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(FONT_PRIMARY);
+                            doc.text(week.week, 40, yPos);
+                            yPos += 20;
+
+                            (doc as any).autoTable({
+                                startY: yPos,
+                                head: [['Date', 'Type / Notes', 'Amount', 'Balance']],
+                                body: [
+                                    [{ content: 'Opening Balance', colSpan: 3, styles: { fontStyle: 'bold' } }, { content: `${currencySymbol}${week.openingBalance.toFixed(0)}`, styles: { halign: 'right', fontStyle: 'bold' } }],
+                                    ...week.entries.map(entry => {
+                                        const typeText = entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : (entry.amount >= 0 ? 'Profit' : 'Loss');
+                                        const notesText = entry.notes ? ` - ${entry.notes}` : '';
+                                        return [
+                                            format(parseISO(entry.date), 'dd/MM/yyyy'),
+                                            `${typeText}${notesText}`,
+                                            { content: `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`, styles: { halign: 'right' } },
+                                            { content: `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`, styles: { halign: 'right' } }
+                                        ];
+                                    })
+                                ],
+                                foot: [[
+                                    { content: 'Closing Balance', colSpan: 3, styles: { fontStyle: 'bold' } },
+                                    { content: `${currencySymbol}${week.closingBalance.toFixed(0)}`, styles: { halign: 'right', fontStyle: 'bold' } }
+                                ]],
+                                theme: 'striped',
+                                styles: { font: 'helvetica', fontSize: 9, cellPadding: 6 },
+                                headStyles: { textColor: FONT_PRIMARY, fontStyle: 'bold', fillColor: [241, 245, 249] },
+                                footStyles: { textColor: FONT_PRIMARY, fontStyle: 'bold', fillColor: [241, 245, 249] },
+                                didParseCell: (data: any) => {
+                                    if (data.column.index === 2 && data.row.section === 'body') {
+                                        const entry = week.entries[data.row.index -1]; // -1 for opening balance row
+                                        if(entry) data.cell.styles.textColor = entry.amount >= 0 ? POSITIVE_COLOR : NEGATIVE_COLOR;
+                                    }
+                                },
+                                didDrawPage: (data: any) => {
+                                    yPos = data.cursor.y;
+                                }
+                            });
+                            yPos = (doc as any).lastAutoTable.finalY + 25;
+                        }
+                    } else {
+                        doc.setFontSize(10);
+                        doc.setTextColor(FONT_MUTED);
+                        doc.text('No transactions for this period.', 40, yPos);
+                        yPos += 20;
+                    }
+                }
+
+                if (i < accountsToExport.length - 1) {
+                    doc.addPage();
                 }
             }
+
+            const addPageFooter = (docInstance: jsPDF) => {
+                const pageCount = (docInstance as any).internal.getNumberOfPages();
+                docInstance.setFontSize(8);
+                docInstance.setTextColor(FONT_MUTED);
+                for (let i = 1; i <= pageCount; i++) {
+                    docInstance.setPage(i);
+                    docInstance.text(`Exported: ${format(new Date(), 'dd MMM yyyy, p')}`, 40, docInstance.internal.pageSize.getHeight() - 20);
+                    docInstance.text(`Page ${i} of ${pageCount}`, pageWidth - 60, docInstance.internal.pageSize.getHeight() - 20);
+                }
+            };
             
-            addPageFooter();
-    
-            const filename = `settlement-ledger-${account.playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+            addPageFooter(doc);
+
+            const filename = accountsToExport.length > 1
+                ? `settlement-ledgers-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+                : `settlement-ledger-${accountsToExport[0].playerName.replace(/\s/g, '_')}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+
             doc.save(filename);
-            toast({ title: 'PDF Exported', description: 'The player settlement ledger has been downloaded.' });
+            toast({ title: 'PDF Exported', description: 'The player settlement ledger(s) have been downloaded.' });
     
         } catch (error) {
             console.error("Could not export PDF:", error);
@@ -739,10 +750,23 @@ const AdminOnlineClubPage: FC = () => {
                             <CardDescription>View balances and manage deposits/withdrawals for all players.</CardDescription>
                         </div>
                          {selectedAccountIds.length > 0 && (
-                            <Button variant="destructive" onClick={() => setBulkDeleteModalOpen(true)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Selected ({selectedAccountIds.length})
-                            </Button>
+                             <div className="flex gap-2">
+                                <Button variant="destructive" onClick={() => setBulkDeleteModalOpen(true)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Selected ({selectedAccountIds.length})
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        const selectedAccounts = accounts.filter(acc => selectedAccountIds.includes(acc.id));
+                                        handleExportPdf(selectedAccounts);
+                                    }}
+                                    disabled={isExporting}
+                                >
+                                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                                    Export Selected ({selectedAccountIds.length})
+                                </Button>
+                            </div>
                         )}
                     </div>
                 </CardHeader>
@@ -852,7 +876,7 @@ const AdminOnlineClubPage: FC = () => {
                         onDeleteTransaction={handleDeleteTransaction}
                         onlineClubs={allOnlineClubs}
                         onOpenReportModal={handleOpenReportModal}
-                        onExportPdf={() => selectedAccount && handleExportPdf(selectedAccount)}
+                        onExportPdf={() => selectedAccount && handleExportPdf([selectedAccount])}
                         isExporting={isExporting}
                         onlineClubCurrencyMap={onlineClubCurrencyMap}
                     />
@@ -920,12 +944,9 @@ const BulkDeleteAccountDialog: FC<{
 
     const handleDelete = async () => {
         setIsDeleting(true);
-        try {
-            await onConfirmDelete(accountsToDelete.map(a => a.id));
-            onOpenChange(false);
-        } finally {
-            setIsDeleting(false);
-        }
+        await onConfirmDelete(accountsToDelete.map(a => a.id));
+        setIsDeleting(false);
+        onOpenChange(false);
     };
     
     return (
@@ -970,12 +991,9 @@ const DeleteAccountDialog: FC<{
 
     const handleDelete = async () => {
         setIsDeleting(true);
-        try {
-            await onConfirmDelete(account.id, account.playerName);
-            onOpenChange(false);
-        } finally {
-            setIsDeleting(false);
-        }
+        await onConfirmDelete(account.id, account.playerName);
+        setIsDeleting(false);
+        onOpenChange(false);
     };
     
     return (
