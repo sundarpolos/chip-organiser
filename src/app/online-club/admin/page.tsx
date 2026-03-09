@@ -32,6 +32,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -830,16 +831,64 @@ const AdminOnlineClubPage: FC = () => {
                                             })}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-right space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}><Plus className="h-4 w-4 mr-1" /> Deposit</Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}><Minus className="h-4 w-4 mr-1" /> Withdraw</Button>
-                                        <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>Ledger</Button>
-                                        <Button size="icon" variant="destructive" onClick={() => {
-                                            setPlayerToDelete(account);
-                                            setDeleteModalOpen(true);
-                                        }}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'deposit')}>
+                                                            <Plus className="h-4 w-4" />
+                                                            <span className="sr-only">Deposit</span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Deposit</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
+                                                            <Minus className="h-4 w-4" />
+                                                            <span className="sr-only">Withdrawal</span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Withdrawal</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleOpenLedger(account)}>
+                                                            <Landmark className="h-4 w-4" />
+                                                            <span className="sr-only">Ledger</span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>View Ledger</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                         <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => {
+                                                            setPlayerToDelete(account);
+                                                            setDeleteModalOpen(true);
+                                                        }}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span className="sr-only">Delete</span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Delete Account</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
