@@ -33,6 +33,7 @@ import 'jspdf-autotable';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Separator } from '@/components/ui/separator';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
@@ -791,109 +792,202 @@ const AdminOnlineClubPage: FC = () => {
                             />
                         </div>
                     </div>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="px-2 w-12">
-                                    <Checkbox
-                                        checked={filteredAccounts.length > 0 && selectedAccountIds.length === filteredAccounts.length}
-                                        onCheckedChange={(checked) => handleSelectAllAccounts(!!checked)}
-                                        aria-label="Select all accounts"
-                                    />
-                                </TableHead>
-                                <TableHead>Player</TableHead>
-                                <TableHead>Club</TableHead>
-                                <TableHead className="text-right">Club Balances</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredAccounts.map(account => (
-                                <TableRow key={account.id}>
-                                    <TableCell className="px-2">
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="px-2 w-12">
+                                        <Checkbox
+                                            checked={filteredAccounts.length > 0 && selectedAccountIds.length === filteredAccounts.length}
+                                            onCheckedChange={(checked) => handleSelectAllAccounts(!!checked)}
+                                            aria-label="Select all accounts"
+                                        />
+                                    </TableHead>
+                                    <TableHead>Player</TableHead>
+                                    <TableHead>Club</TableHead>
+                                    <TableHead className="text-right">Club Balances</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredAccounts.map(account => (
+                                    <TableRow key={account.id}>
+                                        <TableCell className="px-2">
+                                            <Checkbox
+                                                checked={selectedAccountIds.includes(account.id)}
+                                                onCheckedChange={(checked) => handleSelectAccount(account.id, !!checked)}
+                                                aria-label={`Select account for ${account.playerName}`}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="font-medium">{account.playerName}</TableCell>
+                                        <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex flex-wrap justify-end gap-1">
+                                                {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
+                                                    const currency = onlineClubCurrencyMap.get(clubName) || '₹';
+                                                    return (
+                                                        <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
+                                                            {clubName}: {currency}{balance.toFixed(0)}
+                                                        </Badge>
+                                                    )
+                                                })}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'deposit')}>
+                                                                <Plus className="h-4 w-4" />
+                                                                <span className="sr-only">Deposit</span>
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Deposit</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
+                                                                <Minus className="h-4 w-4" />
+                                                                <span className="sr-only">Withdrawal</span>
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Withdrawal</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleOpenLedger(account)}>
+                                                                <Landmark className="h-4 w-4" />
+                                                                <span className="sr-only">Ledger</span>
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>View Ledger</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                             <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => {
+                                                                setPlayerToDelete(account);
+                                                                setDeleteModalOpen(true);
+                                                            }}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                                <span className="sr-only">Delete</span>
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Delete Account</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4">
+                        {filteredAccounts.map(account => (
+                            <Card key={account.id}>
+                                <CardContent className="p-4 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="font-medium">{account.playerName}</div>
+                                            <div className="text-sm text-muted-foreground">{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</div>
+                                        </div>
                                         <Checkbox
                                             checked={selectedAccountIds.includes(account.id)}
                                             onCheckedChange={(checked) => handleSelectAccount(account.id, !!checked)}
                                             aria-label={`Select account for ${account.playerName}`}
                                         />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{account.playerName}</TableCell>
-                                    <TableCell>{allClubs.find(c=> c.id === account.clubId)?.name || 'N/A'}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex flex-wrap justify-end gap-1">
-                                            {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
-                                                const currency = onlineClubCurrencyMap.get(clubName) || '₹';
-                                                return (
-                                                    <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
-                                                        {clubName}: {currency}{balance.toFixed(0)}
-                                                    </Badge>
-                                                )
-                                            })}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-1">
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'deposit')}>
-                                                            <Plus className="h-4 w-4" />
-                                                            <span className="sr-only">Deposit</span>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Deposit</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
-                                                            <Minus className="h-4 w-4" />
-                                                            <span className="sr-only">Withdrawal</span>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Withdrawal</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleOpenLedger(account)}>
-                                                            <Landmark className="h-4 w-4" />
-                                                            <span className="sr-only">Ledger</span>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>View Ledger</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                         <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => {
-                                                            setPlayerToDelete(account);
-                                                            setDeleteModalOpen(true);
-                                                        }}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                            <span className="sr-only">Delete</span>
-                                                        </Button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Delete Account</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                                    </div>
+                                    <div className="flex flex-wrap justify-start gap-1">
+                                        {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
+                                            const currency = onlineClubCurrencyMap.get(clubName) || '₹';
+                                            return (
+                                                <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
+                                                    {clubName}: {currency}{balance.toFixed(0)}
+                                                </Badge>
+                                            )
+                                        })}
+                                    </div>
+                                    <Separator />
+                                    <div className="flex justify-end gap-2">
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'deposit')}>
+                                                        <Plus className="h-4 w-4" />
+                                                        <span className="sr-only">Deposit</span>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Deposit</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
+                                                        <Minus className="h-4 w-4" />
+                                                        <span className="sr-only">Withdrawal</span>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Withdrawal</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleOpenLedger(account)}>
+                                                        <Landmark className="h-4 w-4" />
+                                                        <span className="sr-only">Ledger</span>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>View Ledger</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                        <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => {
+                                                        setPlayerToDelete(account);
+                                                        setDeleteModalOpen(true);
+                                                    }}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span className="sr-only">Delete</span>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Delete Account</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
             
