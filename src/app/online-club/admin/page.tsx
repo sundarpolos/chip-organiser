@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, type FC } from 'react';
@@ -319,7 +318,7 @@ const AdminOnlineClubPage: FC = () => {
             setAccounts(playerAccounts);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
-            setAllLedgerEntries(allEntries);
+            setAllLedgerEntries(allEntries || []);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -855,6 +854,7 @@ const AdminOnlineClubPage: FC = () => {
                 accountsToDelete={accounts.filter(acc => selectedAccountIds.includes(acc.id))}
                 onConfirmDelete={handleConfirmBulkDelete}
                 toast={toast}
+                allClubs={allClubs}
             />
 
             {selectedAccount && (
@@ -939,10 +939,59 @@ const BulkDeleteAccountDialog: FC<{
     accountsToDelete: OnlinePlayerAccount[];
     onConfirmDelete: (accountIds: string[]) => Promise<void>;
     toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast }) => {
+    allClubs: Club[];
+}> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast, allClubs }) => {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+    
+    useEffect(() => {
+        if (!isOpen) {
+            setIsDeleting(false);
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSendingOtp(false);
+        }
+    }, [isOpen]);
+    
+    const handleRequestOtp = async () => {
+        if (accountsToDelete.length === 0) return;
+        setIsSendingOtp(true);
+        
+        const clubIds = new Set(accountsToDelete.map(a => a.clubId));
+        let clubName = "multiple clubs";
+        if (clubIds.size === 1) {
+            const club = allClubs.find(c => c.id === accountsToDelete[0].clubId);
+            if (club) clubName = club.name;
+        }
+
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: `${accountsToDelete.length} player(s)`,
+                clubName: clubName,
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
 
     const handleDelete = async () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP' });
+            return;
+        }
         setIsDeleting(true);
         await onConfirmDelete(accountsToDelete.map(a => a.id));
         setIsDeleting(false);
@@ -955,7 +1004,9 @@ const BulkDeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {accountsToDelete.length} Online Accounts?</DialogTitle>
                     <DialogDescription>
-                        This will permanently delete the online accounts and all transaction history for the selected players. This action cannot be undone.
+                        {isOtpSent
+                            ? "Enter the OTP sent to the Super Admin's WhatsApp to finalize the deletion."
+                            : "This will permanently delete the selected accounts and all their transaction history. An OTP will be sent to the Super Admin to confirm."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -965,13 +1016,27 @@ const BulkDeleteAccountDialog: FC<{
                         {accountsToDelete.map(acc => <li key={acc.id}>{acc.playerName}</li>)}
                     </ul>
                 </ScrollArea>
+                
+                {isOtpSent && (
+                    <div className="py-4 space-y-2">
+                       <Label htmlFor="delete-bulk-otp">Admin OTP</Label>
+                       <Input id="delete-bulk-otp" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                    </div>
+                )}
 
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                        Confirm & Delete Accounts
-                    </Button>
+                    {isOtpSent ? (
+                        <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete Accounts
+                        </Button>
+                    ) : (
+                        <Button variant="destructive" onClick={handleRequestOtp} disabled={isSendingOtp}>
+                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send OTP to Delete
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -988,8 +1053,48 @@ const DeleteAccountDialog: FC<{
     toast: ReturnType<typeof useToast>['toast'];
 }> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            // Reset state on close
+            setIsDeleting(false);
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSendingOtp(false);
+        }
+    }, [isOpen]);
+
+    const handleRequestOtp = async () => {
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: account.playerName,
+                clubName: clubName,
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
 
     const handleDelete = async () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP' });
+            return;
+        }
         setIsDeleting(true);
         await onConfirmDelete(account.id, account.playerName);
         setIsDeleting(false);
@@ -1002,15 +1107,32 @@ const DeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {account.playerName}'s Online Account?</DialogTitle>
                     <DialogDescription>
-                        This action cannot be undone. This will permanently delete the online account and all associated transaction history.
+                        {isOtpSent
+                            ? "Enter the OTP sent to the Super Admin's WhatsApp to finalize the deletion."
+                            : 'This is a critical action. To proceed, an OTP will be sent to the Super Admin for verification.'}
                     </DialogDescription>
                 </DialogHeader>
+                
+                {isOtpSent && (
+                    <div className="py-4 space-y-2">
+                       <Label htmlFor="delete-otp">Admin OTP</Label>
+                       <Input id="delete-otp" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                    </div>
+                )}
+
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                        Confirm & Delete Account
-                    </Button>
+                    {isOtpSent ? (
+                        <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete
+                        </Button>
+                    ) : (
+                        <Button variant="destructive" onClick={handleRequestOtp} disabled={isSendingOtp}>
+                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send OTP to Delete
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
