@@ -16,8 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save, ChevronsUpDown, Check, MessageSquare, Send, Copy, Shield, FileDown, ArrowUp, ArrowDown } from 'lucide-react';
-import { format, parseISO, startOfWeek, endOfWeek, isSameWeek } from 'date-fns';
+import { Loader2, Plus, Minus, Landmark, Search, Trash2, Edit, Save, ChevronsUpDown, Check, MessageSquare, Send, Copy, Shield, FileDown, ArrowUp, ArrowDown, CalendarIcon } from 'lucide-react';
+import { format, parseISO, startOfWeek, endOfWeek, isSameWeek, subDays } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { sendDeleteOnlineAccountOtp } from '@/ai/flows/send-delete-online-account-otp';
@@ -34,9 +34,57 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
+import { type DateRange } from 'react-day-picker';
+import { Calendar } from '@/components/ui/calendar';
 
 
 const SUPER_ADMIN_WHATSAPP = '919843350000';
+
+const DateRangePicker: FC<{
+    date: DateRange | undefined,
+    onDateChange: (date: DateRange | undefined) => void,
+    className?: string,
+}> = ({ date, onDateChange, className }) => {
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    id="date"
+                    variant={"outline"}
+                    className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground",
+                        className
+                    )}
+                >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date?.from ? (
+                        date.to ? (
+                            <>
+                                {format(date.from, "LLL dd, y")} -{" "}
+                                {format(date.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(date.from, "LLL dd, y")
+                        )
+                    ) : (
+                        <span>Pick a date range</span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from}
+                    selected={date}
+                    onSelect={onDateChange}
+                    numberOfMonths={2}
+                />
+            </PopoverContent>
+        </Popover>
+    )
+}
 
 const PlayerCombobox: FC<{
     accounts: OnlinePlayerAccount[];
@@ -243,6 +291,10 @@ const AdminOnlineClubPage: FC = () => {
     // Filtering and Dialog states
     const [selectedClubId, setSelectedClubId] = useState<string>('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 29),
+        to: new Date(),
+    });
     const [isTransactionModalOpen, setTransactionModalOpen] = useState(false);
     const [isLedgerModalOpen, setLedgerModalOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState<OnlinePlayerAccount | null>(null);
@@ -320,7 +372,7 @@ const AdminOnlineClubPage: FC = () => {
             setAccounts(playerAccounts);
             setAllClubs(clubs);
             setAllOnlineClubs(onlineClubs);
-            setAllLedgerEntries(allEntries || []);
+            setAllLedgerEntries(allEntries);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load account data.' });
         } finally {
@@ -380,6 +432,7 @@ const AdminOnlineClubPage: FC = () => {
     };
 
     const handleConfirmBulkDelete = async (accountIds: string[]) => {
+        setBulkDeleteModalOpen(false);
         try {
             await deleteMultipleOnlinePlayerAccounts(accountIds);
             toast({ title: 'Accounts Deleted', description: `${accountIds.length} accounts have been successfully removed.` });
@@ -431,6 +484,7 @@ const AdminOnlineClubPage: FC = () => {
     };
     
     const handleDeletePlayerAccount = async (accountId: string, playerName: string) => {
+        setDeleteModalOpen(false);
         await deleteOnlinePlayerAccount(accountId);
         toast({ title: "Account Deleted", description: `The account for ${playerName} has been deleted.` });
         await refreshData();
@@ -773,6 +827,7 @@ const AdminOnlineClubPage: FC = () => {
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                        <DateRangePicker date={dateRange} onDateChange={setDateRange} className="w-full sm:w-[280px]" />
                         <Select value={selectedClubId} onValueChange={setSelectedClubId}>
                             <SelectTrigger className="w-full sm:w-[200px]">
                                 <SelectValue placeholder="Filter by club..." />
@@ -1022,6 +1077,7 @@ const AdminOnlineClubPage: FC = () => {
                         onExportPdf={() => selectedAccount && handleExportPdf([selectedAccount])}
                         isExporting={isExporting}
                         onlineClubCurrencyMap={onlineClubCurrencyMap}
+                        dateRange={dateRange}
                     />
                     {entryToEdit && (
                         <EditTransactionDialog
@@ -1138,7 +1194,6 @@ const BulkDeleteAccountDialog: FC<{
         setIsDeleting(true);
         await onConfirmDelete(accountsToDelete.map(a => a.id));
         setIsDeleting(false);
-        onOpenChange(false);
     };
     
     return (
@@ -1241,7 +1296,6 @@ const DeleteAccountDialog: FC<{
         setIsDeleting(true);
         await onConfirmDelete(account.id, account.playerName);
         setIsDeleting(false);
-        onOpenChange(false);
     };
     
     return (
@@ -1408,7 +1462,8 @@ const LedgerDialog: FC<{
     onExportPdf: () => void;
     isExporting: boolean;
     onlineClubCurrencyMap: Map<string, string>;
-}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs, onOpenReportModal, onExportPdf, isExporting, onlineClubCurrencyMap }) => {
+    dateRange: DateRange | undefined;
+}> = ({ isOpen, onOpenChange, account, ledger, onEditTransaction, onDeleteTransaction, onlineClubs, onOpenReportModal, onExportPdf, isExporting, onlineClubCurrencyMap, dateRange }) => {
     const [activeTab, setActiveTab] = useState('all');
 
     const balanceByClub = useMemo(() => {
@@ -1501,6 +1556,7 @@ const LedgerDialog: FC<{
                             currencySymbol={currencyForLedger}
                             activeTab={activeTab}
                             accountId={account.id}
+                            dateRange={dateRange}
                         />
                     </TabsContent>
                 </Tabs>
@@ -1873,12 +1929,37 @@ const AdminWeeklyLedgerAccordion: FC<{
     currencySymbol?: string,
     activeTab: string,
     accountId: string,
-}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol, activeTab, accountId }) => {
+    dateRange: DateRange | undefined;
+}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol, activeTab, accountId, dateRange }) => {
     
     const weeklyData = useMemo(() => {
-        if (entries.length === 0) return [];
-    
+        if (!entries) return [];
+
         const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        let openingBalanceForPeriod = 0;
+        const fromDate = dateRange?.from ? new Date(dateRange.from.setHours(0, 0, 0, 0)) : null;
+
+        if (fromDate) {
+            // Use all entries for opening balance calculation, not just the filtered ones for the tab
+            sortedLedger.forEach(entry => {
+                if (parseISO(entry.date) < fromDate) {
+                    openingBalanceForPeriod += entry.amount;
+                }
+            });
+        }
+
+        const periodEntries = sortedLedger.filter(entry => {
+            const entryDate = parseISO(entry.date);
+            if (fromDate && entryDate < fromDate) return false;
+            if (dateRange?.to) {
+                const toDate = new Date(dateRange.to.setHours(23, 59, 59, 999));
+                if (entryDate > toDate) return false;
+            }
+            return true;
+        });
+
+        if (periodEntries.length === 0) return [];
     
         const statements: {
             week: string;
@@ -1887,76 +1968,60 @@ const AdminWeeklyLedgerAccordion: FC<{
             closingBalance: number;
         }[] = [];
     
-        if (sortedLedger.length > 0) {
-            let runningBalance = 0;
-            const earliestEntry = sortedLedger[0];
-            const firstWeekStart = startOfWeek(parseISO(earliestEntry.date), { weekStartsOn: 1 });
-            
-            let openingBalanceForFirstWeek = 0;
-            sortedLedger.forEach(entry => {
-                if (parseISO(entry.date) < firstWeekStart) {
-                    openingBalanceForFirstWeek += entry.amount;
-                }
-            });
-            
-            runningBalance = openingBalanceForFirstWeek;
+        let runningBalance = openingBalanceForPeriod;
+        let weekEntries: OnlineLedgerEntry[] = [];
+        let currentWeekStart = startOfWeek(parseISO(periodEntries[0].date), { weekStartsOn: 1 });
 
-            let weekEntries: OnlineLedgerEntry[] = [];
-            let currentWeekStart = firstWeekStart;
-    
-            for (const entry of sortedLedger) {
-                const entryDate = parseISO(entry.date);
-    
-                if (entryDate < firstWeekStart) continue;
-    
-                if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
-                    if (weekEntries.length > 0) {
-                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                        let weekRunningBalance = runningBalance;
-                        const augmentedEntries = weekEntries.map(e => {
-                            weekRunningBalance += e.amount;
-                            return {...e, localRunningBalance: weekRunningBalance };
-                        });
-                        
-                        statements.push({
-                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                            openingBalance: runningBalance,
-                            entries: augmentedEntries,
-                            closingBalance: weekRunningBalance
-                        });
-                        runningBalance = weekRunningBalance;
-                    }
-                    
-                    currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
-                    weekEntries = [entry];
-                } else {
-                    weekEntries.push(entry);
+        for (const entry of periodEntries) {
+            const entryDate = parseISO(entry.date);
+
+            if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
+                 if (weekEntries.length > 0) {
+                    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+                    const openingForWeek = runningBalance;
+                    let weekRunningBalance = openingForWeek;
+                    const augmentedEntries = weekEntries.map(e => {
+                        weekRunningBalance += e.amount;
+                        return { ...e, localRunningBalance: weekRunningBalance };
+                    });
+
+                    statements.push({
+                        week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                        openingBalance: openingForWeek,
+                        entries: augmentedEntries,
+                        closingBalance: weekRunningBalance,
+                    });
+                    runningBalance = weekRunningBalance;
                 }
+                currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
+                weekEntries = [entry];
+            } else {
+                weekEntries.push(entry);
             }
-            
-            if (weekEntries.length > 0) {
-                let weekRunningBalance = runningBalance;
-                const augmentedEntries = weekEntries.map(e => {
-                    weekRunningBalance += e.amount;
-                    return {...e, localRunningBalance: weekRunningBalance };
-                });
-                
-                statements.push({
-                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                    openingBalance: runningBalance,
-                    entries: augmentedEntries,
-                    closingBalance: weekRunningBalance
-                });
-            }
+        }
+        if (weekEntries.length > 0) {
+            const openingForWeek = runningBalance;
+            let weekRunningBalance = openingForWeek;
+            const augmentedEntries = weekEntries.map(e => {
+                weekRunningBalance += e.amount;
+                return { ...e, localRunningBalance: weekRunningBalance };
+            });
+
+            statements.push({
+                week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
+                openingBalance: openingForWeek,
+                entries: augmentedEntries,
+                closingBalance: weekRunningBalance
+            });
         }
         
         return statements.reverse();
-    }, [entries]);
+    }, [entries, dateRange]);
 
-    if (entries.length === 0) {
+    if (!weeklyData || weeklyData.length === 0) {
         return (
             <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
-                No transactions for this club.
+                No transactions for this club in the selected date range.
             </div>
         );
     }
@@ -2022,7 +2087,7 @@ const AdminWeeklyLedgerAccordion: FC<{
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => onDeleteTransaction(accountId, entry.id)}>Delete</AlertDialogAction>
+                                                            <AlertDialogAction onClick={() => onDeleteEntry(accountId, entry.id)}>Delete</AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
                                                 </AlertDialog>
@@ -2049,3 +2114,4 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
