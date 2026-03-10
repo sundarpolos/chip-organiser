@@ -1906,6 +1906,9 @@ const CreateEditOnlineClubDialog: FC<{
     const [eligiblePlayerIds, setEligiblePlayerIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isGroupTesting, setIsGroupTesting] = useState(false);
+    const [weeklyMinimumCharge, setWeeklyMinimumCharge] = useState(0);
+    const [chargeDayOfWeek, setChargeDayOfWeek] = useState<'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | ''>('');
+
 
     useEffect(() => {
         if (isOpen) {
@@ -1914,11 +1917,15 @@ const CreateEditOnlineClubDialog: FC<{
                 setCurrency(onlineClubToEdit.currency || 'INR');
                 setWhatsappGroupId(onlineClubToEdit.whatsappGroupId || '');
                 setEligiblePlayerIds(onlineClubToEdit.eligiblePlayerIds || []);
+                setWeeklyMinimumCharge(onlineClubToEdit.weeklyMinimumCharge || 0);
+                setChargeDayOfWeek(onlineClubToEdit.chargeDayOfWeek || '');
             } else {
                 setName('');
                 setCurrency('INR');
                 setWhatsappGroupId('');
                 setEligiblePlayerIds([]);
+                setWeeklyMinimumCharge(0);
+                setChargeDayOfWeek('');
             }
         }
     }, [onlineClubToEdit, isOpen]);
@@ -1956,11 +1963,12 @@ const CreateEditOnlineClubDialog: FC<{
         }
         setIsSaving(true);
         try {
+            const chargeDay = chargeDayOfWeek || undefined;
             if (onlineClubToEdit) {
-                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim(), eligiblePlayerIds });
+                await updateOnlineClub(onlineClubToEdit.id, { name: name.trim(), currency: currency.trim() || 'INR', whatsappGroupId: whatsappGroupId.trim(), eligiblePlayerIds, weeklyMinimumCharge, chargeDayOfWeek: chargeDay });
                 toast({ title: 'Success', description: `Online club "${name.trim()}" updated.` });
             } else {
-                await createOnlineClub(name.trim(), currency.trim() || 'INR', whatsappGroupId.trim(), eligiblePlayerIds);
+                await createOnlineClub(name.trim(), currency.trim() || 'INR', whatsappGroupId.trim(), eligiblePlayerIds, weeklyMinimumCharge, chargeDay);
                 toast({ title: 'Success', description: `Online club "${name.trim()}" created.` });
             }
             await onSave();
@@ -2024,6 +2032,39 @@ const CreateEditOnlineClubDialog: FC<{
                                 Test Group
                             </Button>
                         </div>
+                         <Separator />
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="weekly-charge">Weekly Minimum Charge</Label>
+                                <Input 
+                                    id="weekly-charge" 
+                                    type="number" 
+                                    value={weeklyMinimumCharge || ''} 
+                                    onChange={e => setWeeklyMinimumCharge(Number(e.target.value))} 
+                                    placeholder="e.g., 500" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="charge-day">Charge Day of Week</Label>
+                                <Select 
+                                    value={chargeDayOfWeek || ''} 
+                                    onValueChange={(value) => setChargeDayOfWeek(value as any)}
+                                    disabled={!weeklyMinimumCharge || weeklyMinimumCharge <= 0}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a day" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                            <SelectItem key={day} value={day}>{day}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground px-1">
+                            Optionally, set a weekly fee that will be applied to player accounts if their weekly profit/loss is negative. The charge is only applied if a minimum charge is set.
+                        </p>
                          <Separator />
                         <div className="space-y-2">
                             <Label>Eligible Players</Label>

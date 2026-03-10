@@ -38,15 +38,16 @@ export async function getOnlinePlayerAccount(playerId: string): Promise<OnlinePl
 }
 
 export async function getOnlinePlayerAccounts(clubId?: string): Promise<OnlinePlayerAccount[]> {
-    const q = clubId
-        ? query(collection(db, ONLINE_ACCOUNTS_COLLECTION), where("clubId", "==", clubId))
-        : collection(db, ONLINE_ACCOUNTS_COLLECTION);
-    
+    const q = collection(db, ONLINE_ACCOUNTS_COLLECTION);
     const querySnapshot = await getDocs(q);
     const accounts: OnlinePlayerAccount[] = [];
     querySnapshot.forEach((doc) => {
         accounts.push({ id: doc.id, ...doc.data() } as OnlinePlayerAccount);
     });
+    
+    if (clubId) {
+        return accounts.filter(acc => acc.clubId === clubId).sort((a,b) => a.playerName.localeCompare(b.playerName));
+    }
     return accounts.sort((a,b) => a.playerName.localeCompare(b.name));
 }
 
@@ -73,6 +74,11 @@ export async function getAllOnlineLedgerEntries(): Promise<OnlineLedgerEntry[]> 
 }
 
 export async function addProfitLoss(accountId: string, amount: number, date: string, onlineClubName: string): Promise<void> {
+    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+    const accountSnap = await getDoc(accountRef);
+    if (!accountSnap.exists()) {
+        await getOnlinePlayerAccount(accountId);
+    }
     const newLedgerEntry: Omit<OnlineLedgerEntry, 'id'> = {
         accountId,
         type: 'p/l',
@@ -88,6 +94,11 @@ export async function addProfitLoss(accountId: string, amount: number, date: str
 
 
 export async function recordTransaction(accountId: string, type: 'deposit' | 'withdrawal', amount: number, paymentMode: string, date: string, onlineClubName: string): Promise<void> {
+    const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
+    const accountSnap = await getDoc(accountRef);
+    if (!accountSnap.exists()) {
+        await getOnlinePlayerAccount(accountId);
+    }
     const transactionAmount = type === 'deposit' ? amount : -amount;
 
     let transactionDate: Date;
@@ -216,24 +227,12 @@ async function recalculateAccountBalance(accountId: string): Promise<void> {
     }
 
     const accountRef = doc(db, ONLINE_ACCOUNTS_COLLECTION, accountId);
-    const playerDoc = await getDoc(doc(db, "masterPlayers", accountId));
     
-    if (!playerDoc.exists()) {
-        console.error(`Cannot recalculate balance: MasterPlayer with ID ${accountId} not found.`);
-        return;
-    }
-    const playerData = playerDoc.data() as MasterPlayer;
-
-    const accountData = {
+    // Update balance
+    batch.update(accountRef, { 
         balance: currentBalance,
         lastUpdated: new Date().toISOString(),
-        playerId: accountId,
-        playerName: playerData.name,
-        clubId: playerData.clubId,
-    };
-    
-    // Use set with merge to create or update the account doc.
-    batch.set(accountRef, accountData, { merge: true });
+    });
     
     await batch.commit();
 }
@@ -241,13 +240,22 @@ async function recalculateAccountBalance(accountId: string): Promise<void> {
 
 // ====== ONLINE CLUB MANAGEMENT ======
 
-export async function createOnlineClub(name: string, currency?: string, whatsappGroupId?: string, eligiblePlayerIds?: string[]): Promise<OnlineClub> {
-    const newOnlineClub: Omit<OnlineClub, 'id'> = { name, currency: currency || 'INR', whatsappGroupId: whatsappGroupId || '', eligiblePlayerIds: eligiblePlayerIds || [] };
+export async function createOnlineClub(name: string, currency?: string, whatsappGroupId?: string, eligiblePlayerIds?: string[], weeklyMinimumCharge?: number, chargeDayOfWeek?: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday'): Promise<OnlineClub> {
+    const newOnlineClub: Omit<OnlineClub, 'id'> = { 
+        name, 
+        currency: currency || 'INR', 
+        whatsappGroupId: whatsappGroupId || '', 
+        eligiblePlayerIds: eligiblePlayerIds || [],
+        weeklyMinimumCharge: weeklyMinimumCharge || 0,
+    };
+    if (chargeDayOfWeek) {
+        (newOnlineClub as OnlineClub).chargeDayOfWeek = chargeDayOfWeek;
+    }
     const docRef = await addDoc(collection(db, ONLINE_CLUBS_COLLECTION), newOnlineClub);
     return { id: docRef.id, ...newOnlineClub };
 }
 
-export async function updateOnlineClub(onlineClubId: string, updates: Partial<Pick<OnlineClub, 'name' | 'currency' | 'whatsappGroupId' | 'eligiblePlayerIds'>>): Promise<void> {
+export async function updateOnlineClub(onlineClubId: string, updates: Partial<Pick<OnlineClub, 'name' | 'currency' | 'whatsappGroupId' | 'eligiblePlayerIds' | 'weeklyMinimumCharge' | 'chargeDayOfWeek'>>): Promise<void> {
     const docRef = doc(db, ONLINE_CLUBS_COLLECTION, onlineClubId);
     await setDoc(docRef, updates, { merge: true });
 }

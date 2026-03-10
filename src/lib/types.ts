@@ -114,6 +114,8 @@ export interface OnlineClub {
   currency?: string;
   whatsappGroupId?: string;
   eligiblePlayerIds?: string[];
+  weeklyMinimumCharge?: number;
+  chargeDayOfWeek?: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 }
 
 export interface OnlinePlayerAccount {
