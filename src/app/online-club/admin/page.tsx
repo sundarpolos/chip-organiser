@@ -300,7 +300,6 @@ const AdminOnlineClubPage: FC = () => {
     const [selectedAccount, setSelectedAccount] = useState<OnlinePlayerAccount | null>(null);
     const [transactionType, setTransactionType] = useState<'deposit' | 'withdrawal'>('deposit');
     const [playerLedger, setPlayerLedger] = useState<OnlineLedgerEntry[]>([]);
-    const [isDeletingPlayer, setIsDeletingPlayer] = useState(false);
     const [isEditTransactionModalOpen, setEditTransactionModalOpen] = useState(false);
     const [entryToEdit, setEntryToEdit] = useState<OnlineLedgerEntry | null>(null);
 
@@ -328,10 +327,12 @@ const AdminOnlineClubPage: FC = () => {
         const map = new Map<string, string>();
         if (allOnlineClubs) {
             allOnlineClubs.forEach(club => {
-                if (club.name && club.name.toLowerCase() === 'phoenix') {
-                    map.set(club.name, 'Rs.');
-                } else if (club.name) {
-                    map.set(club.name, club.currency || '₹');
+                if (club.name) {
+                    if (club.name.toLowerCase() === 'phoenix') {
+                        map.set(club.name, 'Rs.');
+                    } else {
+                        map.set(club.name, club.currency || '₹');
+                    }
                 }
             });
         }
@@ -433,15 +434,10 @@ const AdminOnlineClubPage: FC = () => {
 
     const handleConfirmBulkDelete = async (accountIds: string[]) => {
         setBulkDeleteModalOpen(false);
-        try {
-            await deleteMultipleOnlinePlayerAccounts(accountIds);
-            toast({ title: 'Accounts Deleted', description: `${accountIds.length} accounts have been successfully removed.` });
-            setSelectedAccountIds([]);
-            await refreshData();
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : "Could not delete selected accounts.";
-            toast({ variant: 'destructive', title: 'Bulk Deletion Failed', description: msg });
-        }
+        await deleteMultipleOnlinePlayerAccounts(accountIds);
+        toast({ title: 'Accounts Deleted', description: `${accountIds.length} accounts have been successfully removed.` });
+        setSelectedAccountIds([]);
+        await refreshData();
     };
 
 
@@ -483,10 +479,13 @@ const AdminOnlineClubPage: FC = () => {
         }
     };
     
-    const handleDeletePlayerAccount = async (accountId: string, playerName: string) => {
+    const handleDeletePlayerAccount = async (accountId: string) => {
         setDeleteModalOpen(false);
+        const playerToDelete = accounts.find(acc => acc.id === accountId);
         await deleteOnlinePlayerAccount(accountId);
-        toast({ title: "Account Deleted", description: `The account for ${playerName} has been deleted.` });
+        if (playerToDelete) {
+            toast({ title: "Account Deleted", description: `The account for ${playerToDelete.playerName} has been deleted.` });
+        }
         await refreshData();
     };
 
@@ -983,61 +982,21 @@ const AdminOnlineClubPage: FC = () => {
                                     </div>
                                     <Separator />
                                     <div className="flex justify-end gap-2">
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'deposit')}>
-                                                        <Plus className="h-4 w-4" />
-                                                        <span className="sr-only">Deposit</span>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Deposit</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
-                                                        <Minus className="h-4 w-4" />
-                                                        <span className="sr-only">Withdrawal</span>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Withdrawal</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => handleOpenLedger(account)}>
-                                                        <Landmark className="h-4 w-4" />
-                                                        <span className="sr-only">Ledger</span>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>View Ledger</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                        <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => {
-                                                        setPlayerToDelete(account);
-                                                        setDeleteModalOpen(true);
-                                                    }}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                        <span className="sr-only">Delete</span>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Delete Account</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'deposit')}>
+                                            <Plus className="h-4 w-4 mr-1" /> Deposit
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleOpenTransaction(account, 'withdrawal')}>
+                                            <Minus className="h-4 w-4 mr-1" /> Withdraw
+                                        </Button>
+                                        <Button size="sm" variant="secondary" onClick={() => handleOpenLedger(account)}>
+                                            <Landmark className="h-4 w-4 mr-1" /> Ledger
+                                        </Button>
+                                        <Button size="sm" variant="destructive" onClick={() => {
+                                            setPlayerToDelete(account);
+                                            setDeleteModalOpen(true);
+                                        }}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -1114,7 +1073,6 @@ const AdminOnlineClubPage: FC = () => {
                     account={playerToDelete}
                     clubName={allClubs.find(c => c.id === playerToDelete.clubId)?.name || 'N/A'}
                     onConfirmDelete={handleDeletePlayerAccount}
-                    toast={toast}
                 />
             )}
             {reportContext && (
@@ -1141,56 +1099,14 @@ const BulkDeleteAccountDialog: FC<{
     allClubs: Club[];
 }> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast, allClubs }) => {
     const [isDeleting, setIsDeleting] = useState(false);
-    const [otp, setOtp] = useState('');
-    const [sentOtp, setSentOtp] = useState('');
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [isSendingOtp, setIsSendingOtp] = useState(false);
     
     useEffect(() => {
         if (!isOpen) {
             setIsDeleting(false);
-            setOtp('');
-            setSentOtp('');
-            setIsOtpSent(false);
-            setIsSendingOtp(false);
         }
     }, [isOpen]);
-    
-    const handleRequestOtp = async () => {
-        if (accountsToDelete.length === 0) return;
-        setIsSendingOtp(true);
-        
-        const clubIds = new Set(accountsToDelete.map(a => a.clubId));
-        let clubName = "multiple clubs";
-        if (clubIds.size === 1) {
-            const club = allClubs.find(c => c.id === accountsToDelete[0].clubId);
-            if (club) clubName = club.name;
-        }
-
-        try {
-            const result = await sendDeleteOnlineAccountOtp({
-                playerName: `${accountsToDelete.length} player(s)`,
-                clubName: clubName,
-            });
-            if (result.success && result.otp) {
-                setSentOtp(result.otp);
-                setIsOtpSent(true);
-                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
-            } else {
-                throw new Error(result.error || 'Failed to send OTP.');
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
-        } finally {
-            setIsSendingOtp(false);
-        }
-    };
 
     const handleDelete = async () => {
-        if (otp !== sentOtp) {
-            toast({ variant: 'destructive', title: 'Invalid OTP' });
-            return;
-        }
         setIsDeleting(true);
         await onConfirmDelete(accountsToDelete.map(a => a.id));
         setIsDeleting(false);
@@ -1202,9 +1118,7 @@ const BulkDeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {accountsToDelete.length} Online Accounts?</DialogTitle>
                     <DialogDescription>
-                        {isOtpSent
-                            ? "Enter the OTP sent to the Super Admin's WhatsApp to finalize the deletion."
-                            : "This will permanently delete the selected accounts and all their transaction history. An OTP will be sent to the Super Admin to confirm."}
+                        This will permanently delete the selected accounts and all their transaction history.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1214,27 +1128,13 @@ const BulkDeleteAccountDialog: FC<{
                         {accountsToDelete.map(acc => <li key={acc.id}>{acc.playerName}</li>)}
                     </ul>
                 </ScrollArea>
-                
-                {isOtpSent && (
-                    <div className="py-4 space-y-2">
-                       <Label htmlFor="delete-bulk-otp">Admin OTP</Label>
-                       <Input id="delete-bulk-otp" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-digit OTP" />
-                    </div>
-                )}
 
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    {isOtpSent ? (
-                        <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Confirm & Delete Accounts
-                        </Button>
-                    ) : (
-                        <Button variant="destructive" onClick={handleRequestOtp} disabled={isSendingOtp}>
-                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Send OTP to Delete
-                        </Button>
-                    )}
+                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                        Confirm & Delete Accounts
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1247,54 +1147,19 @@ const DeleteAccountDialog: FC<{
     onOpenChange: (open: boolean) => void;
     account: OnlinePlayerAccount;
     clubName: string;
-    onConfirmDelete: (accountId: string, playerName: string) => Promise<void>;
-    toast: ReturnType<typeof useToast>['toast'];
-}> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
+    onConfirmDelete: (accountId: string) => Promise<void>;
+}> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete }) => {
     const [isDeleting, setIsDeleting] = useState(false);
-    const [otp, setOtp] = useState('');
-    const [sentOtp, setSentOtp] = useState('');
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [isSendingOtp, setIsSendingOtp] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
-            // Reset state on close
             setIsDeleting(false);
-            setOtp('');
-            setSentOtp('');
-            setIsOtpSent(false);
-            setIsSendingOtp(false);
         }
     }, [isOpen]);
 
-    const handleRequestOtp = async () => {
-        setIsSendingOtp(true);
-        try {
-            const result = await sendDeleteOnlineAccountOtp({
-                playerName: account.playerName,
-                clubName: clubName,
-            });
-            if (result.success && result.otp) {
-                setSentOtp(result.otp);
-                setIsOtpSent(true);
-                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
-            } else {
-                throw new Error(result.error || 'Failed to send OTP.');
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
-        } finally {
-            setIsSendingOtp(false);
-        }
-    };
-
     const handleDelete = async () => {
-        if (otp !== sentOtp) {
-            toast({ variant: 'destructive', title: 'Invalid OTP' });
-            return;
-        }
         setIsDeleting(true);
-        await onConfirmDelete(account.id, account.playerName);
+        await onConfirmDelete(account.id);
         setIsDeleting(false);
     };
     
@@ -1304,32 +1169,15 @@ const DeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {account.playerName}'s Online Account?</DialogTitle>
                     <DialogDescription>
-                        {isOtpSent
-                            ? "Enter the OTP sent to the Super Admin's WhatsApp to finalize the deletion."
-                            : 'This is a critical action. To proceed, an OTP will be sent to the Super Admin for verification.'}
+                        Are you sure you want to proceed? This will permanently delete this player's online account and all associated transactions.
                     </DialogDescription>
                 </DialogHeader>
-                
-                {isOtpSent && (
-                    <div className="py-4 space-y-2">
-                       <Label htmlFor="delete-otp">Admin OTP</Label>
-                       <Input id="delete-otp" value={otp} onChange={e => setOtp(e.target.value)} placeholder="4-digit OTP" />
-                    </div>
-                )}
-
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    {isOtpSent ? (
-                        <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Confirm & Delete
-                        </Button>
-                    ) : (
-                        <Button variant="destructive" onClick={handleRequestOtp} disabled={isSendingOtp}>
-                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
-                            Send OTP to Delete
-                        </Button>
-                    )}
+                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                        Confirm & Delete
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1557,6 +1405,7 @@ const LedgerDialog: FC<{
                             activeTab={activeTab}
                             accountId={account.id}
                             dateRange={dateRange}
+                            onlineClub={activeOnlineClub}
                         />
                     </TabsContent>
                 </Tabs>
@@ -1930,7 +1779,8 @@ const AdminWeeklyLedgerAccordion: FC<{
     activeTab: string,
     accountId: string,
     dateRange: DateRange | undefined;
-}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol, activeTab, accountId, dateRange }) => {
+    onlineClub: OnlineClub | undefined;
+}> = ({ entries, onlineClubCurrencyMap, onEditEntry, onDeleteEntry, currencySymbol, activeTab, accountId, dateRange, onlineClub }) => {
     
     const weeklyData = useMemo(() => {
         if (!entries) return [];
@@ -1941,7 +1791,6 @@ const AdminWeeklyLedgerAccordion: FC<{
         const fromDate = dateRange?.from ? new Date(dateRange.from.setHours(0, 0, 0, 0)) : null;
 
         if (fromDate) {
-            // Use all entries for opening balance calculation, not just the filtered ones for the tab
             sortedLedger.forEach(entry => {
                 if (parseISO(entry.date) < fromDate) {
                     openingBalanceForPeriod += entry.amount;
@@ -1972,26 +1821,64 @@ const AdminWeeklyLedgerAccordion: FC<{
         let weekEntries: OnlineLedgerEntry[] = [];
         let currentWeekStart = startOfWeek(parseISO(periodEntries[0].date), { weekStartsOn: 1 });
 
+        const processWeek = (entriesForWeek: OnlineLedgerEntry[], startOfWeekDate: Date, openingForWeek: number) => {
+            let processedEntries = [...entriesForWeek];
+            
+            if (onlineClub && onlineClub.weeklyMinimumCharge && onlineClub.weeklyMinimumCharge > 0 && onlineClub.chargeDayOfWeek) {
+                const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
+
+                if (weeklyPL < 0) {
+                    const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                    const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek];
+                    
+                    let chargeDate = new Date(startOfWeekDate);
+                    chargeDate.setDate(chargeDate.getDate() + chargeDayIndex);
+                    
+                    if(chargeDate < startOfWeekDate) {
+                        chargeDate.setDate(chargeDate.getDate() + 7);
+                    }
+                    chargeDate.setHours(23, 59, 0, 0);
+
+                    const chargeEntry: OnlineLedgerEntry = {
+                        id: `charge-${chargeDate.toISOString()}`,
+                        accountId: accountId,
+                        type: 'withdrawal',
+                        amount: -onlineClub.weeklyMinimumCharge,
+                        date: chargeDate.toISOString(),
+                        notes: 'Weekly Minimum Charge',
+                        runningBalance: 0, // temp
+                        onlineClubName: onlineClub.name
+                    };
+
+                    processedEntries.push(chargeEntry);
+                    processedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                }
+            }
+            
+            const weekEnd = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+            let weekRunningBalance = openingForWeek;
+            const augmentedEntries = processedEntries.map(e => {
+                weekRunningBalance += e.amount;
+                return { ...e, localRunningBalance: weekRunningBalance };
+            });
+
+            statements.push({
+                week: `${format(startOfWeekDate, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                openingBalance: openingForWeek,
+                entries: augmentedEntries,
+                closingBalance: weekRunningBalance,
+            });
+            
+            return weekRunningBalance;
+        };
+
+
         for (const entry of periodEntries) {
             const entryDate = parseISO(entry.date);
 
             if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
-                 if (weekEntries.length > 0) {
-                    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                    const openingForWeek = runningBalance;
-                    let weekRunningBalance = openingForWeek;
-                    const augmentedEntries = weekEntries.map(e => {
-                        weekRunningBalance += e.amount;
-                        return { ...e, localRunningBalance: weekRunningBalance };
-                    });
-
-                    statements.push({
-                        week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                        openingBalance: openingForWeek,
-                        entries: augmentedEntries,
-                        closingBalance: weekRunningBalance,
-                    });
-                    runningBalance = weekRunningBalance;
+                if (weekEntries.length > 0) {
+                    runningBalance = processWeek(weekEntries, currentWeekStart, runningBalance);
                 }
                 currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
                 weekEntries = [entry];
@@ -2000,23 +1887,11 @@ const AdminWeeklyLedgerAccordion: FC<{
             }
         }
         if (weekEntries.length > 0) {
-            const openingForWeek = runningBalance;
-            let weekRunningBalance = openingForWeek;
-            const augmentedEntries = weekEntries.map(e => {
-                weekRunningBalance += e.amount;
-                return { ...e, localRunningBalance: weekRunningBalance };
-            });
-
-            statements.push({
-                week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                openingBalance: openingForWeek,
-                entries: augmentedEntries,
-                closingBalance: weekRunningBalance
-            });
+            processWeek(weekEntries, currentWeekStart, runningBalance);
         }
         
         return statements.reverse();
-    }, [entries, dateRange]);
+    }, [entries, dateRange, onlineClub, accountId]);
 
     if (!weeklyData || weeklyData.length === 0) {
         return (
