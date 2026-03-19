@@ -54,10 +54,12 @@ const WeeklyLedgerAccordion: FC<{
     
         const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
+        type AugmentedOnlineLedgerEntry = OnlineLedgerEntry & { effectiveAmount: number; localRunningBalance: number; };
+
         const statements: {
             week: string;
             openingBalance: number;
-            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            entries: AugmentedOnlineLedgerEntry[];
             closingBalance: number;
         }[] = [];
     
@@ -69,7 +71,14 @@ const WeeklyLedgerAccordion: FC<{
             let openingBalanceForFirstWeek = 0;
             sortedLedger.forEach(entry => {
                 if (parseISO(entry.date) < firstWeekStart) {
-                    openingBalanceForFirstWeek += entry.amount;
+                    let effectiveAmount = entry.amount;
+                    if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    if(entry.notes === "Weekly Minimum Charge") {
+                        effectiveAmount = entry.amount;
+                    }
+                    openingBalanceForFirstWeek += effectiveAmount;
                 }
             });
             
@@ -88,8 +97,12 @@ const WeeklyLedgerAccordion: FC<{
                         const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
                         let weekRunningBalance = runningBalance;
                         const augmentedEntries = weekEntries.map(e => {
-                            weekRunningBalance += e.amount;
-                            return {...e, localRunningBalance: weekRunningBalance };
+                            let effectiveAmount = e.amount;
+                            if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                                effectiveAmount *= 0.5;
+                            }
+                            weekRunningBalance += effectiveAmount;
+                            return {...e, effectiveAmount, localRunningBalance: weekRunningBalance };
                         });
                         
                         statements.push({
@@ -111,8 +124,12 @@ const WeeklyLedgerAccordion: FC<{
             if (weekEntries.length > 0) {
                 let weekRunningBalance = runningBalance;
                 const augmentedEntries = weekEntries.map(e => {
-                    weekRunningBalance += e.amount;
-                    return {...e, localRunningBalance: weekRunningBalance };
+                    let effectiveAmount = e.amount;
+                    if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    weekRunningBalance += effectiveAmount;
+                    return {...e, effectiveAmount, localRunningBalance: weekRunningBalance };
                 });
                 
                 statements.push({
@@ -174,7 +191,14 @@ const WeeklyLedgerAccordion: FC<{
                                         </span>
                                     </TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                        {entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
+                                        {entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l' ? (
+                                            <div>
+                                                <span>{entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}</span>
+                                                <span className="text-muted-foreground text-xs block">({entry.effectiveAmount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.effectiveAmount).toFixed(0)})</span>
+                                            </div>
+                                        ) : (
+                                            <span>{entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}</span>
+                                        )}
                                     </TableCell>
                                      <TableCell className="text-right font-mono p-2 text-xs">
                                        {displaySymbol}{entry.localRunningBalance.toFixed(0)}
@@ -500,7 +524,11 @@ const OnlineClubPage: FC = () => {
     
         ledger.forEach(entry => {
             if (entry.onlineClubName && balances.hasOwnProperty(entry.onlineClubName)) {
-                balances[entry.onlineClubName].balance += entry.amount;
+                let effectiveAmount = entry.amount;
+                if (entry.onlineClubName.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                    effectiveAmount *= 0.5;
+                }
+                balances[entry.onlineClubName].balance += effectiveAmount;
             }
         });
     
@@ -513,10 +541,12 @@ const OnlineClubPage: FC = () => {
     
         const sortedLedger = [...entriesForTab].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
+        type AugmentedOnlineLedgerEntry = OnlineLedgerEntry & { effectiveAmount: number; localRunningBalance: number; };
+
         const statements: {
             week: string;
             openingBalance: number;
-            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            entries: AugmentedOnlineLedgerEntry[];
             closingBalance: number;
         }[] = [];
     
@@ -528,7 +558,11 @@ const OnlineClubPage: FC = () => {
             let openingBalanceForFirstWeek = 0;
             sortedLedger.forEach(entry => {
                 if (parseISO(entry.date) < firstWeekStart) {
-                    openingBalanceForFirstWeek += entry.amount;
+                    let effectiveAmount = entry.amount;
+                    if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    openingBalanceForFirstWeek += effectiveAmount;
                 }
             });
             
@@ -547,8 +581,12 @@ const OnlineClubPage: FC = () => {
                         const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
                         let weekRunningBalance = runningBalance;
                         const augmentedEntries = weekEntries.map(e => {
-                            weekRunningBalance += e.amount;
-                            return {...e, localRunningBalance: weekRunningBalance };
+                            let effectiveAmount = e.amount;
+                             if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                                effectiveAmount *= 0.5;
+                            }
+                            weekRunningBalance += effectiveAmount;
+                            return {...e, effectiveAmount, localRunningBalance: weekRunningBalance };
                         });
                         
                         statements.push({
@@ -570,8 +608,12 @@ const OnlineClubPage: FC = () => {
             if (weekEntries.length > 0) {
                 let weekRunningBalance = runningBalance;
                 const augmentedEntries = weekEntries.map(e => {
-                    weekRunningBalance += e.amount;
-                    return {...e, localRunningBalance: weekRunningBalance };
+                    let effectiveAmount = e.amount;
+                    if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    weekRunningBalance += effectiveAmount;
+                    return {...e, effectiveAmount, localRunningBalance: weekRunningBalance };
                 });
                 
                 statements.push({
@@ -1058,3 +1100,4 @@ export default OnlineClubPage;
     
 
     
+

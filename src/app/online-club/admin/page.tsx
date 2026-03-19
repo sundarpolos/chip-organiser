@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, type FC } from 'react';
@@ -1424,7 +1425,11 @@ const LedgerDialog: FC<{
                     const currency = club?.name?.toLowerCase() === 'phoenix' ? 'Rs.' : (club?.currency || '₹');
                     balances[entry.onlineClubName] = { balance: 0, currency };
                 }
-                balances[entry.onlineClubName].balance += entry.amount;
+                let effectiveAmount = entry.amount;
+                if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                    effectiveAmount *= 0.5;
+                }
+                balances[entry.onlineClubName].balance += effectiveAmount;
             }
         });
     
@@ -1884,7 +1889,11 @@ const AdminWeeklyLedgerAccordion: FC<{
         if (fromDate) {
             sortedLedger.forEach(entry => {
                 if (parseISO(entry.date) < fromDate) {
-                    openingBalanceForPeriod += entry.amount;
+                    let effectiveAmount = entry.amount;
+                    if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    openingBalanceForPeriod += effectiveAmount;
                 }
             });
         }
@@ -1901,20 +1910,23 @@ const AdminWeeklyLedgerAccordion: FC<{
 
         if (periodEntries.length === 0) return [];
     
+        type AugmentedOnlineLedgerEntry = OnlineLedgerEntry & { effectiveAmount: number; localRunningBalance: number; };
         const statements: {
             week: string;
             openingBalance: number;
-            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            entries: AugmentedOnlineLedgerEntry[];
             closingBalance: number;
         }[] = [];
     
         let runningBalance = openingBalanceForPeriod;
         let weekEntries: OnlineLedgerEntry[] = [];
-        let currentWeekStart = startOfWeek(parseISO(periodEntries[0].date), { weekStartsOn: 1 });
+        let currentWeekStart = periodEntries.length > 0 ? startOfWeek(parseISO(periodEntries[0].date), { weekStartsOn: 1 }) : new Date();
 
         const processWeek = (entriesForWeek: OnlineLedgerEntry[], startOfWeekDate: Date, openingForWeek: number) => {
-            let processedEntries = [...entriesForWeek];
+            let processedEntries: OnlineLedgerEntry[] = [...entriesForWeek];
             
+            const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
+
             if (onlineClub && onlineClub.weeklyMinimumCharge && onlineClub.weeklyMinimumCharge > 0 && onlineClub.chargeDayOfWeek) {
                 const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
 
@@ -1922,9 +1934,8 @@ const AdminWeeklyLedgerAccordion: FC<{
                     const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
                     const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek];
                     
-                    const chargeDate = new Date(startOfWeekDate); // This is a Monday
-                    // startOfWeekDate.getDay() is always 1 because weekStartsOn: 1
-                    const dayOffset = (chargeDayIndex - 1 + 7) % 7;
+                    const chargeDate = new Date(startOfWeekDate);
+                    const dayOffset = (chargeDayIndex - (startOfWeekDate.getDay() === 0 ? 7 : startOfWeekDate.getDay()) + 7) % 7;
                     chargeDate.setDate(chargeDate.getDate() + dayOffset);
                     chargeDate.setHours(23, 59, 0, 0);
 
@@ -1947,8 +1958,12 @@ const AdminWeeklyLedgerAccordion: FC<{
             const weekEnd = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
             let weekRunningBalance = openingForWeek;
             const augmentedEntries = processedEntries.map(e => {
-                weekRunningBalance += e.amount;
-                return { ...e, localRunningBalance: weekRunningBalance };
+                let effectiveAmount = e.amount;
+                if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                    effectiveAmount *= 0.5;
+                }
+                weekRunningBalance += effectiveAmount;
+                return { ...e, effectiveAmount, localRunningBalance: weekRunningBalance };
             });
 
             statements.push({
@@ -2031,7 +2046,14 @@ const AdminWeeklyLedgerAccordion: FC<{
                                     </TableCell>
                                     <TableCell>{entry.notes}</TableCell>
                                     <TableCell className={cn('text-right font-mono p-2 text-xs', entry.amount >= 0 ? 'text-green-600' : 'text-red-600')}>
-                                        {entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}
+                                       {entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l' ? (
+                                            <div>
+                                                <span>{entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}</span>
+                                                <span className="text-muted-foreground text-xs block">({entry.effectiveAmount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.effectiveAmount).toFixed(0)})</span>
+                                            </div>
+                                        ) : (
+                                            <span>{entry.amount >= 0 ? '+' : '-'}{onlineClubCurrencyMap.get(entry.onlineClubName || '') || '₹'}{Math.abs(entry.amount).toFixed(0)}</span>
+                                        )}
                                     </TableCell>
                                      <TableCell className="text-right font-mono p-2 text-xs">
                                        {displaySymbol}{entry.localRunningBalance.toFixed(0)}
@@ -2078,5 +2100,6 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
