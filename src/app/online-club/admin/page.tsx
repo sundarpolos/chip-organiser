@@ -328,11 +328,7 @@ const AdminOnlineClubPage: FC = () => {
         if (allOnlineClubs) {
             allOnlineClubs.forEach(club => {
                 if (club.name) {
-                    if (club.name.toLowerCase() === 'phoenix') {
-                        map.set(club.name, 'Rs.');
-                    } else {
-                        map.set(club.name, club.currency || '₹');
-                    }
+                    map.set(club.name, club.currency || '₹');
                 }
             });
         }
@@ -481,8 +477,8 @@ const AdminOnlineClubPage: FC = () => {
     
     const handleDeletePlayerAccount = async (accountId: string) => {
         setDeleteModalOpen(false);
-        const playerToDelete = accounts.find(acc => acc.id === accountId);
         await deleteOnlinePlayerAccount(accountId);
+        const playerToDelete = accounts.find(acc => acc.id === accountId);
         if (playerToDelete) {
             toast({ title: "Account Deleted", description: `The account for ${playerToDelete.playerName} has been deleted.` });
         }
@@ -1073,6 +1069,7 @@ const AdminOnlineClubPage: FC = () => {
                     account={playerToDelete}
                     clubName={allClubs.find(c => c.id === playerToDelete.clubId)?.name || 'N/A'}
                     onConfirmDelete={handleDeletePlayerAccount}
+                    toast={toast}
                 />
             )}
             {reportContext && (
@@ -1099,14 +1096,47 @@ const BulkDeleteAccountDialog: FC<{
     allClubs: Club[];
 }> = ({ isOpen, onOpenChange, accountsToDelete, onConfirmDelete, toast, allClubs }) => {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
     
     useEffect(() => {
         if (!isOpen) {
             setIsDeleting(false);
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSendingOtp(false);
         }
     }, [isOpen]);
 
-    const handleDelete = async () => {
+    const handleDeleteRequest = async () => {
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: `(${accountsToDelete.length}) players`,
+                clubName: 'Multiple'
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+    
+    const handleConfirm = async () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The OTP is incorrect.' });
+            return;
+        }
         setIsDeleting(true);
         await onConfirmDelete(accountsToDelete.map(a => a.id));
         setIsDeleting(false);
@@ -1129,12 +1159,26 @@ const BulkDeleteAccountDialog: FC<{
                     </ul>
                 </ScrollArea>
 
+                {isOtpSent && (
+                    <div className="space-y-2">
+                        <Label htmlFor="bulk-delete-otp">Admin OTP</Label>
+                        <Input id="bulk-delete-otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                    </div>
+                )}
+                
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                        Confirm & Delete Accounts
-                    </Button>
+                    {!isOtpSent ? (
+                        <Button variant="destructive" onClick={handleDeleteRequest} disabled={isSendingOtp}>
+                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send OTP to Delete
+                        </Button>
+                    ) : (
+                        <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1148,16 +1192,50 @@ const DeleteAccountDialog: FC<{
     account: OnlinePlayerAccount;
     clubName: string;
     onConfirmDelete: (accountId: string) => Promise<void>;
-}> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete }) => {
+    toast: ReturnType<typeof useToast>['toast'];
+}> = ({ isOpen, onOpenChange, account, clubName, onConfirmDelete, toast }) => {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [sentOtp, setSentOtp] = useState('');
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [isSendingOtp, setIsSendingOtp] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
             setIsDeleting(false);
+            setOtp('');
+            setSentOtp('');
+            setIsOtpSent(false);
+            setIsSendingOtp(false);
         }
     }, [isOpen]);
-
-    const handleDelete = async () => {
+    
+    const handleDeleteRequest = async () => {
+        setIsSendingOtp(true);
+        try {
+            const result = await sendDeleteOnlineAccountOtp({
+                playerName: account.playerName,
+                clubName: clubName
+            });
+            if (result.success && result.otp) {
+                setSentOtp(result.otp);
+                setIsOtpSent(true);
+                toast({ title: 'OTP Sent', description: 'An OTP has been sent to the Super Admin.' });
+            } else {
+                throw new Error(result.error || 'Failed to send OTP.');
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'OTP Error', description: e.message });
+        } finally {
+            setIsSendingOtp(false);
+        }
+    };
+    
+    const handleConfirm = async () => {
+        if (otp !== sentOtp) {
+            toast({ variant: 'destructive', title: 'Invalid OTP', description: 'The OTP is incorrect.' });
+            return;
+        }
         setIsDeleting(true);
         await onConfirmDelete(account.id);
         setIsDeleting(false);
@@ -1169,15 +1247,28 @@ const DeleteAccountDialog: FC<{
                 <DialogHeader>
                     <DialogTitle>Delete {account.playerName}'s Online Account?</DialogTitle>
                     <DialogDescription>
-                        Are you sure you want to proceed? This will permanently delete this player's online account and all associated transactions.
+                        This action will permanently delete this player's online account and all associated transactions.
                     </DialogDescription>
                 </DialogHeader>
+                 {isOtpSent && (
+                    <div className="space-y-2 py-4">
+                        <Label htmlFor="delete-otp">Admin OTP</Label>
+                        <Input id="delete-otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="4-digit OTP" />
+                    </div>
+                )}
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-                        {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
-                        Confirm & Delete
-                    </Button>
+                     {!isOtpSent ? (
+                        <Button variant="destructive" onClick={handleDeleteRequest} disabled={isSendingOtp}>
+                            {isSendingOtp ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Send OTP to Delete
+                        </Button>
+                    ) : (
+                        <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="animate-spin mr-2" /> : null}
+                            Confirm & Delete
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1385,7 +1476,7 @@ const LedgerDialog: FC<{
                     <TabsList>
                         <TabsTrigger value="all">All</TabsTrigger>
                         {onlineClubs.map(club => (
-                            <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger>
+                            club.name ? <TabsTrigger key={club.id} value={club.name}>{club.name}</TabsTrigger> : null
                         ))}
                     </TabsList>
                     <TabsContent value={activeTab} className="mt-4">
@@ -1747,7 +1838,7 @@ const EditTransactionDialog: FC<{
                             <SelectContent>
                                 {onlineClubs && onlineClubs.length > 0 ? (
                                     onlineClubs.map(club => (
-                                        <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem>
+                                        club.name ? <SelectItem key={club.id} value={club.name}>{club.name}</SelectItem> : null
                                     ))
                                 ) : (
                                     <div className="p-4 text-center text-sm text-muted-foreground">
@@ -1831,12 +1922,10 @@ const AdminWeeklyLedgerAccordion: FC<{
                     const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
                     const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek];
                     
-                    let chargeDate = new Date(startOfWeekDate);
-                    chargeDate.setDate(chargeDate.getDate() + chargeDayIndex);
-                    
-                    if(chargeDate < startOfWeekDate) {
-                        chargeDate.setDate(chargeDate.getDate() + 7);
-                    }
+                    const chargeDate = new Date(startOfWeekDate); // This is a Monday
+                    // startOfWeekDate.getDay() is always 1 because weekStartsOn: 1
+                    const dayOffset = (chargeDayIndex - 1 + 7) % 7;
+                    chargeDate.setDate(chargeDate.getDate() + dayOffset);
                     chargeDate.setHours(23, 59, 0, 0);
 
                     const chargeEntry: OnlineLedgerEntry = {
@@ -1989,4 +2078,5 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
