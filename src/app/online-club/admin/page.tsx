@@ -1927,18 +1927,22 @@ const AdminWeeklyLedgerAccordion: FC<{
             
             const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
 
-            if (onlineClub && onlineClub.weeklyMinimumCharge && onlineClub.weeklyMinimumCharge > 0 && onlineClub.chargeDayOfWeek) {
-                const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
+            if (onlineClub && onlineClub.weeklyMinimumCharge && onlineClub.weeklyMinimumCharge > 0 && weeklyPL < 0) {
+                const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek || 'Monday'];
+                
+                const endOfWeekDate = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+                const chargeDate = new Date(endOfWeekDate);
+                chargeDate.setHours(12, 0, 0, 0);
+                
+                // Find the next upcoming charge day, starting from the day after the week ends
+                chargeDate.setDate(chargeDate.getDate() + 1);
+                while (chargeDate.getDay() !== chargeDayIndex) {
+                    chargeDate.setDate(chargeDate.getDate() + 1);
+                }
 
-                if (weeklyPL < 0) {
-                    const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-                    const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek];
-                    
-                    const chargeDate = new Date(startOfWeekDate);
-                    const dayOffset = (chargeDayIndex - (startOfWeekDate.getDay() === 0 ? 7 : startOfWeekDate.getDay()) + 7) % 7;
-                    chargeDate.setDate(chargeDate.getDate() + dayOffset);
-                    chargeDate.setHours(23, 59, 0, 0);
-
+                const now = new Date();
+                if (chargeDate <= now) {
                     const chargeEntry: OnlineLedgerEntry = {
                         id: `charge-${chargeDate.toISOString()}`,
                         accountId: accountId,
@@ -2100,6 +2104,7 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
