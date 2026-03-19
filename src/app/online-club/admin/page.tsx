@@ -553,7 +553,10 @@ const AdminOnlineClubPage: FC = () => {
                 // --- BALANCE BADGES ---
                 let currentX = pageWidth - 40;
                 balanceByClub.slice().reverse().forEach(clubBalance => {
-                    const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                    let currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                     if (clubBalance.name.toLowerCase() === 'phoenix') {
+                        currencySymbol = '₹';
+                    }
                     const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                     const textWidth = doc.getTextWidth(text);
                     const badgeWidth = textWidth + 20;
@@ -568,13 +571,14 @@ const AdminOnlineClubPage: FC = () => {
                 });
                 yPos += 40;
 
-                const calculateWeeklyData = (entries: OnlineLedgerEntry[]) => {
+                const calculateWeeklyDataForPdf = (entries: OnlineLedgerEntry[], playerAccountId: string, targetOnlineClub: OnlineClub | undefined) => {
                     if (entries.length === 0) return [];
                     const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    type AugmentedEntry = OnlineLedgerEntry & { localRunningBalance: number; effectiveAmount: number; };
                     const statements: {
                         week: string;
                         openingBalance: number;
-                        entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+                        entries: AugmentedEntry[];
                         closingBalance: number;
                     }[] = [];
 
@@ -586,7 +590,11 @@ const AdminOnlineClubPage: FC = () => {
                         let openingBalanceForFirstWeek = 0;
                         sortedLedger.forEach(entry => {
                             if (parseISO(entry.date) < firstWeekStart) {
-                                openingBalanceForFirstWeek += entry.amount;
+                                let effectiveAmount = entry.amount;
+                                if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                                    effectiveAmount *= 0.5;
+                                }
+                                openingBalanceForFirstWeek += effectiveAmount;
                             }
                         });
                         
@@ -594,6 +602,62 @@ const AdminOnlineClubPage: FC = () => {
 
                         let weekEntries: OnlineLedgerEntry[] = [];
                         let currentWeekStart = firstWeekStart;
+                        
+                        const processWeek = (entriesForWeek: OnlineLedgerEntry[], startOfWeekDate: Date, openingForWeek: number) => {
+                            let processedEntries: OnlineLedgerEntry[] = [...entriesForWeek];
+                            
+                            const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
+
+                            if (targetOnlineClub && targetOnlineClub.weeklyMinimumCharge && targetOnlineClub.weeklyMinimumCharge > 0 && weeklyPL < 0) {
+                                const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                                const chargeDayIndex = chargeDayMap[targetOnlineClub.chargeDayOfWeek || 'Monday'];
+                                
+                                const endOfWeekDate = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+                                const chargeDate = new Date(endOfWeekDate);
+                                chargeDate.setHours(12, 0, 0, 0);
+                                
+                                chargeDate.setDate(chargeDate.getDate() + 1);
+                                while (chargeDate.getDay() !== chargeDayIndex) {
+                                    chargeDate.setDate(chargeDate.getDate() + 1);
+                                }
+
+                                const now = new Date();
+                                if (chargeDate <= now) {
+                                    const chargeEntry: OnlineLedgerEntry = {
+                                        id: `charge-${chargeDate.toISOString()}`,
+                                        accountId: playerAccountId,
+                                        type: 'withdrawal',
+                                        amount: -targetOnlineClub.weeklyMinimumCharge,
+                                        date: chargeDate.toISOString(),
+                                        notes: 'Weekly Minimum Charge',
+                                        runningBalance: 0, // temp
+                                        onlineClubName: targetOnlineClub.name
+                                    };
+                                    processedEntries.push(chargeEntry);
+                                    processedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                }
+                            }
+                            
+                            const weekEnd = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+                            let weekRunningBalance = openingForWeek;
+                            const augmentedEntries = processedEntries.map(e => {
+                                let effectiveAmount = e.amount;
+                                if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                                    effectiveAmount *= 0.5;
+                                }
+                                weekRunningBalance += effectiveAmount;
+                                return { ...e, localRunningBalance: weekRunningBalance, effectiveAmount };
+                            });
+                            
+                            statements.push({
+                                week: `${format(startOfWeekDate, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                                openingBalance: openingForWeek,
+                                entries: augmentedEntries,
+                                closingBalance: weekRunningBalance
+                            });
+                            return weekRunningBalance;
+                        };
+
 
                         for (const entry of sortedLedger) {
                             const entryDate = parseISO(entry.date);
@@ -601,42 +665,16 @@ const AdminOnlineClubPage: FC = () => {
 
                             if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
                                 if (weekEntries.length > 0) {
-                                    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                                    let weekRunningBalance = runningBalance;
-                                    const augmentedEntries = weekEntries.map(e => {
-                                        weekRunningBalance += e.amount;
-                                        return {...e, localRunningBalance: weekRunningBalance };
-                                    });
-                                    
-                                    statements.push({
-                                        week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                                        openingBalance: runningBalance,
-                                        entries: augmentedEntries,
-                                        closingBalance: weekRunningBalance
-                                    });
-                                    runningBalance = weekRunningBalance;
+                                    runningBalance = processWeek(weekEntries, currentWeekStart, runningBalance);
                                 }
-                                
                                 currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
                                 weekEntries = [entry];
                             } else {
                                 weekEntries.push(entry);
                             }
                         }
-                        
                         if (weekEntries.length > 0) {
-                            let weekRunningBalance = runningBalance;
-                            const augmentedEntries = weekEntries.map(e => {
-                                weekRunningBalance += e.amount;
-                                return {...e, localRunningBalance: weekRunningBalance };
-                            });
-                            
-                            statements.push({
-                                week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                                openingBalance: runningBalance,
-                                entries: augmentedEntries,
-                                closingBalance: weekRunningBalance
-                            });
+                            processWeek(weekEntries, currentWeekStart, runningBalance);
                         }
                     }
                     return statements;
@@ -652,7 +690,10 @@ const AdminOnlineClubPage: FC = () => {
                     }
         
                     const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
-                    const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                    let currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                     if (clubName.toLowerCase() === 'phoenix') {
+                        currencySymbol = '₹';
+                    }
 
                     // --- STATS SUMMARY ---
                     const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
@@ -689,7 +730,8 @@ const AdminOnlineClubPage: FC = () => {
                     yPos += 20;
 
                     // --- TRANSACTIONS TABLE ---
-                    const weeklyStatements = calculateWeeklyData(clubEntries);
+                    const weeklyStatements = calculateWeeklyDataForPdf(clubEntries, account.id, allOnlineClubs.find(c => c.name === clubName));
+
                     if (weeklyStatements && weeklyStatements.length > 0) {
                         for (const week of [...weeklyStatements].reverse()) { // Show oldest first
                             if (yPos > doc.internal.pageSize.getHeight() - 150) {
@@ -711,10 +753,17 @@ const AdminOnlineClubPage: FC = () => {
                                     ...week.entries.map(entry => {
                                         const typeText = entry.type === 'deposit' ? 'Deposit' : entry.type === 'withdrawal' ? 'Withdrawal' : (entry.amount >= 0 ? 'Profit' : 'Loss');
                                         const notesText = entry.notes ? ` - ${entry.notes}` : '';
+                                        
+                                        const isPhoenixPL = entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l';
+                                        
+                                        const amountCellContent = isPhoenixPL
+                                            ? `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\n(${entry.effectiveAmount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.effectiveAmount).toFixed(0)})`
+                                            : `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`;
+
                                         return [
                                             format(parseISO(entry.date), 'dd/MM/yyyy'),
                                             `${typeText}${notesText}`,
-                                            { content: `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`, styles: { halign: 'right' } },
+                                            { content: amountCellContent, styles: { halign: 'right', cellPadding: 2 } },
                                             { content: `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`, styles: { halign: 'right' } }
                                         ];
                                     })
@@ -1534,16 +1583,18 @@ const SendAdminReportDialog: FC<{
         if (!onlineClub) return [];
         const entries = ledger.filter(e => e.onlineClubName === onlineClub.name);
         if (entries.length === 0) return [];
-    
+
         const sortedLedger = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
+        
+        type AugmentedEntry = OnlineLedgerEntry & { localRunningBalance: number; effectiveAmount: number; };
+
         const statements: {
             week: string;
             openingBalance: number;
-            entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+            entries: AugmentedEntry[];
             closingBalance: number;
         }[] = [];
-    
+
         if (sortedLedger.length > 0) {
             let runningBalance = 0;
             const earliestEntry = sortedLedger[0];
@@ -1552,7 +1603,11 @@ const SendAdminReportDialog: FC<{
             let openingBalanceForFirstWeek = 0;
             sortedLedger.forEach(entry => {
                 if (parseISO(entry.date) < firstWeekStart) {
-                    openingBalanceForFirstWeek += entry.amount;
+                    let effectiveAmount = entry.amount;
+                    if (entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    openingBalanceForFirstWeek += effectiveAmount;
                 }
             });
             
@@ -1560,54 +1615,83 @@ const SendAdminReportDialog: FC<{
 
             let weekEntries: OnlineLedgerEntry[] = [];
             let currentWeekStart = firstWeekStart;
-    
+            
+            const processWeek = (entriesForWeek: OnlineLedgerEntry[], startOfWeekDate: Date, openingForWeek: number) => {
+                let processedEntries: OnlineLedgerEntry[] = [...entriesForWeek];
+                
+                const weeklyPL = entriesForWeek.filter(e => e.type === 'p/l').reduce((sum, e) => sum + e.amount, 0);
+
+                if (onlineClub && onlineClub.weeklyMinimumCharge && onlineClub.weeklyMinimumCharge > 0 && weeklyPL < 0) {
+                    const chargeDayMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                    const chargeDayIndex = chargeDayMap[onlineClub.chargeDayOfWeek || 'Monday'];
+                    
+                    const endOfWeekDate = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+                    const chargeDate = new Date(endOfWeekDate);
+                    chargeDate.setHours(12, 0, 0, 0);
+                    
+                    chargeDate.setDate(chargeDate.getDate() + 1);
+                    while (chargeDate.getDay() !== chargeDayIndex) {
+                        chargeDate.setDate(chargeDate.getDate() + 1);
+                    }
+
+                    const now = new Date();
+                    if (chargeDate <= now) {
+                        const chargeEntry: OnlineLedgerEntry = {
+                            id: `charge-${chargeDate.toISOString()}`,
+                            accountId: player!.id,
+                            type: 'withdrawal',
+                            amount: -onlineClub.weeklyMinimumCharge,
+                            date: chargeDate.toISOString(),
+                            notes: 'Weekly Minimum Charge',
+                            runningBalance: 0, // temp
+                            onlineClubName: onlineClub.name
+                        };
+                        processedEntries.push(chargeEntry);
+                        processedEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                    }
+                }
+                
+                const weekEnd = endOfWeek(startOfWeekDate, { weekStartsOn: 1 });
+                let weekRunningBalance = openingForWeek;
+                const augmentedEntries = processedEntries.map(e => {
+                    let effectiveAmount = e.amount;
+                    if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    weekRunningBalance += effectiveAmount;
+                    return {...e, localRunningBalance: weekRunningBalance, effectiveAmount };
+                });
+                
+                statements.push({
+                    week: `${format(startOfWeekDate, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
+                    openingBalance: openingForWeek,
+                    entries: augmentedEntries,
+                    closingBalance: weekRunningBalance
+                });
+                return weekRunningBalance;
+            };
+
             for (const entry of sortedLedger) {
                 const entryDate = parseISO(entry.date);
-    
+
                 if (entryDate < firstWeekStart) continue;
-    
+
                 if (!isSameWeek(entryDate, currentWeekStart, { weekStartsOn: 1 })) {
                     if (weekEntries.length > 0) {
-                        const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-                        let weekRunningBalance = runningBalance;
-                        const augmentedEntries = weekEntries.map(e => {
-                            weekRunningBalance += e.amount;
-                            return {...e, localRunningBalance: weekRunningBalance };
-                        });
-                        
-                        statements.push({
-                            week: `${format(currentWeekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM yyyy')}`,
-                            openingBalance: runningBalance,
-                            entries: augmentedEntries,
-                            closingBalance: weekRunningBalance
-                        });
-                        runningBalance = weekRunningBalance;
+                        runningBalance = processWeek(weekEntries, currentWeekStart, runningBalance);
                     }
-                    
                     currentWeekStart = startOfWeek(entryDate, { weekStartsOn: 1 });
                     weekEntries = [entry];
                 } else {
                     weekEntries.push(entry);
                 }
             }
-            
             if (weekEntries.length > 0) {
-                let weekRunningBalance = runningBalance;
-                const augmentedEntries = weekEntries.map(e => {
-                    weekRunningBalance += e.amount;
-                    return {...e, localRunningBalance: weekRunningBalance };
-                });
-                
-                statements.push({
-                    week: `${format(currentWeekStart, 'dd MMM')} - ${format(endOfWeek(currentWeekStart, { weekStartsOn: 1 }), 'dd MMM yyyy')}`,
-                    openingBalance: runningBalance,
-                    entries: augmentedEntries,
-                    closingBalance: weekRunningBalance
-                });
+                processWeek(weekEntries, currentWeekStart, runningBalance);
             }
         }
         return statements.reverse();
-    }, [ledger, onlineClub]);
+    }, [ledger, onlineClub, player]);
 
     const message = useMemo(() => {
         if (!onlineClub || !weeklyData || weeklyData.length === 0 || !player) return 'No data to send.';
@@ -1619,7 +1703,10 @@ const SendAdminReportDialog: FC<{
         }
     
         [...weeklyData].reverse().forEach(week => {
-            const currencySymbol = onlineClub.currency || '₹';
+            let currencySymbol = onlineClub.currency || '₹';
+            if (onlineClub.name.toLowerCase() === 'phoenix') {
+                currencySymbol = '₹';
+            }
             msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
             msg += `----------------------------------\n`;
@@ -1635,12 +1722,17 @@ const SendAdminReportDialog: FC<{
                      description = entry.amount >= 0 ? 'Profit' : 'Loss';
                 }
 
+                const isPhoenixPL = entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l';
                 const sign = entry.amount >= 0 ? '+' : '-';
-                const amount = `${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`;
+                let amountStr = `\`${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\``;
+                if (isPhoenixPL) {
+                    const effectiveSign = entry.effectiveAmount >= 0 ? '+' : '-';
+                    amountStr = `\`${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\` (Effective: \`${effectiveSign} ${currencySymbol}${Math.abs(entry.effectiveAmount).toFixed(0)}\`)`;
+                }
                 const balance = `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`;
     
                 msg += `*${date}* - ${description}\n`;
-                msg += `  \`${amount}\`  (Balance: \`${balance}\`)\n\n`;
+                msg += `  ${amountStr}  (Balance: \`${balance}\`)\n\n`;
             });
             
             msg += `----------------------------------\n`;
@@ -2104,6 +2196,7 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 

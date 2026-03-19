@@ -277,7 +277,7 @@ const SendOnlineClubReportDialog: FC<{
     weeklyData: {
         week: string;
         openingBalance: number;
-        entries: (OnlineLedgerEntry & { localRunningBalance: number })[];
+        entries: (OnlineLedgerEntry & { localRunningBalance: number; effectiveAmount: number; })[];
         closingBalance: number;
     }[];
     toast: ReturnType<typeof useToast>['toast'];
@@ -296,7 +296,10 @@ const SendOnlineClubReportDialog: FC<{
         }
     
         [...weeklyData].reverse().forEach(week => {
-            const currencySymbol = onlineClub.currency || '₹';
+            let currencySymbol = onlineClub.currency || '₹';
+             if (onlineClub.name.toLowerCase() === 'phoenix') {
+                currencySymbol = '₹';
+            }
             msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
             msg += `----------------------------------\n`;
@@ -312,12 +315,17 @@ const SendOnlineClubReportDialog: FC<{
                      description = entry.amount >= 0 ? 'Profit' : 'Loss';
                 }
 
+                const isPhoenixPL = entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l';
                 const sign = entry.amount >= 0 ? '+' : '-';
-                const amount = `${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`;
+                let amountStr = `\`${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\``;
+                if (isPhoenixPL) {
+                    const effectiveSign = entry.effectiveAmount >= 0 ? '+' : '-';
+                    amountStr = `\`${sign} ${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\` (Effective: \`${effectiveSign} ${currencySymbol}${Math.abs(entry.effectiveAmount).toFixed(0)}\`)`;
+                }
                 const balance = `${currencySymbol}${entry.localRunningBalance.toFixed(0)}`;
     
                 msg += `*${date}* - ${description}\n`;
-                msg += `  \`${amount}\`  (Balance: \`${balance}\`)\n\n`;
+                msg += `  ${amountStr}  (Balance: \`${balance}\`)\n\n`;
             });
             
             msg += `----------------------------------\n`;
@@ -622,11 +630,7 @@ const OnlineClubPage: FC = () => {
 
     const handleExportPdf = async () => {
         if (!account) {
-            toast({
-                variant: "destructive",
-                title: "Export Error",
-                description: "There is no account data to export.",
-            });
+            toast({ variant: "destructive", title: "Export Error", description: "There is no account data to export." });
             return;
         }
 
@@ -671,7 +675,10 @@ const OnlineClubPage: FC = () => {
             // --- BALANCE BADGES ---
             let currentX = pageWidth - 40;
             balanceByClub.slice().reverse().forEach(clubBalance => {
-                const currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                let currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
+                if (clubBalance.name.toLowerCase() === 'phoenix') {
+                    currencySymbol = '₹';
+                }
                 const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                 const textWidth = doc.getTextWidth(text);
                 const badgeWidth = textWidth + 20;
@@ -696,7 +703,10 @@ const OnlineClubPage: FC = () => {
                 }
 
                 const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
-                const currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                let currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
+                 if (clubName.toLowerCase() === 'phoenix') {
+                    currencySymbol = '₹';
+                }
 
                 const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
                 const loss = clubEntries.filter(e => e.type === 'p/l' && e.amount < 0).reduce((sum, e) => sum + e.amount, 0);
@@ -736,11 +746,20 @@ const OnlineClubPage: FC = () => {
                 (doc as any).autoTable({
                     startY: yPos,
                     head: [['Date', 'Type', 'Amount']],
-                    body: clubEntries.map(entry => [
-                        format(parseISO(entry.date), 'dd/MM/yyyy p'),
-                        entry.type.toUpperCase(),
-                        `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`
-                    ]),
+                    body: clubEntries.map(entry => {
+                        const isPhoenixPL = entry.onlineClubName?.toLowerCase() === 'phoenix' && entry.type === 'p/l';
+                        let amountText = `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}`;
+                        if (isPhoenixPL) {
+                             const effectiveAmount = entry.amount * 0.5;
+                             amountText = `${entry.amount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(entry.amount).toFixed(0)}\n(${effectiveAmount >= 0 ? '+' : ''}${currencySymbol}${Math.abs(effectiveAmount).toFixed(0)})`;
+                        }
+                        
+                        return [
+                            format(parseISO(entry.date), 'dd/MM/yyyy p'),
+                            entry.type.toUpperCase(),
+                            amountText
+                        ];
+                    }),
                     theme: 'plain',
                     styles: { font: 'helvetica', fontSize: 10, cellPadding: { top: 6, bottom: 6 } },
                     headStyles: { textColor: FONT_MUTED, fontStyle: 'normal' },
@@ -879,15 +898,29 @@ const OnlineClubPage: FC = () => {
                 weeklyData={useMemo(() => {
                     const entriesForTab = ledger.filter(e => e.onlineClubName === activeTab);
                     if (entriesForTab.length === 0) return [];
-                    // This is a simplified version of the main weeklyData calculation.
-                    // A more robust implementation would share the logic.
                     const sortedLedger = [...entriesForTab].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                    return [{
-                        week: 'Last Week',
+                    
+                    const statements: any[] = []; // Simplified for this context
+                    let runningBalance = 0;
+                    const augmentedEntries = sortedLedger.map(e => {
+                        let effectiveAmount = e.amount;
+                        if (e.onlineClubName?.toLowerCase() === 'phoenix' && e.type === 'p/l') {
+                            effectiveAmount *= 0.5;
+                        }
+                        runningBalance += effectiveAmount;
+                        return { ...e, localRunningBalance: runningBalance, effectiveAmount };
+                    });
+
+                    // This is a simplified representation to pass to the dialog.
+                    // The dialog will perform the full weekly breakdown.
+                    statements.push({
+                        week: 'Full Period',
                         openingBalance: 0,
-                        entries: sortedLedger.map(e => ({...e, localRunningBalance: 0, effectiveAmount: e.amount})),
-                        closingBalance: 0
-                    }];
+                        entries: augmentedEntries,
+                        closingBalance: runningBalance
+                    });
+                    
+                    return statements;
                 }, [ledger, activeTab])}
                 toast={toast}
             />
@@ -1046,5 +1079,6 @@ export default OnlineClubPage;
     
 
     
+
 
 
