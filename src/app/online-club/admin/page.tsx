@@ -276,6 +276,11 @@ const RecordPlayerPLCard: FC<{
     );
 };
 
+type AccountWithBalances = OnlinePlayerAccount & {
+    clubBalances: Record<string, number>;
+    rawClubBalances: Record<string, number>;
+};
+
 
 const AdminOnlineClubPage: FC = () => {
     const { toast } = useToast();
@@ -384,25 +389,35 @@ const AdminOnlineClubPage: FC = () => {
         }
     }, [currentUser]);
 
-    const accountsWithClubBalances = useMemo(() => {
+    const accountsWithClubBalances: AccountWithBalances[] = useMemo(() => {
         if (!accounts || !allLedgerEntries) return [];
         
         return accounts.map(account => {
             const playerEntries = allLedgerEntries.filter(e => e.accountId === account.id);
             const clubBalances: Record<string, number> = {};
+            const rawClubBalances: Record<string, number> = {};
     
             playerEntries.forEach(entry => {
                 if (entry.onlineClubName) {
-                    if (!clubBalances[entry.onlineClubName]) {
+                    if (clubBalances[entry.onlineClubName] === undefined) {
                         clubBalances[entry.onlineClubName] = 0;
+                        rawClubBalances[entry.onlineClubName] = 0;
                     }
-                    clubBalances[entry.onlineClubName] += entry.amount;
+                    
+                    rawClubBalances[entry.onlineClubName] += entry.amount;
+
+                    let effectiveAmount = entry.amount;
+                    if (entry.onlineClubName.toLowerCase() === 'phoenix' && entry.type === 'p/l') {
+                        effectiveAmount *= 0.5;
+                    }
+                    clubBalances[entry.onlineClubName] += effectiveAmount;
                 }
             });
     
             return {
                 ...account,
                 clubBalances,
+                rawClubBalances,
             };
         });
     }, [accounts, allLedgerEntries]);
@@ -553,10 +568,7 @@ const AdminOnlineClubPage: FC = () => {
                 // --- BALANCE BADGES ---
                 let currentX = pageWidth - 40;
                 balanceByClub.slice().reverse().forEach(clubBalance => {
-                    let currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
-                     if (clubBalance.name.toLowerCase() === 'phoenix') {
-                        currencySymbol = 'Rs.';
-                    }
+                    let currencySymbol = clubBalance.name.toLowerCase() === 'phoenix' ? 'Rs.' : (onlineClubCurrencyMap.get(clubBalance.name) || '₹');
                     const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                     const textWidth = doc.getTextWidth(text);
                     const badgeWidth = textWidth + 20;
@@ -690,10 +702,7 @@ const AdminOnlineClubPage: FC = () => {
                     }
         
                     const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
-                    let currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
-                     if (clubName.toLowerCase() === 'phoenix') {
-                        currencySymbol = 'Rs.';
-                    }
+                    let currencySymbol = clubName.toLowerCase() === 'phoenix' ? 'Rs.' : (onlineClubCurrencyMap.get(clubName) || '₹');
 
                     // --- STATS SUMMARY ---
                     const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
@@ -927,9 +936,21 @@ const AdminOnlineClubPage: FC = () => {
                                             <div className="flex flex-wrap justify-end gap-1">
                                                 {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
                                                     const currency = onlineClubCurrencyMap.get(clubName) || '₹';
+                                                    const displayCurrency = clubName.toLowerCase() === 'phoenix' ? 'Rs.' : currency;
+                                                    const rawBalance = account.rawClubBalances[clubName];
+                                                    const isPhoenix = clubName.toLowerCase() === 'phoenix';
+                                                    const showDualDisplay = isPhoenix && Math.round(rawBalance) !== Math.round(balance);
+
                                                     return (
-                                                        <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
-                                                            {clubName}: {currency}{balance.toFixed(0)}
+                                                        <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length], showDualDisplay && "h-auto items-start p-1.5")}>
+                                                            {showDualDisplay ? (
+                                                                <div className="flex flex-col text-right text-xs">
+                                                                    <span>{clubName}: {displayCurrency}{rawBalance.toFixed(0)}</span>
+                                                                    <span className="font-normal opacity-80">(Eff: {displayCurrency}{balance.toFixed(0)})</span>
+                                                                </div>
+                                                            ) : (
+                                                                `${clubName}: ${displayCurrency}${balance.toFixed(0)}`
+                                                            )}
                                                         </Badge>
                                                     )
                                                 })}
@@ -1019,9 +1040,21 @@ const AdminOnlineClubPage: FC = () => {
                                     <div className="flex flex-wrap justify-start gap-1">
                                         {Object.entries(account.clubBalances).map(([clubName, balance], index) => {
                                             const currency = onlineClubCurrencyMap.get(clubName) || '₹';
+                                            const displayCurrency = clubName.toLowerCase() === 'phoenix' ? 'Rs.' : currency;
+                                            const rawBalance = account.rawClubBalances[clubName];
+                                            const isPhoenix = clubName.toLowerCase() === 'phoenix';
+                                            const showDualDisplay = isPhoenix && Math.round(rawBalance) !== Math.round(balance);
+
                                             return (
-                                                <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length])}>
-                                                    {clubName}: {currency}{balance.toFixed(0)}
+                                                <Badge key={clubName} variant="secondary" className={cn("font-semibold", badgeColors[index % badgeColors.length], showDualDisplay && "h-auto items-start p-1.5")}>
+                                                    {showDualDisplay ? (
+                                                        <div className="flex flex-col text-left text-xs">
+                                                            <span>{clubName}: {displayCurrency}{rawBalance.toFixed(0)}</span>
+                                                            <span className="font-normal opacity-80">(Eff: {displayCurrency}{balance.toFixed(0)})</span>
+                                                        </div>
+                                                    ) : (
+                                                        `${clubName}: ${displayCurrency}${balance.toFixed(0)}`
+                                                    )}
                                                 </Badge>
                                             )
                                         })}
@@ -1703,10 +1736,7 @@ const SendAdminReportDialog: FC<{
         }
     
         [...weeklyData].reverse().forEach(week => {
-            let currencySymbol = onlineClub.currency || '₹';
-            if (onlineClub.name.toLowerCase() === 'phoenix') {
-                currencySymbol = 'Rs.';
-            }
+            let currencySymbol = onlineClub.name.toLowerCase() === 'phoenix' ? 'Rs.' : (onlineClub.currency || '₹');
             msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
             msg += `----------------------------------\n`;
@@ -2196,6 +2226,7 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 
