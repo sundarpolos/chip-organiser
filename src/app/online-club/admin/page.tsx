@@ -477,13 +477,13 @@ const AdminOnlineClubPage: FC = () => {
     };
     
     const handleDeletePlayerAccount = async (accountId: string) => {
-        setDeleteModalOpen(false);
         await deleteOnlinePlayerAccount(accountId);
         const playerToDelete = accounts.find(acc => acc.id === accountId);
         if (playerToDelete) {
             toast({ title: "Account Deleted", description: `The account for ${playerToDelete.playerName} has been deleted.` });
         }
         await refreshData();
+        setDeleteModalOpen(false);
     };
 
     const handleOpenReportModal = (account: OnlinePlayerAccount, onlineClub: OnlineClub) => {
@@ -555,7 +555,7 @@ const AdminOnlineClubPage: FC = () => {
                 balanceByClub.slice().reverse().forEach(clubBalance => {
                     let currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
                      if (clubBalance.name.toLowerCase() === 'phoenix') {
-                        currencySymbol = '₹';
+                        currencySymbol = 'Rs.';
                     }
                     const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                     const textWidth = doc.getTextWidth(text);
@@ -692,7 +692,7 @@ const AdminOnlineClubPage: FC = () => {
                     const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
                     let currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
                      if (clubName.toLowerCase() === 'phoenix') {
-                        currencySymbol = '₹';
+                        currencySymbol = 'Rs.';
                     }
 
                     // --- STATS SUMMARY ---
@@ -1705,7 +1705,7 @@ const SendAdminReportDialog: FC<{
         [...weeklyData].reverse().forEach(week => {
             let currencySymbol = onlineClub.currency || '₹';
             if (onlineClub.name.toLowerCase() === 'phoenix') {
-                currencySymbol = '₹';
+                currencySymbol = 'Rs.';
             }
             msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
@@ -2196,6 +2196,7 @@ const AdminWeeklyLedgerAccordion: FC<{
 
 
 export default AdminOnlineClubPage;
+
 
 
 

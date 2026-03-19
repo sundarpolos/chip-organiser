@@ -298,7 +298,7 @@ const SendOnlineClubReportDialog: FC<{
         [...weeklyData].reverse().forEach(week => {
             let currencySymbol = onlineClub.currency || '₹';
              if (onlineClub.name.toLowerCase() === 'phoenix') {
-                currencySymbol = '₹';
+                currencySymbol = 'Rs.';
             }
             msg += `*${week.week}*\n`;
             msg += `Opening Balance: *${currencySymbol}${week.openingBalance.toFixed(0)}*\n`;
@@ -551,7 +551,8 @@ const OnlineClubPage: FC = () => {
     
         eligibleOnlineClubs.forEach(club => {
             if(club.name) {
-                balances[club.name] = { balance: 0, currency: club.currency || '₹' };
+                const currency = club.name.toLowerCase() === 'phoenix' ? 'Rs.' : (club.currency || '₹');
+                balances[club.name] = { balance: 0, currency };
             }
         });
     
@@ -575,6 +576,7 @@ const OnlineClubPage: FC = () => {
     const currencyForLedger = useMemo(() => {
         if (activeTab === 'all') return undefined; // Return undefined for 'All' tab
         const club = onlineClubs.find(oc => oc.name === activeTab);
+        if (club?.name?.toLowerCase() === 'phoenix') return 'Rs.';
         return club?.currency || '₹'; // Default to '₹' if currency is not set for the club
     }, [activeTab, onlineClubs]);
 
@@ -677,7 +679,7 @@ const OnlineClubPage: FC = () => {
             balanceByClub.slice().reverse().forEach(clubBalance => {
                 let currencySymbol = onlineClubCurrencyMap.get(clubBalance.name) || '₹';
                 if (clubBalance.name.toLowerCase() === 'phoenix') {
-                    currencySymbol = '₹';
+                    currencySymbol = 'Rs.';
                 }
                 const text = `${clubBalance.name}: ${currencySymbol}${clubBalance.balance.toFixed(0)}`;
                 const textWidth = doc.getTextWidth(text);
@@ -705,7 +707,7 @@ const OnlineClubPage: FC = () => {
                 const clubEntries = ledger.filter(entry => entry.onlineClubName === clubName);
                 let currencySymbol = onlineClubCurrencyMap.get(clubName) || '₹';
                  if (clubName.toLowerCase() === 'phoenix') {
-                    currencySymbol = '₹';
+                    currencySymbol = 'Rs.';
                 }
 
                 const profit = clubEntries.filter(e => e.type === 'p/l' && e.amount > 0).reduce((sum, e) => sum + e.amount, 0);
@@ -1079,6 +1081,7 @@ export default OnlineClubPage;
     
 
     
+
 
 
 
