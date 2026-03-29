@@ -12,7 +12,7 @@
   "dependencies": {
     "@genkit-ai/ai": "^1.17.1",
     "@genkit-ai/core": "^1.17.1",
-    "@genkit-ai/firebase": "^1.17.1",
+    "@genkit-ai/firebase": "^1.19.1",
     "@genkit-ai/googleai": "^1.17.1",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
